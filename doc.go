@@ -345,10 +345,11 @@ type Config struct {
 	// Tags is passed to the templates
 	Tags map[string]string `json:"tags" yaml:"tags" usage:"keypairs passed to the templates at render,e.g title=Page"`
 
+	ForwardingGrantType string `json:"forwarding-grant-type" yaml:"forwarding-grant-type" usage:"grant-type to use when logging into the openid provider, can be one of password, client_credentials"`
 	// ForwardingUsername is the username to login to the oauth service
-	ForwardingUsername string `json:"forwarding-username" yaml:"forwarding-username" usage:"username to use when logging into the openid provider" env:"FORWARDING_USERNAME"`
+	ForwardingUsername string `json:"forwarding-username" yaml:"forwarding-username" usage:"username to use when logging into the openid provider"`
 	// ForwardingPassword is the password to use for the above
-	ForwardingPassword string `json:"forwarding-password" yaml:"forwarding-password" usage:"password to use when logging into the openid provider" env:"FORWARDING_PASSWORD"`
+	ForwardingPassword string `json:"forwarding-password" yaml:"forwarding-password" usage:"password to use when logging into the openid provider"`
 	// ForwardingDomains is a collection of domains to signs
 	ForwardingDomains []string `json:"forwarding-domains" yaml:"forwarding-domains" usage:"list of domains which should be signed; everything else is relayed unsigned"`
 

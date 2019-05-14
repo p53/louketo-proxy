@@ -262,24 +262,122 @@ func TestAuthTokenHeader(t *testing.T) {
 }
 
 func TestForwardingProxy(t *testing.T) {
-	cfg := newFakeKeycloakConfig()
-	cfg.EnableForwarding = true
-	cfg.ForwardingDomains = []string{}
-	cfg.ForwardingUsername = validUsername
-	cfg.ForwardingPassword = validPassword
 	s := httptest.NewServer(&fakeUpstreamService{})
-	requests := []fakeRequest{
+	cfg := newFakeKeycloakConfig()
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
 		{
-			URL:                     s.URL + "/test",
-			ProxyRequest:            true,
-			ExpectedProxy:           true,
-			ExpectedCode:            http.StatusOK,
-			ExpectedContentContains: "Bearer ey",
+			Name: "TestPasswordGrant",
+			ProxySettings: func(c *Config) {
+				cfg.EnableForwarding = true
+				cfg.ForwardingDomains = []string{}
+				cfg.ForwardingUsername = validUsername
+				cfg.ForwardingPassword = validPassword
+				cfg.ForwardingGrantType = "password"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "Bearer ey",
+				},
+			},
+		},
+		{
+			Name: "TestPasswordGrantWithRefreshing",
+			ProxySettings: func(c *Config) {
+				cfg.EnableForwarding = true
+				cfg.ForwardingDomains = []string{}
+				cfg.ForwardingUsername = validUsername
+				cfg.ForwardingPassword = validPassword
+				cfg.ForwardingGrantType = "password"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					OnResponse:              delay,
+					ExpectedContentContains: "Bearer ey",
+				},
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "Bearer ey",
+				},
+			},
+		},
+		{
+			Name: "TestClientCredentialsGrant",
+			ProxySettings: func(c *Config) {
+				cfg.EnableForwarding = true
+				cfg.ForwardingDomains = []string{}
+				cfg.ClientID = validUsername
+				cfg.ClientSecret = validPassword
+				cfg.ForwardingGrantType = "client_credentials"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "Bearer ey",
+				},
+			},
+		},
+		{
+			Name: "TestClientCredentialsGrantWithRefreshing",
+			ProxySettings: func(c *Config) {
+				cfg.EnableForwarding = true
+				cfg.ForwardingDomains = []string{}
+				cfg.ClientID = validUsername
+				cfg.ClientSecret = validPassword
+				cfg.ForwardingGrantType = "client_credentials"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					OnResponse:              delay,
+					ExpectedContentContains: "Bearer ey",
+				},
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "Bearer ey",
+				},
+			},
 		},
 	}
-	p := newFakeProxy(cfg, &fakeAuthConfig{})
-	<-time.After(time.Duration(100) * time.Millisecond)
-	p.RunTests(t, requests)
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		c := cfg
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.idp.setTokenExpiration(900 * time.Millisecond)
+				<-time.After(time.Duration(100) * time.Millisecond)
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }
 
 func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
@@ -289,6 +387,7 @@ func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
 	cfg.ForwardingUsername = validUsername
 	cfg.ForwardingPassword = validPassword
 	cfg.SkipOpenIDProviderTLSVerify = true
+	cfg.ForwardingGrantType = "password"
 	s := httptest.NewServer(&fakeUpstreamService{})
 	requests := []fakeRequest{
 		{

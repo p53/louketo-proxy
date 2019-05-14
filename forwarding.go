@@ -24,6 +24,7 @@ import (
 
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -126,15 +127,42 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 
 			// step: do we have a access token
 			if state.login {
-				r.log.Info("requesting access token for user",
-					zap.String("username", r.config.ForwardingUsername))
-
 				// step: login into the service
-				resp, err := conf.PasswordCredentialsToken(
-					ctx,
-					r.config.ForwardingUsername,
-					r.config.ForwardingPassword,
-				)
+
+				var resp *oauth2.Token
+				var err error
+
+				switch r.config.ForwardingGrantType {
+				case GrantTypeClientCreds:
+					r.log.Info(
+						"requesting access token for client (client_credentials grant) ",
+						zap.String("client_id", r.config.ClientID),
+					)
+
+					conf := &clientcredentials.Config{
+						ClientID:     r.config.ClientID,
+						ClientSecret: r.config.ClientSecret,
+						Scopes:       r.config.Scopes,
+						TokenURL:     r.provider.Endpoint().TokenURL,
+					}
+					resp, err = conf.Token(ctx)
+				case GrantTypeUserCreds:
+					r.log.Info(
+						"requesting access token for user (password grant) ",
+						zap.String("username", r.config.ForwardingUsername),
+					)
+
+					resp, err = conf.PasswordCredentialsToken(
+						ctx,
+						r.config.ForwardingUsername,
+						r.config.ForwardingPassword,
+					)
+				default:
+					r.log.Info(
+						"Chosen grant type is not supported",
+						zap.String("forwarding_grant_type", r.config.ForwardingGrantType),
+					)
+				}
 
 				if err != nil {
 					r.log.Error("failed to login to authentication service", zap.Error(err))
@@ -179,7 +207,7 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 				)
 
 				// step: if we a have a refresh token, we need to login again
-				if state.refresh != "" {
+				if state.refresh != "" && r.config.ForwardingGrantType != GrantTypeClientCreds {
 					r.log.Info("attempting to refresh the access token",
 						zap.String("subject", state.subject),
 						zap.String("expires", state.expiration.Format(time.RFC3339)))
