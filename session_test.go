@@ -62,7 +62,7 @@ func TestGetIndentity(t *testing.T) {
 	}
 
 	for i, c := range testCases {
-		user, err := p.getIdentity(c.Request)
+		user, rawToken, err := p.getIdentity(c.Request)
 		if err != nil && c.Ok {
 			t.Errorf("test case %d should not have errored", i)
 			continue
@@ -70,7 +70,7 @@ func TestGetIndentity(t *testing.T) {
 		if err != nil && !c.Ok {
 			continue
 		}
-		if user.token.Encode() != encoded {
+		if user.rawToken != encoded {
 			t.Errorf("test case %d the tokens are not the same", i)
 		}
 	}

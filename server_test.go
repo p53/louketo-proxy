@@ -26,9 +26,14 @@ import (
 	"testing"
 	"time"
 
+	"crypto/x509"
+	"encoding/pem"
+
 	"github.com/coreos/go-oidc/jose"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/websocket"
+	gojose "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 const (
@@ -65,6 +70,71 @@ var (
 		"typ":                "Bearer",
 	}
 )
+
+type DefaultTestTokenClaims struct {
+	aud                string
+	azp                string
+	client_session     string
+	email              string
+	family_name        string
+	given_name         string
+	iat                string
+	iss                string
+	jti                string
+	name               string
+	nbf                int
+	preferred_username string
+	session_state      string
+	sub                string
+	typ                string
+}
+
+var defTestTokenClaims = DefaultTestTokenClaims{
+	aud:                "test",
+	azp:                "clientid",
+	client_session:     "f0105893-369a-46bc-9661-ad8c747b1a69",
+	email:              "gambol99@gmail.com",
+	family_name:        "Jayawardene",
+	given_name:         "Rohith",
+	iat:                "1450372669",
+	iss:                "test",
+	jti:                "4ee75b8e-3ee6-4382-92d4-3390b4b4937b",
+	name:               "Rohith Jayawardene",
+	nbf:                0,
+	preferred_username: "rjayawardene",
+	session_state:      "98f4c3d2-1b8c-4932-b8c4-92ec0ea7e195",
+	sub:                "1e11e539-8256-4b3b-bda8-cc0d56cddb48",
+	typ:                "Bearer",
+}
+
+var testPrivRSAKey1 = `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDIHBvDHAr7jh8h
+xaqBCl11fjI9YZtdC5b3HtXTXZW3c2dIOImNUjffT8POP6p5OpzivmC1om7iOyuZ
+3nJjC9LT3zqqs3f2i5d4mImxEuqG6uWdryFfkp0uIv5VkjVO+iQWd6pDAPGP7r1Z
+foXCleyCtmyNH4JSkJneNPOk/4BxO8vcvRnCMT/Gv81IT6H+OQ6OovWOuJr8RX9t
+1wuCjC9ezZxeI9ONffhiO5FMrVh5H9LJTl3dPOVa4aEcOvgd45hBmvxAyXqf8daE
+6Kl2O7vQ4uwgnSTVXYIIjCjbepuersApIMGx/XPSgiU1K3Xtah/TBvep+S3VlwPc
+q/QH25S9AgMBAAECggEAe+y8XKYfPw4SxY1uPB+5JSwT3ON3nbWxtjSIYy9Pqp5z
+Vcx9kuFZ7JevQSk4X38m7VzM8282kC/ono+d8yy9Uayq3k/qeOqV0X9Vti1qxEbw
+ECkG1/MqGApfy4qSLOjINInDDV+mOWa2KJgsKgdCwuhKbVMYGB2ozG2qfYIlfvlY
+vLcBEpGWmswJHNmkcjTtGFIyJgPbsI6ndkkOeQbqQKAaadXtG1xUzH+vIvqaUl/l
+AkNf+p4qhPkHsoAWXf1qu9cYa2T8T+mEo79AwlgVC6awXQWNRTiyClDJC7cu6NBy
+ZHXCLFMbalzWF9qeI2OPaFX2x3IBWrbyDxcJ4TSdQQKBgQD/Fp/uQonMBh1h4Vi4
+HlxZdqSOArTitXValdLFGVJ23MngTGV/St4WH6eRp4ICfPyldsfcv6MZpNwNm1Rn
+lB5Gtpqpby1dsrOSfvVbY7U3vpLnd8+hJ/lT5zCYt5Eor46N6iWRkYWzNe4PixiF
+z1puGUvFCbZdeeACVrPLmW3JKQKBgQDI0y9WTf8ezKPbtap4UEE6yBf49ftohVGz
+p4iD6Ng1uqePwKahwoVXKOc179CjGGtW/UUBORAoKRmxdHajHq6LJgsBxpaARz21
+COPy99BUyp9ER5P8vYn63lC7Cpd/K7uyMjaz1DAzYBZIeVZHIw8O9wuGNJKjRFy9
+SZyD3V0ddQKBgFMdohrWH2QVEfnUnT3Q1rJn0BJdm2bLTWOosbZ7G72TD0xAWEnz
+sQ1wXv88n0YER6X6YADziEdQykq8s/HT91F/KkHO8e83zP8M0xFmGaQCOoelKEgQ
+aFMIX3NDTM7+9OoUwwz9Z50PE3SJFAJ1n7eEEoYvNfabQXxBl+/dHEKRAoGAPEvU
+EaiXacrtg8EWrssB2sFLGU/ZrTciIbuybFCT4gXp22pvXXAHEvVP/kzDqsRhLhwb
+BNP6OuSkNziNikpjA5pngZ/7fgZly54gusmW/m5bxWdsUl0iOXVYbeAvPlqGH2me
+LP4Pfs1hw17S/cbT9Z1NE31jbavP4HFikeD73SUCgYEArQfuudml6ei7XZ1Emjq8
+jZiD+fX6e6BD/ISatVnuyZmGj9wPFsEhY2BpLiAMQHMDIvH9nlKzsFvjkTPB86qG
+jCh3D67Os8eSBk5uRC6iW3Fc4DXvB5EFS0W9/15Sl+V5vXAcrNMpYS82OTSMG2Gt
+b9Ym/nxaqyTu0PxajXkKm5Q=
+-----END PRIVATE KEY-----`
 
 func TestNewKeycloakProxy(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
@@ -422,7 +492,7 @@ func newTestProxyService(config *Config) (*oauthProxy, *fakeAuthServer, string) 
 	config.RedirectionURL = service.URL
 
 	// step: we need to update the client config
-	if proxy.client, proxy.idp, proxy.idpClient, err = proxy.newOpenIDClient(); err != nil {
+	if proxy.provider, proxy.idpClient, err = proxy.newOpenIDProvider(); err != nil {
 		panic("failed to recreate the openid client, error: " + err.Error())
 	}
 
@@ -592,9 +662,31 @@ func (t *fakeToken) merge(claims jose.Claims) {
 }
 
 // getToken returns a JWT token from the clains
-func (t *fakeToken) getToken() jose.JWT {
-	tk, _ := jose.NewJWT(jose.JOSEHeader{"alg": "RS256"}, t.claims)
-	return tk
+func (t *fakeToken) getToken() (string, error) {
+	input := []byte("")
+	block, _ := pem.Decode([]byte(testPrivRSAKey1))
+	if block != nil {
+		input = block.Bytes
+	}
+
+	var priv interface{}
+	priv, err0 := x509.ParsePKCS1PrivateKey(input)
+
+	if err0 != nil {
+		return "", err0
+	}
+
+	alg := gojose.SignatureAlgorithm("RS256")
+	signer, err := gojose.NewSigner(gojose.SigningKey{Algorithm: alg, Key: priv}, nil)
+
+	b := jwt.Signed(signer).Claims(&defTestTokenClaims)
+	jwt, err := b.FullSerialize()
+
+	if err != nil {
+		return "", err
+	}
+
+	return jwt, nil
 }
 
 // setExpiration sets the expiration of the token

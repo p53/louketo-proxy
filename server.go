@@ -40,6 +40,7 @@ import (
 
 	proxyproto "github.com/armon/go-proxyproto"
 	"github.com/coreos/go-oidc/oidc"
+	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/elazarl/goproxy"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -51,6 +52,7 @@ import (
 
 type oauthProxy struct {
 	client         *oidc.Client
+	provider       *oidc3.Provider
 	config         *Config
 	endpoint       *url.URL
 	idp            oidc.ProviderConfig
@@ -104,7 +106,7 @@ func newProxy(config *Config) (*oauthProxy, error) {
 
 	// initialize the openid client
 	if !config.SkipTokenVerification {
-		if svc.client, svc.idp, svc.idpClient, err = svc.newOpenIDClient(); err != nil {
+		if svc.provider, svc.idpClient, err = svc.newOpenIDProvider(); err != nil {
 			return nil, err
 		}
 	} else {
@@ -659,11 +661,10 @@ func (r *oauthProxy) createTemplates() error {
 	return nil
 }
 
-// newOpenIDClient initializes the openID configuration, note: the redirection url is deliberately left blank
+// newOpenIDProvider initializes the openID configuration, note: the redirection url is deliberately left blank
 // in order to retrieve it from the host header on request
-func (r *oauthProxy) newOpenIDClient() (*oidc.Client, oidc.ProviderConfig, *http.Client, error) {
+func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) {
 	var err error
-	var config oidc.ProviderConfig
 
 	// step: fix up the url if required, the underlining lib will add the .well-known/openid-configuration to the discovery url for us.
 	if strings.HasSuffix(r.config.DiscoveryURL, "/.well-known/openid-configuration") {
@@ -693,14 +694,20 @@ func (r *oauthProxy) newOpenIDClient() (*oidc.Client, oidc.ProviderConfig, *http
 		Timeout: time.Second * 10,
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), r.config.OpenIDProviderTimeout)
+	defer cancel()
+	var provider *oidc3.Provider
+
 	// step: attempt to retrieve the provider configuration
 	completeCh := make(chan bool)
 	go func() {
 		for {
-			r.log.Info("attempting to retrieve configuration discovery url",
+			r.log.Info(
+				"attempting to retrieve configuration discovery url",
 				zap.String("url", r.config.DiscoveryURL),
-				zap.String("timeout", r.config.OpenIDProviderTimeout.String()))
-			if config, err = oidc.FetchProviderConfig(hc, r.config.DiscoveryURL); err == nil {
+				zap.String("timeout", r.config.OpenIDProviderTimeout.String()),
+			)
+			if provider, err = oidc3.NewProvider(ctx, r.config.DiscoveryURL); err == nil {
 				break // break and complete
 			}
 			r.log.Warn("failed to get provider configuration from discovery", zap.Error(err))
@@ -710,29 +717,13 @@ func (r *oauthProxy) newOpenIDClient() (*oidc.Client, oidc.ProviderConfig, *http
 	}()
 	// wait for timeout or successful retrieval
 	select {
-	case <-time.After(r.config.OpenIDProviderTimeout):
-		return nil, config, nil, errors.New("failed to retrieve the provider configuration from discovery url")
+	case <-ctx.Done():
+		return nil, nil, errors.New("failed to retrieve the provider configuration from discovery url")
 	case <-completeCh:
 		r.log.Info("successfully retrieved openid configuration from the discovery")
 	}
 
-	client, err := oidc.NewClient(oidc.ClientConfig{
-		Credentials: oidc.ClientCredentials{
-			ID:     r.config.ClientID,
-			Secret: r.config.ClientSecret,
-		},
-		HTTPClient:     hc,
-		RedirectURL:    fmt.Sprintf("%s/oauth/callback", r.config.RedirectionURL),
-		ProviderConfig: config,
-		Scope:          append(r.config.Scopes, oidc.DefaultScope...),
-	})
-	if err != nil {
-		return nil, config, hc, err
-	}
-	// start the provider sync for key rotation
-	client.SyncProviderConfig(r.config.DiscoveryURL)
-
-	return client, config, hc, nil
+	return provider, hc, nil
 }
 
 // Render implements the echo Render interface

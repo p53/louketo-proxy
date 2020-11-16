@@ -31,7 +31,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
-	"gopkg.in/resty.v1"
+	resty "gopkg.in/resty.v1"
 )
 
 const (
@@ -102,7 +102,7 @@ func newFakeProxy(c *Config) *fakeProxy {
 	}
 	c.RedirectionURL = fmt.Sprintf("http://%s", proxy.listener.Addr().String())
 	// step: we need to update the client configs
-	if proxy.client, proxy.idp, proxy.idpClient, err = proxy.newOpenIDClient(); err != nil {
+	if proxy.provider, proxy.idpClient, err = proxy.newOpenIDProvider(); err != nil {
 		panic("failed to recreate the openid client, error: " + err.Error())
 	}
 
@@ -471,7 +471,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 		{ // See KEYCLOAK-10864
-			URI:                     "/administrativeMonitor/hudson.diagnosis.ReverseProxySetupMonitor/testForReverseProxySetup/https%3A%2F%2Flocalhost%3A6001%2Fmanage/",
+			URI: "/administrativeMonitor/hudson.diagnosis.ReverseProxySetupMonitor/testForReverseProxySetup/https%3A%2F%2Flocalhost%3A6001%2Fmanage/",
 			ExpectedContentContains: `"uri":"/administrativeMonitor/hudson.diagnosis.ReverseProxySetupMonitor/testForReverseProxySetup/https%3A%2F%2Flocalhost%3A6001%2Fmanage/"`,
 			HasToken:                true,
 			Roles:                   []string{"user"},
@@ -479,7 +479,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 			ExpectedCode:            http.StatusOK,
 		},
 		{ // See KEYCLOAK-11276
-			URI:                     "/iiif/2/edepot_local:ST%2F00001%2FST00005_00001.jpg/full/1000,/0/default.png",
+			URI: "/iiif/2/edepot_local:ST%2F00001%2FST00005_00001.jpg/full/1000,/0/default.png",
 			ExpectedContentContains: `"uri":"/iiif/2/edepot_local:ST%2F00001%2FST00005_00001.jpg/full/1000,/0/default.png"`,
 			HasToken:                true,
 			Roles:                   []string{"user"},
@@ -487,7 +487,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 			ExpectedCode:            http.StatusOK,
 		},
 		{ // See KEYCLOAK-13315
-			URI:                     "/rabbitmqui/%2F/replicate-to-central",
+			URI: "/rabbitmqui/%2F/replicate-to-central",
 			ExpectedContentContains: `"uri":"/rabbitmqui/%2F/replicate-to-central"`,
 			HasToken:                true,
 			Roles:                   []string{"user"},
@@ -502,7 +502,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 		{ // should work
-			URI:                     "/api/v1/auth?referer=https%3A%2F%2Fwww.example.com%2Fauth",
+			URI: "/api/v1/auth?referer=https%3A%2F%2Fwww.example.com%2Fauth",
 			ExpectedContentContains: `"uri":"/api/v1/auth?referer=https%3A%2F%2Fwww.example.com%2Fauth"`,
 			HasToken:                true,
 			Roles:                   []string{"admin"},
@@ -516,7 +516,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 			ExpectedCode: http.StatusForbidden,
 		},
 		{ // should work
-			URI:                     "/api/v3/auth?referer=https%3A%2F%2Fwww.example.com%2Fauth",
+			URI: "/api/v3/auth?referer=https%3A%2F%2Fwww.example.com%2Fauth",
 			ExpectedContentContains: `"uri":"/api/v3/auth?referer=https%3A%2F%2Fwww.example.com%2Fauth"`,
 			HasToken:                true,
 			Roles:                   []string{"user"},

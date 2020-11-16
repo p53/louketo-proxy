@@ -188,12 +188,17 @@ func TestLogoutHandlerGood(t *testing.T) {
 
 func TestTokenHandler(t *testing.T) {
 	uri := newFakeKeycloakConfig().WithOAuthURI(tokenURL)
-	goodToken := newTestToken("example").getToken()
+	goodToken, err := newTestToken("example").getToken()
+
+	if err != nil {
+		t.Fatalf("Error when creating test token %v", err)
+	}
+
 	requests := []fakeRequest{
 		{
 			URI:          uri,
 			HasToken:     true,
-			RawToken:     (&goodToken).Encode(),
+			RawToken:     goodToken,
 			ExpectedCode: http.StatusOK,
 		},
 		{

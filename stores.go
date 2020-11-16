@@ -20,7 +20,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
 	"go.uber.org/zap"
 )
 
@@ -51,14 +50,14 @@ func (r *oauthProxy) useStore() bool {
 }
 
 // StoreRefreshToken the token to the store
-func (r *oauthProxy) StoreRefreshToken(token jose.JWT, value string, expiration time.Duration) error {
-	return r.store.Set(getHashKey(&token), value, expiration)
+func (r *oauthProxy) StoreRefreshToken(token string, value string, expiration time.Duration) error {
+	return r.store.Set(getHashKey(token), value, expiration)
 }
 
 // Get retrieves a token from the store, the key we are using here is the access token
-func (r *oauthProxy) GetRefreshToken(token jose.JWT) (string, error) {
+func (r *oauthProxy) GetRefreshToken(token string) (string, error) {
 	// step: the key is the access token
-	v, err := r.store.Get(getHashKey(&token))
+	v, err := r.store.Get(getHashKey(token))
 	if err != nil {
 		return v, err
 	}
@@ -70,8 +69,8 @@ func (r *oauthProxy) GetRefreshToken(token jose.JWT) (string, error) {
 }
 
 // DeleteRefreshToken removes a key from the store
-func (r *oauthProxy) DeleteRefreshToken(token jose.JWT) error {
-	if err := r.store.Delete(getHashKey(&token)); err != nil {
+func (r *oauthProxy) DeleteRefreshToken(token string) error {
+	if err := r.store.Delete(getHashKey(token)); err != nil {
 		r.log.Error("unable to delete token", zap.Error(err))
 
 		return err

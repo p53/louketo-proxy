@@ -21,9 +21,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
-	"github.com/coreos/go-oidc/oidc"
 	"go.uber.org/zap"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // proxyMiddleware is responsible for handles reverse proxy request to the upstream endpoint
@@ -93,17 +92,19 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 	// the loop state
 	var state struct {
 		// the access token
-		token jose.JWT
+		token jwt.JSONWebToken
 		// the refresh token if any
 		refresh string
-		// the identity of the user
-		identity *oidc.Identity
 		// the expiry time of the access token
 		expiration time.Time
 		// whether we need to login
 		login bool
 		// whether we should wait for expiration
 		wait bool
+		// RawToken
+		rawToken string
+		// Subject
+		subject string
 	}
 	state.login = true
 
@@ -126,8 +127,9 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 					continue
 				}
 
+				state.rawToken = resp.AccessToken
 				// step: parse the token
-				token, identity, err := parseToken(resp.AccessToken)
+				token, err := jwt.ParseSigned(resp.AccessToken)
 				if err != nil {
 					r.log.Error("failed to parse the access token", zap.Error(err))
 					// step: we should probably hope and reschedule here
@@ -135,39 +137,47 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 					continue
 				}
 
+				stdClaims := &jwt.Claims{}
+
+				err = token.UnsafeClaimsWithoutVerification(stdClaims)
+
+				if err != nil {
+					r.log.Error("unable to parse access token for claims", zap.Error(err))
+					continue
+				}
+
 				// step: update the loop state
-				state.token = token
-				state.identity = identity
-				state.expiration = identity.ExpiresAt
+				state.token = *token
+				state.expiration = stdClaims.Expiry.Time()
+				state.subject = stdClaims.Subject
 				state.wait = true
 				state.login = false
 				state.refresh = resp.RefreshToken
 
 				r.log.Info("successfully retrieved access token for subject",
-					zap.String("subject", state.identity.ID),
-					zap.String("email", state.identity.Email),
+					zap.String("subject", state.subject),
 					zap.String("expires", state.expiration.Format(time.RFC3339)))
 			} else {
 				r.log.Info("access token is about to expiry",
-					zap.String("subject", state.identity.ID),
-					zap.String("email", state.identity.Email))
+					zap.String("subject", state.subject),
+				)
 
 				// step: if we a have a refresh token, we need to login again
 				if state.refresh != "" {
 					r.log.Info("attempting to refresh the access token",
-						zap.String("subject", state.identity.ID),
-						zap.String("email", state.identity.Email),
+						zap.String("subject", state.subject),
 						zap.String("expires", state.expiration.Format(time.RFC3339)))
 
 					// step: attempt to refresh the access
-					token, newRefreshToken, expiration, _, err := getRefreshedToken(conf, state.refresh)
+					token, rawToken, newRefreshToken, expiration, _, err := getRefreshedToken(conf, state.refresh)
+					state.rawToken = rawToken
 					if err != nil {
 						state.login = true
 						switch err {
 						case ErrRefreshTokenExpired:
 							r.log.Warn("the refresh token has expired, need to login again",
-								zap.String("subject", state.identity.ID),
-								zap.String("email", state.identity.Email))
+								zap.String("subject", state.subject),
+							)
 						default:
 							r.log.Error("failed to refresh the access token", zap.Error(err))
 						}
@@ -185,13 +195,12 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 
 					// step: add some debugging
 					r.log.Info("successfully refreshed the access token",
-						zap.String("subject", state.identity.ID),
-						zap.String("email", state.identity.Email),
+						zap.String("subject", state.subject),
 						zap.String("expires", state.expiration.Format(time.RFC3339)))
 				} else {
 					r.log.Info("session does not support refresh token, acquiring new token",
-						zap.String("subject", state.identity.ID),
-						zap.String("email", state.identity.Email))
+						zap.String("subject", state.subject),
+						zap.String("email", state.subject))
 
 					// we don't have a refresh token, we must perform a login again
 					state.wait = false
@@ -217,7 +226,7 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 		req.URL.Host = hostname
 		// is the host being signed?
 		if len(r.config.ForwardingDomains) == 0 || containsSubString(hostname, r.config.ForwardingDomains) {
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.token.Encode()))
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.rawToken))
 			req.Header.Set("X-Forwarded-Agent", prog)
 		}
 	}

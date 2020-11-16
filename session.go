@@ -21,32 +21,37 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/coreos/go-oidc/jose"
 	"go.uber.org/zap"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // getIdentity retrieves the user identity from a request, either from a session cookie or a bearer token
-func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, error) {
+func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, string, error) {
 	var isBearer bool
 	// step: check for a bearer token or cookie with jwt token
 	access, isBearer, err := getTokenInRequest(req, r.config.CookieAccessName)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie && !isBearer {
 		if access, err = decodeText(access, r.config.EncryptionKey); err != nil {
-			return nil, ErrDecryption
+			return nil, "", ErrDecryption
 		}
 	}
-	token, err := jose.ParseJWT(access)
+
+	rawToken := access
+	token, err := jwt.ParseSigned(access)
+
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+
 	user, err := extractIdentity(token)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	user.bearerToken = isBearer
+	user.rawToken = rawToken
 
 	r.log.Debug("found the user identity",
 		zap.String("id", user.id),
@@ -55,7 +60,7 @@ func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, error) {
 		zap.String("roles", strings.Join(user.roles, ",")),
 		zap.String("groups", strings.Join(user.groups, ",")))
 
-	return user, nil
+	return user, rawToken, nil
 }
 
 // getRefreshTokenFromCookie returns the refresh token from the cookie if any
