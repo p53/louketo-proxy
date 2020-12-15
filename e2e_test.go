@@ -57,7 +57,7 @@ func checkListenOrBail(endpoint string) bool {
 	return limit < maxWaitCycles
 }
 
-func runTestLouketo(t *testing.T, config *Config) error {
+func runTestProxy(t *testing.T, config *Config) error {
 	proxy, err := newProxy(config)
 	if err != nil {
 		return err
@@ -140,8 +140,8 @@ func TestCorsWithUpstream(t *testing.T) {
 	// launch fake oauth OIDC server
 	_ = runTestAuth(t)
 
-	// launch louketo-proxy proxy
-	_ = runTestLouketo(t, config)
+	// launch gatekeeper proxy
+	_ = runTestProxy(t, config)
 
 	// ok now exercise the ensemble with a CORS-enabled request
 	client := http.Client{}

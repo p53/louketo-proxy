@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	release  = "v2.3.0"
+	release  = "1.1.0"
 	gitsha   = "no gitsha provided"
 	compiled = "0"
 	version  = ""
@@ -36,9 +36,9 @@ var (
 type contextKey int8
 
 const (
-	prog        = "louketo-proxy"
-	author      = "Louketo"
-	email       = "louketo@googlegroups.com"
+	prog        = "gatekeeper"
+	author      = "go-gatekeeper"
+	email       = ""
 	description = "is a proxy using the keycloak service for auth and authorization"
 
 	authorizationHeader = "Authorization"

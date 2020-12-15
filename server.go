@@ -390,7 +390,7 @@ func (r *oauthProxy) Run() error {
 	r.listener = listener
 
 	go func() {
-		r.log.Info("Louketo proxy service starting", zap.String("interface", r.config.Listen))
+		r.log.Info("Gatekeeper proxy service starting", zap.String("interface", r.config.Listen))
 		if err = server.Serve(listener); err != nil {
 			if err != http.ErrServerClosed {
 				r.log.Fatal("failed to start the http service", zap.Error(err))
@@ -400,7 +400,7 @@ func (r *oauthProxy) Run() error {
 
 	// step: are we running http service as well?
 	if r.config.ListenHTTP != "" {
-		r.log.Info("Louketo proxy http service starting", zap.String("interface", r.config.ListenHTTP))
+		r.log.Info("Gatekeeper proxy http service starting", zap.String("interface", r.config.ListenHTTP))
 		httpListener, err := r.createHTTPListener(listenerConfig{
 			listen:        r.config.ListenHTTP,
 			proxyProtocol: r.config.EnableProxyProtocol,

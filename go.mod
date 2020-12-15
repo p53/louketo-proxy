@@ -1,4 +1,4 @@
-module github.com/louketo/louketo-proxy
+module github.com/go-gatekeeper/gatekeeper
 
 require (
 	github.com/PuerkitoBio/purell v1.1.0
