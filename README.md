@@ -17,7 +17,7 @@ Please remember to provide a good summary, description as well as steps to repro
 
 To run Gatekeeper, please refer to our [building and working with the code base](docs/building.md) guide. Alternatively, you can use the Docker image by running:
 
-    docker run -it --rm docker.io/go-gatekeeper/gatekeeper \
+    docker run -it --rm quay.io/go-gatekeeper/gatekeeper \
       --listen 127.0.0.1:8080 \
       --upstream-url http://127.0.0.1:80 \
       --discovery-url https://keycloak.example.com/auth/realms/<REALM_NAME> \
