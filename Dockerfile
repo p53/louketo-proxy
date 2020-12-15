@@ -19,7 +19,7 @@ RUN cp "$(find . -name 'gatekeeper' -type f -print -quit)" /gatekeeper
 # Actual image
 #
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.2
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.3
 
 LABEL Name=gatekeeper \
       Release=https://github.com/go-gatekeeper/gatekeeper \
