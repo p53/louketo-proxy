@@ -1,4 +1,4 @@
-module github.com/go-gatekeeper/gatekeeper
+module github.com/gogatekeeper/gatekeeper
 
 require (
 	github.com/PuerkitoBio/purell v1.1.0

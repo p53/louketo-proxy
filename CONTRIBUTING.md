@@ -29,7 +29,7 @@ not be able to respond to your PR immediately. The best place to ping us is on t
 
 If you would like to contribute to Gatekeeper, but are not sure exactly what to work on, you can find a number of open
 issues that are awaiting contributions in the
-[GitHub Issues](https://github.com/go-gatekeeper/gatekeeper/issues).
+[GitHub Issues](https://github.com/gogatekeeper/gatekeeper/issues).
 
 ### Create an issue in GitHub Issues
 
@@ -50,9 +50,9 @@ refactoring.
 
 ### Documentation
 
-We require contributions to include relevant documentation. Alongside your PR for code changes, prepare a PR to the [Gatekeeper Documentation](https://github.com/go-gatekeeper/gatekeeper/tree/master/docs).
+We require contributions to include relevant documentation. Alongside your PR for code changes, prepare a PR to the [Gatekeeper Documentation](https://github.com/gogatekeeper/gatekeeper/tree/master/docs).
 
-In the description of your PR include a link to the PR to [Gatekeeper Documentation](https://github.com/go-gatekeeper/gatekeeper/tree/master/docs).
+In the description of your PR include a link to the PR to [Gatekeeper Documentation](https://github.com/gogatekeeper/gatekeeper/tree/master/docs).
 
 ### Submitting your PR
 

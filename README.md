@@ -1,23 +1,23 @@
 # Gatekeeper
 
-This repository is a work in progress and contains the source code for the Gatekeeper. You should be able to see what's being planned at our [milestones page](https://github.com/go-gatekeeper/gatekeeper/milestones).
+This repository is a work in progress and contains the source code for the Gatekeeper. You should be able to see what's being planned at our [milestones page](https://github.com/gogatekeeper/gatekeeper/milestones).
 
 ## Help and Documentation
 
 * [Gatekeeper documentation](docs/user-guide.md)
 * [Gatekeeper chat](https://discord.com/invite/zRqVXXTMCv)
-* [Issue Tracker](https://github.com/go-gatekeeper/gatekeeper/issues) - Issue tracker for bugs and feature requests
+* [Issue Tracker](https://github.com/gogatekeeper/gatekeeper/issues) - Issue tracker for bugs and feature requests
 
 ## Reporting an issue
 
-If you believe you have discovered a defect in Gatekeeper please open an issue in our [Issue Tracker](https://github.com/go-gatekeeper/gatekeeper/issues).
+If you believe you have discovered a defect in Gatekeeper please open an issue in our [Issue Tracker](https://github.com/gogatekeeper/gatekeeper/issues).
 Please remember to provide a good summary, description as well as steps to reproduce the issue.
 
 ## Getting started
 
 To run Gatekeeper, please refer to our [building and working with the code base](docs/building.md) guide. Alternatively, you can use the Docker image by running:
 
-    docker run -it --rm quay.io/go-gatekeeper/gatekeeper \
+    docker run -it --rm quay.io/gogatekeeper/gatekeeper \
       --listen 127.0.0.1:8080 \
       --upstream-url http://127.0.0.1:80 \
       --discovery-url https://keycloak.example.com/auth/realms/<REALM_NAME> \

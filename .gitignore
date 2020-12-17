@@ -43,3 +43,4 @@ _testmain.go
 *.exe
 *.test
 *.prof
+__debug_bin

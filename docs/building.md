@@ -7,7 +7,7 @@ Ensure you have Golang 1.11 (or newer) and Git installed
 
 First clone the Gatekeeper repository:
 
-    git clone https://github.com/go-gatekeeper/gatekeeper.git
+    git clone https://github.com/gogatekeeper/gatekeeper.git
     cd gatekeeper
 
 To build Gatekeeper run:

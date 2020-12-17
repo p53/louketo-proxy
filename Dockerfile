@@ -22,9 +22,9 @@ RUN cp "$(find . -name 'gatekeeper' -type f -print -quit)" /gatekeeper
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.3
 
 LABEL Name=gatekeeper \
-      Release=https://github.com/go-gatekeeper/gatekeeper \
-      Url=https://github.com/go-gatekeeper/gatekeeper \
-      Help=https://github.com/go-gatekeeper/gatekeeper/issues
+      Release=https://github.com/gogatekeeper/gatekeeper \
+      Url=https://github.com/gogatekeeper/gatekeeper \
+      Help=https://github.com/gogatekeeper/gatekeeper/issues
 
 WORKDIR "/opt/gatekeeper"
 
