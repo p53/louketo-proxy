@@ -64,14 +64,11 @@ func extractIdentity(token *jwt.JSONWebToken) (*userContext, error) {
 		preferredName = customClaims.Email
 	}
 
-	var audiences []string
-	audiences = stdClaims.Audience
+	audiences := stdClaims.Audience
 
 	// @step: extract the realm roles
-	var roleList []string
-	for _, r := range customClaims.RealmAccess.Roles {
-		roleList = append(roleList, fmt.Sprintf("%s", r))
-	}
+	roleList := make([]string, 0)
+	roleList = append(roleList, customClaims.RealmAccess.Roles...)
 
 	// @step: extract the client roles from the access token
 	for name, list := range customClaims.ResourceAccess {

@@ -51,7 +51,6 @@ import (
 )
 
 type oauthProxy struct {
-	client         *oidc.Client
 	provider       *oidc3.Provider
 	config         *Config
 	endpoint       *url.URL

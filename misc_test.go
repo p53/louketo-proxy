@@ -116,6 +116,6 @@ func TestGetAccessCookieExpiration_ValidExp(t *testing.T) {
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
 	proxy := newFakeProxy(c).proxy
 	duration := proxy.getAccessCookieExpiration(token)
-	expectedDuration := time.Until(time.Unix(int64(ft.claims.Exp), 0))
+	expectedDuration := time.Until(time.Unix(ft.claims.Exp, 0))
 	assertAlmostEquals(t, expectedDuration, duration)
 }

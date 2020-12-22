@@ -57,12 +57,7 @@ const (
 	tokenURL         = "/token"
 	debugURL         = "/debug/pprof"
 
-	claimAudience       = "aud"
-	claimPreferredName  = "preferred_username"
-	claimRealmAccess    = "realm_access"
-	claimResourceAccess = "resource_access"
-	claimResourceRoles  = "roles"
-	claimGroups         = "groups"
+	claimResourceRoles = "roles"
 
 	accessCookie       = "kc-access"
 	refreshCookie      = "kc-state"
@@ -126,12 +121,8 @@ var (
 	ErrNoSessionStateFound = errors.New("no session state found")
 	// ErrInvalidSession the session is invalid
 	ErrInvalidSession = errors.New("invalid session identifier")
-	// ErrAccessTokenExpired indicates the access token has expired
-	ErrAccessTokenExpired = errors.New("the access token has expired")
 	// ErrRefreshTokenExpired indicates the refresh token as expired
 	ErrRefreshTokenExpired = errors.New("the refresh token has expired")
-	// ErrNoTokenAudience indicates their is not audience in the token
-	ErrNoTokenAudience = errors.New("the token does not audience in claims")
 	// ErrDecryption indicates we can't decrypt the token
 	ErrDecryption = errors.New("failed to decrypt token")
 )

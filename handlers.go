@@ -239,6 +239,12 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 
 		refreshToken, err := jwt.ParseSigned(resp.RefreshToken)
 
+		if err != nil {
+			r.log.Error("failed to parse refresh token", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 		stdRefreshClaims := &jwt.Claims{}
 
 		err = refreshToken.UnsafeClaimsWithoutVerification(stdRefreshClaims)

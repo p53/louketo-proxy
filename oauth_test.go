@@ -17,13 +17,14 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -101,22 +102,6 @@ pwV3LE2/HWIp0xtWA33YyU8jQOPWROCW5zvD6hESGYwg3ll7KdLv49h0XTJddpCj
 drpOwbzZ
 -----END CERTIFICATE-----
 `
-
-type fakeDiscoveryResponse struct {
-	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
-	EndSessionEndpoint               string   `json:"end_session_endpoint"`
-	GrantTypesSupported              []string `json:"grant_types_supported"`
-	IDTokenSigningAlgValuesSupported []string `json:"id_token_signing_alg_values_supported"`
-	Issuer                           string   `json:"issuer"`
-	JwksURI                          string   `json:"jwks_uri"`
-	RegistrationEndpoint             string   `json:"registration_endpoint"`
-	ResponseModesSupported           []string `json:"response_modes_supported"`
-	ResponseTypesSupported           []string `json:"response_types_supported"`
-	SubjectTypesSupported            []string `json:"subject_types_supported"`
-	TokenEndpoint                    string   `json:"token_endpoint"`
-	TokenIntrospectionEndpoint       string   `json:"token_introspection_endpoint"`
-	UserinfoEndpoint                 string   `json:"userinfo_endpoint"`
-}
 
 type fakeOidcDiscoveryResponse struct {
 	Issuer      string   `json:"issuer"`
@@ -217,7 +202,15 @@ func (r *fakeAuthServer) authHandler(w http.ResponseWriter, req *http.Request) {
 	if state == "" {
 		state = "/"
 	}
-	redirectionURL := fmt.Sprintf("%s?state=%s&code=%s", redirect, state, getRandomString(32))
+
+	randString, err := getRandomString(32)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	redirectionURL := fmt.Sprintf("%s?state=%s&code=%s", redirect, state, randString)
 
 	http.Redirect(w, req, redirectionURL, http.StatusSeeOther)
 }
@@ -371,12 +364,18 @@ func TestTokenExpired(t *testing.T) {
 	}
 }
 
-func getRandomString(n int) string {
+func getRandomString(n int) (string, error) {
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
+
+		if err != nil {
+			return "", err
+		}
+
+		b[i] = letterRunes[num.Int64()]
 	}
-	return string(b)
+	return string(b), nil
 }
 
 func renderJSON(code int, w http.ResponseWriter, req *http.Request, data interface{}) {
