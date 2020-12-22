@@ -301,12 +301,19 @@ func (r *oauthProxy) loginHandler(w http.ResponseWriter, req *http.Request) {
 		// @metric observe the time taken for a login request
 		oauthLatencyMetric.WithLabelValues("login").Observe(time.Since(start).Seconds())
 
-		_, identity, err := parseToken(token.AccessToken)
+		webToken, err := jwt.ParseSigned(token.AccessToken)
+
 		if err != nil {
 			return "unable to decode the access token", http.StatusNotImplemented, err
 		}
 
-		r.dropAccessTokenCookie(req, w, token.AccessToken, time.Until(identity.ExpiresAt))
+		identity, err := extractIdentity(webToken)
+
+		if err != nil {
+			return "unable to extract identity from access token", http.StatusNotImplemented, err
+		}
+
+		r.dropAccessTokenCookie(req, w, token.AccessToken, time.Until(identity.expiresAt))
 
 		// @metric a token has been issued
 		oauthTokensMetric.WithLabelValues("login").Inc()

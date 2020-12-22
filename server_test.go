@@ -28,7 +28,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 
-	"github.com/coreos/go-oidc/jose"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/websocket"
 	gojose "gopkg.in/square/go-jose.v2"
@@ -48,26 +47,6 @@ const (
 	testProxyAccepted      = "Proxy-Accepted"
 	validUsername          = "test"
 	validPassword          = "test"
-)
-
-var (
-	defaultTestTokenClaims = jose.Claims{
-		"aud":                "test",
-		"azp":                "clientid",
-		"client_session":     "f0105893-369a-46bc-9661-ad8c747b1a69",
-		"email":              "gambol99@gmail.com",
-		"family_name":        "Jayawardene",
-		"given_name":         "Rohith",
-		"iat":                "1450372669",
-		"iss":                "test",
-		"jti":                "4ee75b8e-3ee6-4382-92d4-3390b4b4937b",
-		"name":               "Rohith Jayawardene",
-		"nbf":                0,
-		"preferred_username": "rjayawardene",
-		"session_state":      "98f4c3d2-1b8c-4932-b8c4-92ec0ea7e195",
-		"sub":                "1e11e539-8256-4b3b-bda8-cc0d56cddb48",
-		"typ":                "Bearer",
-	}
 )
 
 type RoleClaim struct {

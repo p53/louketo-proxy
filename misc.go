@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // filterCookies is responsible for censoring any cookies we don't want sent
@@ -117,8 +118,15 @@ func (r *oauthProxy) getAccessCookieExpiration(refresh string) time.Duration {
 	// however we can decode the refresh token, we will set the duration to the duration of the
 	// refresh token
 	duration := r.config.AccessTokenDuration
-	if _, ident, err := parseToken(refresh); err == nil {
-		delta := time.Until(ident.ExpiresAt)
+
+	webToken, err := jwt.ParseSigned(refresh)
+
+	if err != nil {
+		r.log.Error("unable to parse token")
+	}
+
+	if ident, err := extractIdentity(webToken); err == nil {
+		delta := time.Until(ident.expiresAt)
 		if delta > 0 {
 			duration = delta
 		}

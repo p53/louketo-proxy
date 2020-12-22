@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
 	uuid "github.com/gofrs/uuid"
 	"github.com/oleiade/reflections"
 	"github.com/rs/cors"
@@ -34,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	resty "gopkg.in/resty.v1"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 const (
@@ -1254,15 +1254,18 @@ func testEncryptedToken(t *testing.T, cfg *Config) {
 		if err != nil {
 			return false
 		}
-		jwt, err := jose.ParseJWT(accessToken)
+		token, err := jwt.ParseSigned(accessToken)
+
 		if err != nil {
 			return false
 		}
-		claims, err := jwt.Claims()
+
+		user, err := extractIdentity(token)
+
 		if err != nil {
 			return false
 		}
-		return assert.Contains(t, claims, "aud") && assert.Contains(t, claims, "email")
+		return assert.Contains(t, user.claims, "aud") && assert.Contains(t, user.claims, "email")
 	}
 	p := newFakeProxy(cfg)
 	p.idp.setTokenExpiration(1000 * time.Millisecond)

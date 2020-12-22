@@ -33,18 +33,17 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/coreos/go-oidc/jose"
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/stretchr/testify/assert"
 	jose2 "gopkg.in/square/go-jose.v2"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 type fakeAuthServer struct {
 	location   *url.URL
 	key        jose2.JSONWebKey
-	signer     jose.Signer
 	server     *httptest.Server
 	expiration time.Duration
 }
@@ -132,17 +131,10 @@ var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 // newFakeAuthServer simulates a oauth service
 func newFakeAuthServer() *fakeAuthServer {
-	// step: load the private key
-	block, _ := pem.Decode([]byte(fakePrivateKey))
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		panic("failed to parse the private key, error: " + err.Error())
-	}
-
 	certBlock, _ := pem.Decode([]byte(fakeCert))
 
 	var cert *x509.Certificate
-	cert, err = x509.ParseCertificate(certBlock.Bytes)
+	cert, err := x509.ParseCertificate(certBlock.Bytes)
 
 	if err != nil {
 		panic("failed to parse certificate from block, error: " + err.Error())
@@ -160,7 +152,6 @@ func newFakeAuthServer() *fakeAuthServer {
 			CertificateThumbprintSHA1:   x5tSHA1[:],
 			CertificateThumbprintSHA256: x5tSHA256[:],
 		},
-		signer: jose.NewSignerRSA("test-kid", *privateKey),
 	}
 
 	r := chi.NewRouter()
@@ -194,10 +185,6 @@ func (r *fakeAuthServer) getLocation() string {
 
 func (r *fakeAuthServer) getRevocationURL() string {
 	return fmt.Sprintf("%s://%s/auth/realms/hod-test/protocol/openid-connect/logout", r.location.Scheme, r.location.Host)
-}
-
-func (r *fakeAuthServer) signToken(claims jose.Claims) (*jose.JWT, error) {
-	return jose.NewSignedJWT(claims, r.signer)
 }
 
 func (r *fakeAuthServer) setTokenExpiration(tm time.Duration) *fakeAuthServer {
@@ -250,25 +237,29 @@ func (r *fakeAuthServer) userInfoHandler(w http.ResponseWriter, req *http.Reques
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	decoded, err := jose.ParseJWT(items[1])
+
+	token, err := jwt.ParseSigned(items[1])
+
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	claims, err := decoded.Claims()
+
+	user, err := extractIdentity(token)
+
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	renderJSON(http.StatusOK, w, req, map[string]interface{}{
-		"sub":                claims["sub"],
-		"name":               claims["name"],
-		"given_name":         claims["given_name"],
-		"family_name":        claims["familty_name"],
-		"preferred_username": claims["preferred_username"],
-		"email":              claims["email"],
-		"picture":            claims["picture"],
+		"sub":                user.claims["sub"],
+		"name":               user.claims["name"],
+		"given_name":         user.claims["given_name"],
+		"family_name":        user.claims["familty_name"],
+		"preferred_username": user.claims["preferred_username"],
+		"email":              user.claims["email"],
+		"picture":            user.claims["picture"],
 	})
 }
 

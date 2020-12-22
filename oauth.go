@@ -16,19 +16,12 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strings"
 	"time"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 
-	"github.com/coreos/go-oidc/jose"
-	"github.com/coreos/go-oidc/oidc"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -55,18 +48,6 @@ func (r *oauthProxy) newOAuth2Config(redirectionURL string) *oauth2.Config {
 	}
 
 	return conf
-}
-
-// verifyToken verify that the token in the user context is valid
-func verifyToken(client *oidc.Client, token jose.JWT) error {
-	if err := client.VerifyJWT(token); err != nil {
-		if strings.Contains(err.Error(), "token is expired") {
-			return ErrAccessTokenExpired
-		}
-		return err
-	}
-
-	return nil
 }
 
 // getRefreshedToken attempts to refresh the access token, returning the parsed token, optionally with a renewed
@@ -106,38 +87,6 @@ func exchangeAuthenticationCode(client *oauth2.Config, code string) (*oauth2.Tok
 	return getToken(client, GrantTypeAuthCode, code)
 }
 
-// getUserinfo is responsible for getting the userinfo from the IDPD
-// use as an http.Client
-// The goal is to replace completely go-oidc/http.Client by http.Client. The comment below
-// disable the warnings from linter like:
-// `client` can be `github.com/coreos/go-oidc/http.Client`
-// nolint:interfacer
-func getUserinfo(client *http.Client, endpoint string, token string) (jose.Claims, error) {
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(authorizationHeader, fmt.Sprintf("Bearer %s", token))
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("token not validate by userinfo endpoint")
-	}
-	content, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var claims jose.Claims
-	if err := json.Unmarshal(content, &claims); err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return claims, nil
-}
-
 // getToken retrieves a code from the provider, extracts and verified the token
 func getToken(config *oauth2.Config, grantType, code string) (*oauth2.Token, error) {
 	ctx := context.Background()
@@ -157,22 +106,4 @@ func getToken(config *oauth2.Config, grantType, code string) (*oauth2.Token, err
 	}
 
 	return token, err
-}
-
-// parseToken retrieves the user identity from the token
-func parseToken(t string) (jose.JWT, *oidc.Identity, error) {
-	token, err := jose.ParseJWT(t)
-	if err != nil {
-		return jose.JWT{}, nil, err
-	}
-	claims, err := token.Claims()
-	if err != nil {
-		return jose.JWT{}, nil, err
-	}
-	identity, err := oidc.IdentityFromClaims(claims)
-	if err != nil {
-		return jose.JWT{}, nil, err
-	}
-
-	return token, identity, nil
 }
