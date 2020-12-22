@@ -694,6 +694,8 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 		Timeout: time.Second * 10,
 	}
 
+	// see https://github.com/coreos/go-oidc/issues/214
+	// see https://github.com/coreos/go-oidc/pull/260
 	ctx, cancel := context.WithTimeout(context.Background(), r.config.OpenIDProviderTimeout)
 	defer cancel()
 	var provider *oidc3.Provider
@@ -707,7 +709,8 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 				zap.String("url", r.config.DiscoveryURL),
 				zap.String("timeout", r.config.OpenIDProviderTimeout.String()),
 			)
-			if provider, err = oidc3.NewProvider(ctx, r.config.DiscoveryURL); err == nil {
+			provider, err = oidc3.NewProvider(ctx, r.config.DiscoveryURL)
+			if err == nil {
 				break // break and complete
 			}
 			r.log.Warn("failed to get provider configuration from discovery", zap.Error(err))

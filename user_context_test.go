@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 func TestIsAudience(t *testing.T) {
@@ -80,7 +81,11 @@ func TestGetUserContext(t *testing.T) {
 	token := newTestToken("test")
 	token.addRealmRoles(realmRoles)
 	token.addClientRoles("client", []string{"client"})
-	context, err := extractIdentity(token.getToken())
+	jwtToken, err := token.getToken()
+	assert.NoError(t, err)
+	webToken, err := jwt.ParseSigned(jwtToken)
+	assert.NoError(t, err)
+	context, err := extractIdentity(webToken)
 	assert.NoError(t, err)
 	assert.NotNil(t, context)
 	assert.Equal(t, "1e11e539-8256-4b3b-bda8-cc0d56cddb48", context.id)
@@ -93,18 +98,28 @@ func TestGetUserRealmRoleContext(t *testing.T) {
 	roles := []string{"dsp-dev-vpn", "vpn-user", "dsp-prod-vpn", "openvpn:dev-vpn"}
 	token := newTestToken("test")
 	token.addRealmRoles(roles)
-	context, err := extractIdentity(token.getToken())
+	jwtToken, err := token.getToken()
+	assert.NoError(t, err)
+	webToken, err := jwt.ParseSigned(jwtToken)
+	assert.NoError(t, err)
+	context, err := extractIdentity(webToken)
 	assert.NoError(t, err)
 	assert.NotNil(t, context)
 	assert.Equal(t, "1e11e539-8256-4b3b-bda8-cc0d56cddb48", context.id)
 	assert.Equal(t, "gambol99@gmail.com", context.email)
 	assert.Equal(t, "rjayawardene", context.preferredName)
+	// we have "defaultclient:default" in default test claims
+	roles = append(roles, "defaultclient:default")
 	assert.Equal(t, roles, context.roles)
 }
 
 func TestUserContextString(t *testing.T) {
 	token := newTestToken("test")
-	context, err := extractIdentity(token.getToken())
+	jwtToken, err := token.getToken()
+	assert.NoError(t, err)
+	webToken, err := jwt.ParseSigned(jwtToken)
+	assert.NoError(t, err)
+	context, err := extractIdentity(webToken)
 	assert.NoError(t, err)
 	assert.NotNil(t, context)
 	assert.NotEmpty(t, context.String())

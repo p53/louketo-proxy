@@ -17,7 +17,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -71,40 +70,63 @@ var (
 	}
 )
 
+type RoleClaim struct {
+	Roles []string `json:"roles"`
+}
+
 type DefaultTestTokenClaims struct {
-	aud                string
-	azp                string
-	client_session     string
-	email              string
-	family_name        string
-	given_name         string
-	iat                string
-	iss                string
-	jti                string
-	name               string
-	nbf                int
-	preferred_username string
-	session_state      string
-	sub                string
-	typ                string
+	Aud               string               `json:"aud"`
+	Azp               string               `json:"azp"`
+	ClientSession     string               `json:"client_session"`
+	Email             string               `json:"email"`
+	FamilyName        string               `json:"family_name"`
+	GivenName         string               `json:"given_name"`
+	Username          string               `json:"username"`
+	Iat               int64                `json:"iat"`
+	Iss               string               `json:"iss"`
+	Jti               string               `json:"jti"`
+	Name              string               `json:"name"`
+	Nbf               int                  `json:"nbf"`
+	Exp               int64                `json:"exp"`
+	PreferredUsername string               `json:"preferred_username"`
+	SessionState      string               `json:"session_state"`
+	Sub               string               `json:"sub"`
+	Typ               string               `json:"typ"`
+	Groups            []string             `json:"groups"`
+	RealmAccess       RoleClaim            `json:"realm_access"`
+	ResourceAccess    map[string]RoleClaim `json:"resource_access"`
+	Item              string               `json:"item"`
+	Found             string               `json:"found"`
+	Item1             []string             `json:"item1"`
+	Item2             []string             `json:"item2"`
+	Item3             []string             `json:"item3"`
 }
 
 var defTestTokenClaims = DefaultTestTokenClaims{
-	aud:                "test",
-	azp:                "clientid",
-	client_session:     "f0105893-369a-46bc-9661-ad8c747b1a69",
-	email:              "gambol99@gmail.com",
-	family_name:        "Jayawardene",
-	given_name:         "Rohith",
-	iat:                "1450372669",
-	iss:                "test",
-	jti:                "4ee75b8e-3ee6-4382-92d4-3390b4b4937b",
-	name:               "Rohith Jayawardene",
-	nbf:                0,
-	preferred_username: "rjayawardene",
-	session_state:      "98f4c3d2-1b8c-4932-b8c4-92ec0ea7e195",
-	sub:                "1e11e539-8256-4b3b-bda8-cc0d56cddb48",
-	typ:                "Bearer",
+	Aud:               "test",
+	Azp:               "clientid",
+	ClientSession:     "f0105893-369a-46bc-9661-ad8c747b1a69",
+	Email:             "gambol99@gmail.com",
+	FamilyName:        "Jayawardene",
+	GivenName:         "Rohith",
+	Username:          "Jayawardene",
+	Iat:               1450372669,
+	Iss:               "test",
+	Jti:               "4ee75b8e-3ee6-4382-92d4-3390b4b4937b",
+	Name:              "Rohith Jayawardene",
+	Nbf:               0,
+	Exp:               0,
+	PreferredUsername: "rjayawardene",
+	SessionState:      "98f4c3d2-1b8c-4932-b8c4-92ec0ea7e195",
+	Sub:               "1e11e539-8256-4b3b-bda8-cc0d56cddb48",
+	Typ:               "Bearer",
+	Groups:            []string{"default"},
+	RealmAccess:       RoleClaim{Roles: []string{"default"}},
+	ResourceAccess:    map[string]RoleClaim{"defaultclient": RoleClaim{Roles: []string{"default"}}},
+	Item:              "item",
+	Item1:             []string{"default"},
+	Item2:             []string{"default"},
+	Item3:             []string{"default"},
 }
 
 var testPrivRSAKey1 = `-----BEGIN PRIVATE KEY-----
@@ -155,18 +177,18 @@ func TestReverseProxyHeaders(t *testing.T) {
 	p := newFakeProxy(nil)
 	token := newTestToken(p.idp.getLocation())
 	token.addRealmRoles([]string{fakeAdminRole})
-	signed, _ := p.idp.signToken(token.claims)
+	jwt, _ := token.getToken()
 	uri := "/auth_all/test"
 	requests := []fakeRequest{
 		{
 			URI:           uri,
-			RawToken:      signed.Encode(),
+			RawToken:      jwt,
 			ExpectedProxy: true,
 			ExpectedProxyHeaders: map[string]string{
 				"X-Auth-Email":    "gambol99@gmail.com",
-				"X-Auth-Roles":    "role:admin",
-				"X-Auth-Subject":  token.claims["sub"].(string),
-				"X-Auth-Token":    signed.Encode(),
+				"X-Auth-Roles":    "role:admin,defaultclient:default",
+				"X-Auth-Subject":  token.claims.Sub,
+				"X-Auth-Token":    jwt,
 				"X-Auth-Userid":   "rjayawardene",
 				"X-Auth-Username": "rjayawardene",
 			},
@@ -243,12 +265,12 @@ func TestAuthTokenHeaderDisabled(t *testing.T) {
 	c.EnableTokenHeader = false
 	p := newFakeProxy(c)
 	token := newTestToken(p.idp.getLocation())
-	signed, _ := p.idp.signToken(token.claims)
+	jwt, _ := token.getToken()
 
 	requests := []fakeRequest{
 		{
 			URI:                    "/auth_all/test",
-			RawToken:               signed.Encode(),
+			RawToken:               jwt,
 			ExpectedNoProxyHeaders: []string{"X-Auth-Token"},
 			ExpectedProxy:          true,
 			ExpectedCode:           http.StatusOK,
@@ -399,26 +421,30 @@ func TestCustomResponseHeaders(t *testing.T) {
 }
 
 func TestSkipClientIDDisabled(t *testing.T) {
+	// !!!! Before in keycloak in audience of access_token was client_id of
+	// client for which was access token released, but this is not according spec
+	// as access_token could be also other type not just JWT
 	c := newFakeKeycloakConfig()
 	p := newFakeProxy(c)
 	// create two token, one with a bad client id
 	bad := newTestToken(p.idp.getLocation())
-	bad.merge(jose.Claims{"aud": "bad_client_id"})
-	badSigned, _ := p.idp.signToken(bad.claims)
+	bad.claims.Aud = "bad_client_id"
+	badSigned, _ := bad.getToken()
 	// and the good
 	good := newTestToken(p.idp.getLocation())
-	goodSigned, _ := p.idp.signToken(good.claims)
+	goodSigned, _ := good.getToken()
 	requests := []fakeRequest{
 		{
 			URI:           "/auth_all/test",
-			RawToken:      goodSigned.Encode(),
+			RawToken:      goodSigned,
 			ExpectedProxy: true,
 			ExpectedCode:  http.StatusOK,
 		},
 		{
-			URI:          "/auth_all/test",
-			RawToken:     badSigned.Encode(),
-			ExpectedCode: http.StatusForbidden,
+			URI:           "/auth_all/test",
+			RawToken:      badSigned,
+			ExpectedProxy: true,
+			ExpectedCode:  http.StatusOK,
 		},
 	}
 	p.RunTests(t, requests)
@@ -427,14 +453,14 @@ func TestSkipClientIDDisabled(t *testing.T) {
 func TestAuthTokenHeaderEnabled(t *testing.T) {
 	p := newFakeProxy(nil)
 	token := newTestToken(p.idp.getLocation())
-	signed, _ := p.idp.signToken(token.claims)
+	signed, _ := token.getToken()
 
 	requests := []fakeRequest{
 		{
 			URI:      "/auth_all/test",
-			RawToken: signed.Encode(),
+			RawToken: signed,
 			ExpectedProxyHeaders: map[string]string{
-				"X-Auth-Token": signed.Encode(),
+				"X-Auth-Token": signed,
 			},
 			ExpectedProxy: true,
 			ExpectedCode:  http.StatusOK,
@@ -448,13 +474,13 @@ func TestDisableAuthorizationCookie(t *testing.T) {
 	c.EnableAuthorizationCookies = false
 	p := newFakeProxy(c)
 	token := newTestToken(p.idp.getLocation())
-	signed, _ := p.idp.signToken(token.claims)
+	signed, _ := token.getToken()
 
 	requests := []fakeRequest{
 		{
 			URI: "/auth_all/test",
 			Cookies: []*http.Cookie{
-				{Name: c.CookieAccessName, Value: signed.Encode()},
+				{Name: c.CookieAccessName, Value: signed},
 				{Name: "mycookie", Value: "myvalue"},
 			},
 			HasToken:                true,
@@ -528,7 +554,7 @@ func newFakeKeycloakConfig() *Config {
 		EnableCompression:          false,
 		Listen:                     "127.0.0.1:0",
 		OAuthURI:                   "/oauth",
-		OpenIDProviderTimeout:      time.Second * 5,
+		OpenIDProviderTimeout:      time.Second * 320,
 		Scopes:                     []string{},
 		Verbose:                    false,
 		Resources: []*Resource{
@@ -580,7 +606,7 @@ func makeTestCodeFlowLogin(location string) (*http.Response, error) {
 			return nil, err
 		}
 		if resp.StatusCode != http.StatusSeeOther {
-			return nil, errors.New("no redirection found in resp")
+			return nil, fmt.Errorf("no redirection found in resp, status code %d", resp.StatusCode)
 		}
 		location = resp.Header.Get("Location")
 		if !strings.HasPrefix(location, "http") {
@@ -639,32 +665,22 @@ func (f *fakeUpstreamService) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 type fakeToken struct {
-	claims jose.Claims
+	claims DefaultTestTokenClaims
 }
 
 func newTestToken(issuer string) *fakeToken {
-	claims := make(jose.Claims)
-	for k, v := range defaultTestTokenClaims {
-		claims[k] = v
-	}
-	claims.Add("exp", float64(time.Now().Add(1*time.Hour).Unix()))
-	claims.Add("iat", float64(time.Now().Unix()))
-	claims.Add("iss", issuer)
+	claims := defTestTokenClaims
+	claims.Exp = time.Now().Add(1 * time.Hour).Unix()
+	claims.Iat = time.Now().Unix()
+	claims.Iss = issuer
 
 	return &fakeToken{claims: claims}
-}
-
-// merge is responsible for merging claims into the token
-func (t *fakeToken) merge(claims jose.Claims) {
-	for k, v := range claims {
-		t.claims.Add(k, v)
-	}
 }
 
 // getToken returns a JWT token from the clains
 func (t *fakeToken) getToken() (string, error) {
 	input := []byte("")
-	block, _ := pem.Decode([]byte(testPrivRSAKey1))
+	block, _ := pem.Decode([]byte(fakePrivateKey))
 	if block != nil {
 		input = block.Bytes
 	}
@@ -677,10 +693,11 @@ func (t *fakeToken) getToken() (string, error) {
 	}
 
 	alg := gojose.SignatureAlgorithm("RS256")
-	signer, err := gojose.NewSigner(gojose.SigningKey{Algorithm: alg, Key: priv}, nil)
+	privKey := &gojose.JSONWebKey{Key: priv, Algorithm: string(alg), KeyID: "test-kid"}
+	signer, err := gojose.NewSigner(gojose.SigningKey{Algorithm: alg, Key: privKey}, nil)
 
-	b := jwt.Signed(signer).Claims(&defTestTokenClaims)
-	jwt, err := b.FullSerialize()
+	b := jwt.Signed(signer).Claims(&t.claims)
+	jwt, err := b.CompactSerialize()
 
 	if err != nil {
 		return "", err
@@ -689,28 +706,84 @@ func (t *fakeToken) getToken() (string, error) {
 	return jwt, nil
 }
 
+// getJSONWebToken returns a getJSONWebToken
+func (t *fakeToken) getJSONWebToken() (*jwt.JSONWebToken, error) {
+	input := []byte("")
+	block, _ := pem.Decode([]byte(fakePrivateKey))
+	if block != nil {
+		input = block.Bytes
+	}
+
+	var priv interface{}
+	priv, err0 := x509.ParsePKCS1PrivateKey(input)
+
+	if err0 != nil {
+		return nil, err0
+	}
+
+	alg := gojose.SignatureAlgorithm("RS256")
+	privKey := &gojose.JSONWebKey{Key: priv, Algorithm: string(alg), KeyID: "test-kid"}
+	signer, err := gojose.NewSigner(gojose.SigningKey{Algorithm: alg, Key: privKey}, nil)
+
+	b := jwt.Signed(signer).Claims(&t.claims)
+	jwt, err := b.Token()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return jwt, nil
+}
+
+// getUnsignedToken returns a unsigned JWT token from the clains
+func (t *fakeToken) getUnsignedToken() (string, error) {
+	input := []byte("")
+	block, _ := pem.Decode([]byte(fakePrivateKey))
+	if block != nil {
+		input = block.Bytes
+	}
+
+	var priv interface{}
+	priv, err0 := x509.ParsePKCS1PrivateKey(input)
+
+	if err0 != nil {
+		return "", err0
+	}
+
+	alg := gojose.SignatureAlgorithm("RS256")
+	privKey := &gojose.JSONWebKey{Key: priv, Algorithm: string(alg), KeyID: ""}
+	signer, err := gojose.NewSigner(gojose.SigningKey{Algorithm: alg, Key: privKey}, nil)
+
+	b := jwt.Signed(signer).Claims(&t.claims)
+	jwt, err := b.CompactSerialize()
+
+	if err != nil {
+		return "", err
+	}
+
+	items := strings.Split(jwt, ".")
+	jwt = strings.Join(items[0:1], ".")
+
+	return jwt, nil
+}
+
 // setExpiration sets the expiration of the token
 func (t *fakeToken) setExpiration(tm time.Time) {
-	t.claims.Add("exp", float64(tm.Unix()))
+	t.claims.Exp = tm.Unix()
 }
 
 // addGroups adds groups to then token
 func (t *fakeToken) addGroups(groups []string) {
-	t.claims.Add("groups", groups)
+	t.claims.Groups = groups
 }
 
 // addRealmRoles adds realms roles to token
 func (t *fakeToken) addRealmRoles(roles []string) {
-	t.claims.Add("realm_access", map[string]interface{}{
-		"roles": roles,
-	})
+	t.claims.RealmAccess.Roles = roles
 }
 
 // addClientRoles adds client roles to the token
 func (t *fakeToken) addClientRoles(client string, roles []string) {
-	t.claims.Add("resource_access", map[string]interface{}{
-		client: map[string]interface{}{
-			"roles": roles,
-		},
-	})
+	t.claims.ResourceAccess = make(map[string]RoleClaim, 0)
+	t.claims.ResourceAccess[client] = RoleClaim{Roles: roles}
 }

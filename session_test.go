@@ -25,8 +25,8 @@ import (
 
 func TestGetIndentity(t *testing.T) {
 	p, idp, _ := newTestProxyService(nil)
-	token := newTestToken(idp.getLocation()).getToken()
-	encoded := token.Encode()
+	token, err := newTestToken(idp.getLocation()).getToken()
+	assert.NoError(t, err)
 
 	testCases := []struct {
 		Request *http.Request
@@ -35,7 +35,7 @@ func TestGetIndentity(t *testing.T) {
 		{
 			Request: &http.Request{
 				Header: http.Header{
-					"Authorization": []string{fmt.Sprintf("Bearer %s", encoded)},
+					"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
 				},
 			},
 			Ok: true,
@@ -50,7 +50,7 @@ func TestGetIndentity(t *testing.T) {
 		{
 			Request: &http.Request{
 				Header: http.Header{
-					"Authorization": []string{fmt.Sprintf("Test %s", encoded)},
+					"Authorization": []string{fmt.Sprintf("Test %s", token)},
 				},
 			},
 		},
@@ -62,7 +62,7 @@ func TestGetIndentity(t *testing.T) {
 	}
 
 	for i, c := range testCases {
-		user, rawToken, err := p.getIdentity(c.Request)
+		user, _, err := p.getIdentity(c.Request)
 		if err != nil && c.Ok {
 			t.Errorf("test case %d should not have errored", i)
 			continue
@@ -70,7 +70,7 @@ func TestGetIndentity(t *testing.T) {
 		if err != nil && !c.Ok {
 			continue
 		}
-		if user.rawToken != encoded {
+		if user.rawToken != token {
 			t.Errorf("test case %d the tokens are not the same", i)
 		}
 	}
@@ -78,7 +78,8 @@ func TestGetIndentity(t *testing.T) {
 
 func TestGetTokenInRequest(t *testing.T) {
 	defaultName := newDefaultConfig().CookieAccessName
-	token := newTestToken("test").getToken()
+	token, err := newTestToken("test").getToken()
+	assert.NoError(t, err)
 	cs := []struct {
 		Token      string
 		AuthScheme string
@@ -90,12 +91,12 @@ func TestGetTokenInRequest(t *testing.T) {
 			Error:      ErrSessionNotFound,
 		},
 		{
-			Token:      token.Encode(),
+			Token:      token,
 			AuthScheme: "",
 			Error:      nil,
 		},
 		{
-			Token:      token.Encode(),
+			Token:      token,
 			AuthScheme: "Bearer",
 			Error:      nil,
 		},
@@ -105,7 +106,7 @@ func TestGetTokenInRequest(t *testing.T) {
 			Error:      ErrSessionNotFound,
 		},
 		{
-			Token:      token.Encode(),
+			Token:      token,
 			AuthScheme: "Test",
 			Error:      ErrSessionNotFound,
 		},
@@ -129,7 +130,7 @@ func TestGetTokenInRequest(t *testing.T) {
 		case nil:
 			assert.NoError(t, err, "case %d should not have thrown an error", i)
 			assert.Equal(t, x.AuthScheme == "Bearer", bearer)
-			assert.Equal(t, token.Encode(), access)
+			assert.Equal(t, token, access)
 		default:
 			assert.Equal(t, x.Error, err, "case %d, expected error: %s", i, x.Error)
 		}

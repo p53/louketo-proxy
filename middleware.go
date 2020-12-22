@@ -349,8 +349,18 @@ func (r *oauthProxy) checkClaim(user *userContext, claimName string, match *rege
 	}
 
 	switch user.claims[claimName].(type) {
-	case []string:
-		for _, value := range user.claims[claimName].([]string) {
+	case []interface{}:
+		for _, v := range user.claims[claimName].([]interface{}) {
+			value, ok := v.(string)
+			if !ok {
+				r.log.Warn("Problem while asserting claim", append(errFields,
+					zap.String("issued", fmt.Sprintf("%v", user.claims[claimName])),
+					zap.String("required", match.String()),
+				)...)
+
+				return false
+			}
+
 			if match.MatchString(value) {
 				return true
 			}

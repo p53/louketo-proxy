@@ -34,15 +34,25 @@ func extractIdentity(token *jwt.JSONWebToken) (*userContext, error) {
 	// Extract custom claims
 	type custClaims struct {
 		Email          string                 `json:"email"`
-		PrefName       string                 `json:"preferred_name"`
+		PrefName       string                 `json:"preferred_username"`
 		RealmAccess    RealmRoles             `json:"realm_access"`
 		Groups         []string               `json:"groups"`
 		ResourceAccess map[string]interface{} `json:"resource_access"`
+		FamilyName     string                 `json:"family_name"`
+		GivenName      string                 `json:"given_name"`
+		Username       string                 `json:"username"`
 	}
 
 	customClaims := custClaims{}
 
 	err := token.UnsafeClaimsWithoutVerification(stdClaims, &customClaims)
+
+	if err != nil {
+		return nil, err
+	}
+
+	jsonMap := make(map[string]interface{})
+	err = token.UnsafeClaimsWithoutVerification(&jsonMap)
 
 	if err != nil {
 		return nil, err
@@ -73,15 +83,6 @@ func extractIdentity(token *jwt.JSONWebToken) (*userContext, error) {
 		}
 	}
 
-	claims := map[string]interface{}{
-		"audiences":      audiences,
-		"email":          customClaims.Email,
-		"groups":         customClaims.Groups,
-		"sub":            stdClaims.Subject,
-		"preferred_name": preferredName,
-		"roles":          roleList,
-	}
-
 	return &userContext{
 		audiences:     audiences,
 		email:         customClaims.Email,
@@ -92,7 +93,7 @@ func extractIdentity(token *jwt.JSONWebToken) (*userContext, error) {
 		preferredName: preferredName,
 		roles:         roleList,
 		token:         token,
-		claims:        claims,
+		claims:        jsonMap,
 	}, nil
 }
 

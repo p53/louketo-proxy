@@ -17,6 +17,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -32,14 +34,16 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/coreos/go-oidc/jose"
+	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/stretchr/testify/assert"
+	jose2 "gopkg.in/square/go-jose.v2"
 )
 
 type fakeAuthServer struct {
 	location   *url.URL
-	key        jose.JWK
+	key        jose2.JSONWebKey
 	signer     jose.Signer
 	server     *httptest.Server
 	expiration time.Duration
@@ -75,6 +79,30 @@ Ka0WPQGKjQJhZRtqDAT3sfnrEEUa34+MkXQeKFCu6Yi0dRFic4iqOYU=
 -----END RSA PRIVATE KEY-----
 `
 
+const fakeCert = `
+-----BEGIN CERTIFICATE-----
+MIIDYjCCAkqgAwIBAgIJAIiInNaxV42WMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
+BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
+aWRnaXRzIFB0eSBMdGQwIBcNMjAxMjE4MDEzNjUwWhgPMjEyMDExMjQwMTM2NTBa
+MEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJ
+bnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw
+ggEKAoIBAQDEwsjCL/9gboY91hQ9pXQ8JcEReODZeF/z/40wH/We37CKnhmusBB/
+Xg9MJOU3ixtzZAaBEa1iKQkEdDJ+D+UK2Gudqx92AvxzpISuvsNvnbhKqIOb7/Io
+YjrzQuYFQg+QDSKQImBvhxhUKInce5icVlROxQB4rXhKheBwl1a6WPSHpo+JQiDl
+Wt6G6oAb7VGUr4ZRGCv0Ns6Zcn9JhUpf9ACt0HONncGJDWfFZbAEIsd/C/jxtbE8
+khsMOdQ2XouiWlImTGDiqWn7Qj/GAS94rWfUIwQDSYe5cUd56Qo7vYYMoCSHz0L2
+pUXYaakN+jwbQPeUWbabeMU3IxBNaRKTAgMBAAGjUzBRMB0GA1UdDgQWBBQAgj89
+hTjJ2QkGUTipvlmM59Q1KDAfBgNVHSMEGDAWgBQAgj89hTjJ2QkGUTipvlmM59Q1
+KDAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQAhkC1rZ8MO3v3e
+AUZXL2qUeT6CIEjCBlIBDPdoSVny9sixtzYLcNktL9Q3q/rg7yM7wpNuPJjfvZ77
+mI5f6FZfDYaU8d92Y+n1EJVD3w0hMz450tyGN+dwcP+6espLIVjHiPBQPbXLw5Ii
+z9rK0uqIWSfbjbVPkmZQiEkicaHhwmQzhkB+nVOCz/1vbMIja/ssPAFTRI9EntsQ
+oPk9iblhvtUKX4/NWQPXbE2E7GGtIXaiuK7+gNGrbq0ifhIVhf8rUJX1AMGaqaJD
+pwV3LE2/HWIp0xtWA33YyU8jQOPWROCW5zvD6hESGYwg3ll7KdLv49h0XTJddpCj
+drpOwbzZ
+-----END CERTIFICATE-----
+`
+
 type fakeDiscoveryResponse struct {
 	AuthorizationEndpoint            string   `json:"authorization_endpoint"`
 	EndSessionEndpoint               string   `json:"end_session_endpoint"`
@@ -91,6 +119,15 @@ type fakeDiscoveryResponse struct {
 	UserinfoEndpoint                 string   `json:"userinfo_endpoint"`
 }
 
+type fakeOidcDiscoveryResponse struct {
+	Issuer      string   `json:"issuer"`
+	AuthURL     string   `json:"authorization_endpoint"`
+	TokenURL    string   `json:"token_endpoint"`
+	JWKSURL     string   `json:"jwks_uri"`
+	UserInfoURL string   `json:"userinfo_endpoint"`
+	Algorithms  []string `json:"id_token_signing_alg_values_supported"`
+}
+
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 // newFakeAuthServer simulates a oauth service
@@ -101,15 +138,27 @@ func newFakeAuthServer() *fakeAuthServer {
 	if err != nil {
 		panic("failed to parse the private key, error: " + err.Error())
 	}
+
+	certBlock, _ := pem.Decode([]byte(fakeCert))
+
+	var cert *x509.Certificate
+	cert, err = x509.ParseCertificate(certBlock.Bytes)
+
+	if err != nil {
+		panic("failed to parse certificate from block, error: " + err.Error())
+	}
+
+	x5tSHA1 := sha1.Sum(cert.Raw)
+	x5tSHA256 := sha256.Sum256(cert.Raw)
+
 	service := &fakeAuthServer{
-		key: jose.JWK{
-			ID:       "test-kid",
-			Type:     "RSA",
-			Alg:      "RS256",
-			Use:      "sig",
-			Exponent: privateKey.PublicKey.E,
-			Modulus:  privateKey.PublicKey.N,
-			Secret:   block.Bytes,
+		key: jose2.JSONWebKey{
+			Key:                         cert.PublicKey,
+			KeyID:                       "test-kid",
+			Algorithm:                   "RS256",
+			Certificates:                []*x509.Certificate{cert},
+			CertificateThumbprintSHA1:   x5tSHA1[:],
+			CertificateThumbprintSHA256: x5tSHA256[:],
 		},
 		signer: jose.NewSignerRSA("test-kid", *privateKey),
 	}
@@ -157,25 +206,18 @@ func (r *fakeAuthServer) setTokenExpiration(tm time.Duration) *fakeAuthServer {
 }
 
 func (r *fakeAuthServer) discoveryHandler(w http.ResponseWriter, req *http.Request) {
-	renderJSON(http.StatusOK, w, req, fakeDiscoveryResponse{
-		AuthorizationEndpoint:            fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/auth", r.location.Host),
-		EndSessionEndpoint:               fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/logout", r.location.Host),
-		Issuer:                           fmt.Sprintf("http://%s/auth/realms/hod-test", r.location.Host),
-		JwksURI:                          fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/certs", r.location.Host),
-		RegistrationEndpoint:             fmt.Sprintf("http://%s/auth/realms/hod-test/clients-registrations/openid-connect", r.location.Host),
-		TokenEndpoint:                    fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/token", r.location.Host),
-		TokenIntrospectionEndpoint:       fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/token/introspect", r.location.Host),
-		UserinfoEndpoint:                 fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/userinfo", r.location.Host),
-		GrantTypesSupported:              []string{"authorization_code", "implicit", "refresh_token", "password", "client_credentials"},
-		IDTokenSigningAlgValuesSupported: []string{"RS256"},
-		ResponseModesSupported:           []string{"query", "fragment", "form_post"},
-		ResponseTypesSupported:           []string{"code", "none", "id_token", "token", "id_token token", "code id_token", "code token", "code id_token token"},
-		SubjectTypesSupported:            []string{"public"},
+	renderJSON(http.StatusOK, w, req, fakeOidcDiscoveryResponse{
+		Issuer:      fmt.Sprintf("http://%s/auth/realms/hod-test", r.location.Host),
+		AuthURL:     fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/auth", r.location.Host),
+		TokenURL:    fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/token", r.location.Host),
+		JWKSURL:     fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/certs", r.location.Host),
+		UserInfoURL: fmt.Sprintf("http://%s/auth/realms/hod-test/protocol/openid-connect/userinfo", r.location.Host),
+		Algorithms:  []string{"RS256"},
 	})
 }
 
 func (r *fakeAuthServer) keysHandler(w http.ResponseWriter, req *http.Request) {
-	renderJSON(http.StatusOK, w, req, jose.JWKSet{Keys: []jose.JWK{r.key}})
+	renderJSON(http.StatusOK, w, req, jose2.JSONWebKeySet{Keys: []jose2.JSONWebKey{r.key}})
 }
 
 func (r *fakeAuthServer) authHandler(w http.ResponseWriter, req *http.Request) {
@@ -232,11 +274,11 @@ func (r *fakeAuthServer) userInfoHandler(w http.ResponseWriter, req *http.Reques
 
 func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) {
 	expires := time.Now().Add(r.expiration)
-	unsigned := newTestToken(r.getLocation())
-	unsigned.setExpiration(expires)
+	token := newTestToken(r.getLocation())
+	token.setExpiration(expires)
 
 	// sign the token with the private key
-	token, err := jose.NewSignedJWT(unsigned.claims, r.signer)
+	jwt, err := token.getToken()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -252,9 +294,9 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 		}
 		if username == validUsername && password == validPassword {
 			renderJSON(http.StatusOK, w, req, tokenResponse{
-				IDToken:      token.Encode(),
-				AccessToken:  token.Encode(),
-				RefreshToken: token.Encode(),
+				IDToken:      jwt,
+				AccessToken:  jwt,
+				RefreshToken: jwt,
 				ExpiresIn:    float64(expires.UTC().Second()),
 			})
 			return
@@ -267,9 +309,9 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 		fallthrough
 	case GrantTypeAuthCode:
 		renderJSON(http.StatusOK, w, req, tokenResponse{
-			IDToken:      token.Encode(),
-			AccessToken:  token.Encode(),
-			RefreshToken: token.Encode(),
+			IDToken:      jwt,
+			AccessToken:  jwt,
+			RefreshToken: jwt,
 			ExpiresIn:    float64(expires.Second()),
 		})
 	default:
@@ -279,14 +321,23 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 
 func TestGetUserinfo(t *testing.T) {
 	px, idp, _ := newTestProxyService(nil)
-	token := newTestToken(idp.getLocation()).getToken()
-	tokenSource := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token.Encode()},
-	)
-	client := oauth2.NewClient(context.Background(), tokenSource)
-	claims, err := getUserinfo(client, px.idp.UserInfoEndpoint.String(), token.Encode())
+	token, err := newTestToken(idp.getLocation()).getToken()
 	assert.NoError(t, err)
-	assert.NotEmpty(t, claims)
+	tokenSource := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), px.config.OpenIDProviderTimeout)
+	defer cancel()
+
+	userInfo, err := px.provider.UserInfo(ctx, tokenSource)
+	assert.NoError(t, err)
+
+	claims := DefaultTestTokenClaims{}
+	err = userInfo.Claims(&claims)
+
+	assert.NoError(t, err)
+	assert.NotEqual(t, (DefaultTestTokenClaims{}), claims)
 }
 
 func TestTokenExpired(t *testing.T) {
@@ -306,12 +357,20 @@ func TestTokenExpired(t *testing.T) {
 	}
 	for i, x := range cs {
 		token.setExpiration(time.Now().Add(x.Expire))
-		signed, err := idp.signToken(token.claims)
+		jwt, err := token.getToken()
 		if err != nil {
 			t.Errorf("case %d unable to sign the token, error: %s", i, err)
 			continue
 		}
-		err = verifyToken(px.client, *signed)
+
+		verifier := px.provider.Verifier(
+			&oidc3.Config{
+				ClientID:          px.config.ClientID,
+				SkipClientIDCheck: true,
+			},
+		)
+		_, err = verifier.Verify(context.Background(), jwt)
+
 		if x.OK && err != nil {
 			t.Errorf("case %d, expected: %t got error: %s", i, x.OK, err)
 		}

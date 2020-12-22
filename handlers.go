@@ -74,7 +74,6 @@ func (r *oauthProxy) oauthAuthorizationHandler(w http.ResponseWriter, req *http.
 		return
 	}
 	conf := r.newOAuth2Config(r.getRedirectionURL(w, req))
-
 	// step: set the access type of the session
 	accessType := oauth2.AccessTypeOnline
 	if containedIn("offline", r.config.Scopes) {
@@ -114,7 +113,6 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 	}
 
 	conf := r.newOAuth2Config(r.getRedirectionURL(w, req))
-
 	resp, err := exchangeAuthenticationCode(conf, code)
 	if err != nil {
 		r.log.Error("unable to exchange code for access token", zap.Error(err))
@@ -134,8 +132,15 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 	}
 
 	rawToken = rawIDToken
+
 	verifier := r.provider.Verifier(&oidc3.Config{ClientID: r.config.ClientID})
-	idToken, err := verifier.Verify(context.Background(), rawIDToken)
+
+	var idToken *oidc3.IDToken
+
+	ctx, cancel := context.WithTimeout(context.Background(), r.config.OpenIDProviderTimeout)
+	defer cancel()
+
+	idToken, err = verifier.Verify(ctx, rawIDToken)
 
 	if err != nil {
 		r.log.Error("unable to verify the id token", zap.Error(err))
@@ -165,12 +170,17 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	err = idToken.VerifyAccessToken(resp.AccessToken)
+	// check https://openid.net/specs/openid-connect-core-1_0.html#ImplicitIDToken - at_hash
+	// keycloak seems doesnt support yet at_hash
+	// https://stackoverflow.com/questions/60818373/configure-keycloak-to-include-an-at-hash-claim-in-the-id-token
+	if idToken.AccessTokenHash != "" {
+		err = idToken.VerifyAccessToken(resp.AccessToken)
 
-	if err != nil {
-		r.log.Error("unable to verify access token", zap.Error(err))
-		r.accessForbidden(w, req)
-		return
+		if err != nil {
+			r.log.Error("unable to verify access token", zap.Error(err))
+			r.accessForbidden(w, req)
+			return
+		}
 	}
 
 	accToken, err := jwt.ParseSigned(resp.AccessToken)
