@@ -403,10 +403,7 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// set the default revocation url
-	revokeDefault := ""
-	if r.idp.EndSessionEndpoint != nil {
-		revokeDefault = r.idp.EndSessionEndpoint.String()
-	}
+	revokeDefault := fmt.Sprintf("%s/protocol/openid-connect/logout", strings.TrimSuffix(r.config.DiscoveryURL, "/.well-known/openid-configuration"))
 	revocationURL := defaultTo(r.config.RevocationEndpoint, revokeDefault)
 
 	// @check if we should redirect to the provider

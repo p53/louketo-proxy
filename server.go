@@ -39,7 +39,6 @@ import (
 	httplog "log"
 
 	proxyproto "github.com/armon/go-proxyproto"
-	"github.com/coreos/go-oidc/oidc"
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/elazarl/goproxy"
 	"github.com/go-chi/chi"
@@ -54,7 +53,6 @@ type oauthProxy struct {
 	provider       *oidc3.Provider
 	config         *Config
 	endpoint       *url.URL
-	idp            oidc.ProviderConfig
 	idpClient      *http.Client
 	listener       net.Listener
 	log            *zap.Logger
