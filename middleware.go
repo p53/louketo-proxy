@@ -197,6 +197,7 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 					&oidc3.Config{
 						ClientID:          r.config.ClientID,
 						SkipClientIDCheck: true,
+						SkipIssuerCheck:   true,
 					},
 				)
 				_, err := verifier.Verify(context.Background(), rawToken)
