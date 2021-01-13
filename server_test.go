@@ -389,16 +389,75 @@ func TestSkipClientIDDisabled(t *testing.T) {
 	goodSigned, _ := good.getToken()
 	requests := []fakeRequest{
 		{
-			URI:           "/auth_all/test",
-			RawToken:      goodSigned,
-			ExpectedProxy: true,
-			ExpectedCode:  http.StatusOK,
+			URI:               "/auth_all/test",
+			RawToken:          goodSigned,
+			ExpectedProxy:     true,
+			ExpectedCode:      http.StatusOK,
+			SkipClientIDCheck: false,
 		},
 		{
-			URI:           "/auth_all/test",
-			RawToken:      badSigned,
-			ExpectedProxy: true,
-			ExpectedCode:  http.StatusOK,
+			URI:               "/auth_all/test",
+			RawToken:          goodSigned,
+			ExpectedProxy:     true,
+			ExpectedCode:      http.StatusOK,
+			SkipClientIDCheck: true,
+		},
+		{
+			URI:               "/auth_all/test",
+			RawToken:          badSigned,
+			ExpectedCode:      http.StatusForbidden,
+			ExpectedProxy:     false,
+			SkipClientIDCheck: false,
+		},
+		{
+			URI:               "/auth_all/test",
+			RawToken:          badSigned,
+			ExpectedProxy:     true,
+			ExpectedCode:      http.StatusOK,
+			SkipClientIDCheck: true,
+		},
+	}
+	p.RunTests(t, requests)
+}
+
+func TestSkipIssuer(t *testing.T) {
+	c := newFakeKeycloakConfig()
+	p := newFakeProxy(c)
+	// create two token, one with a bad client id
+	bad := newTestToken(p.idp.getLocation())
+	bad.claims.Iss = "bad_issuer"
+	badSigned, _ := bad.getToken()
+	// and the good
+	good := newTestToken(p.idp.getLocation())
+	goodSigned, _ := good.getToken()
+	requests := []fakeRequest{
+		{
+			URI:             "/auth_all/test",
+			RawToken:        goodSigned,
+			ExpectedProxy:   true,
+			ExpectedCode:    http.StatusOK,
+			SkipIssuerCheck: false,
+		},
+		{
+			URI:             "/auth_all/test",
+			RawToken:        goodSigned,
+			ExpectedProxy:   true,
+			ExpectedCode:    http.StatusOK,
+			SkipIssuerCheck: true,
+		},
+		{
+			URI:             "/auth_all/test",
+			RawToken:        badSigned,
+			ExpectedCode:    http.StatusForbidden,
+			ExpectedProxy:   false,
+			SkipIssuerCheck: false,
+		},
+		{
+			URI:             "/auth_all/test",
+			RawToken:        badSigned,
+			ExpectedProxy:   true,
+			ExpectedCode:    http.StatusOK,
+			SkipIssuerCheck: true,
 		},
 	}
 	p.RunTests(t, requests)

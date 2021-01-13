@@ -59,6 +59,8 @@ type fakeRequest struct {
 	RawToken                 string
 	Redirects                bool
 	Roles                    []string
+	SkipClientIDCheck        bool
+	SkipIssuerCheck          bool
 	TokenClaims              map[string]interface{}
 	URI                      string
 	URL                      string
@@ -125,6 +127,8 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 		var upstream fakeUpstreamResponse
 
 		f.config.NoRedirects = !c.Redirects
+		f.config.SkipAccessTokenClientIDCheck = c.SkipClientIDCheck
+		f.config.SkipAccessTokenIssuerCheck = c.SkipIssuerCheck
 		// we need to set any defaults
 		if c.Method == "" {
 			c.Method = http.MethodGet
