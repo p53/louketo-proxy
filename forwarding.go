@@ -199,8 +199,7 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 						zap.String("expires", state.expiration.Format(time.RFC3339)))
 				} else {
 					r.log.Info("session does not support refresh token, acquiring new token",
-						zap.String("subject", state.subject),
-						zap.String("email", state.subject))
+						zap.String("subject", state.subject))
 
 					// we don't have a refresh token, we must perform a login again
 					state.wait = false
