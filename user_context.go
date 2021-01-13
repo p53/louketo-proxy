@@ -89,7 +89,6 @@ func extractIdentity(token *jwt.JSONWebToken) (*userContext, error) {
 		name:          preferredName,
 		preferredName: preferredName,
 		roles:         roleList,
-		token:         token,
 		claims:        jsonMap,
 	}, nil
 }

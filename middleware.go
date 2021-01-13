@@ -251,7 +251,7 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 					// exp: expiration of the access token
 					// expiresIn: expiration of the ID token
 					conf := r.newOAuth2Config(r.config.RedirectionURL)
-					token, newRawAccToken, newRefreshToken, accessExpiresAt, refreshExpiresIn, err := getRefreshedToken(conf, refresh)
+					_, newRawAccToken, newRefreshToken, accessExpiresAt, refreshExpiresIn, err := getRefreshedToken(conf, refresh)
 					if err != nil {
 						switch err {
 						case ErrRefreshTokenExpired:
@@ -324,7 +324,6 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 					}
 
 					// update the with the new access token and inject into the context
-					user.token = &token
 					user.rawToken = accessToken
 					ctx = context.WithValue(req.Context(), contextScopeName, scope)
 				}
