@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 var (
@@ -425,8 +424,6 @@ type userContext struct {
 	preferredName string
 	// roles is a collection of roles the users holds
 	roles []string
-	// the access token itself
-	token *jwt.JSONWebToken
 	// rawToken
 	rawToken string
 	// claims
