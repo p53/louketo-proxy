@@ -1,6 +1,6 @@
-NAME=louketo-proxy
-AUTHOR=louketo
-REGISTRY=docker.io
+NAME=gatekeeper
+AUTHOR=gogatekeeper
+REGISTRY=quay.io
 CONTAINER_TOOL=$(shell command -v podman 2>/dev/null || command -v docker)
 ROOT_DIR=${PWD}
 HARDWARE=$(shell uname -m)
@@ -36,20 +36,21 @@ static: golang
 container-build: docker-build
 docker-build:
 	@echo "--> Compiling the project, inside a temporary container"
+	@mkdir -p bin
 	$(eval IMAGE=$(shell uuidgen))
 	${CONTAINER_TOOL} build --target build-env -t ${IMAGE} .
-	${CONTAINER_TOOL} run --rm ${IMAGE} /bin/cat /louketo-proxy > bin/louketo-proxy
+	${CONTAINER_TOOL} run --rm ${IMAGE} /bin/cat /gatekeeper > bin/gatekeeper
 	${CONTAINER_TOOL} rmi ${IMAGE}
-	chmod +x bin/louketo-proxy
+	chmod +x bin/gatekeeper
 
 .PHONY: container-test docker-test
 container-test: docker-test
 docker-test:
 	@echo "--> Running the container image tests"
 	${CONTAINER_TOOL} run --rm -ti -p 3000:3000 \
-    -v ${ROOT_DIR}/config.yml:/etc/louketo/config.yml:ro \
+    -v ${ROOT_DIR}/config.yml:/etc/gatekeeper/config.yml:ro \
     -v ${ROOT_DIR}/tests:/opt/tests:ro \
-    ${REGISTRY}/${AUTHOR}/${NAME}:${VERSION} --config /etc/louketo/config.yml
+    ${REGISTRY}/${AUTHOR}/${NAME}:${VERSION} --config /etc/gatekeeper/config.yml
 
 .PHONY: container-release docker-release
 container-release: docker-release
@@ -137,7 +138,9 @@ cover:
 spelling:
 	@echo "--> Checking the spelling"
 	@which misspell 2>/dev/null ; if [ $$? -eq 1 ]; then \
+		cd ..; \
 		go get -u github.com/client9/misspell/cmd/misspell; \
+		cd -; \
 	fi
 	@misspell -error *.go
 	@misspell -error *.md

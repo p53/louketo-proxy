@@ -9,11 +9,11 @@ spec:
       labels:
         name: proxy
       annotations:
-        repository: https://github.com/louketo/louketo-proxy
+        repository: https://github.com/gogatekeeper/gatekeeper
     spec:
       containers:
       - name: proxy
-        image: docker.io/jboss/louketo/louketo-proxy:latest
+        image: quay.io/gogatekeeper/gatekeeper:1.1.0
         imagePullPolicy: Always
         args:
           - --config /etc/secrets/forwarding.yml

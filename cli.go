@@ -38,7 +38,7 @@ func newOauthProxyApp() *cli.App {
 	app.Author = author
 	app.Email = email
 	app.Flags = getCommandLineOptions()
-	app.UsageText = "louketo-proxy [options]"
+	app.UsageText = "gatekeeper [options]"
 
 	// step: the standard usage message isn't that helpful
 	app.OnUsageError = func(context *cli.Context, err error, isSubcommand bool) error {

@@ -20,6 +20,17 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+    - wrapcheck
+    - gosec
+    - gocritic
+    - errorlint
+    - gci
+    - gofumpt
+    - nlreturn
+    - noctx
+    - paralleltest
+    - exhaustive
+    - exhaustivestruct
     - maligned
     - unparam
     - lll

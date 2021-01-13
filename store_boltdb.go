@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	dbName = "louketo"
+	dbName = "gatekeeper"
 )
 
 var (
