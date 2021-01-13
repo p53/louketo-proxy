@@ -26,16 +26,16 @@ import (
 )
 
 // getIdentity retrieves the user identity from a request, either from a session cookie or a bearer token
-func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, string, error) {
+func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, error) {
 	var isBearer bool
 	// step: check for a bearer token or cookie with jwt token
 	access, isBearer, err := getTokenInRequest(req, r.config.CookieAccessName)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie && !isBearer {
 		if access, err = decodeText(access, r.config.EncryptionKey); err != nil {
-			return nil, "", ErrDecryption
+			return nil, ErrDecryption
 		}
 	}
 
@@ -43,12 +43,12 @@ func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, string, error
 	token, err := jwt.ParseSigned(access)
 
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	user, err := extractIdentity(token)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	user.bearerToken = isBearer
 	user.rawToken = rawToken
@@ -60,7 +60,7 @@ func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, string, error
 		zap.String("roles", strings.Join(user.roles, ",")),
 		zap.String("groups", strings.Join(user.groups, ",")))
 
-	return user, rawToken, nil
+	return user, nil
 }
 
 // getRefreshTokenFromCookie returns the refresh token from the cookie if any

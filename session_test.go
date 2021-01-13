@@ -62,7 +62,7 @@ func TestGetIndentity(t *testing.T) {
 	}
 
 	for i, c := range testCases {
-		user, _, err := p.getIdentity(c.Request)
+		user, err := p.getIdentity(c.Request)
 		if err != nil && c.Ok {
 			t.Errorf("test case %d should not have errored", i)
 			continue

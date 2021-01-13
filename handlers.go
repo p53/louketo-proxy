@@ -376,14 +376,14 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// @step: drop the access token
-	user, rawToken, err := r.getIdentity(req)
+	user, err := r.getIdentity(req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	// step: can either use the id token or the refresh token
-	identityToken := rawToken
+	identityToken := user.rawToken
 	//nolint:vetshadow
 	if refresh, _, err := r.retrieveRefreshToken(req, user); err == nil {
 		identityToken = refresh
@@ -477,7 +477,7 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 
 // expirationHandler checks if the token has expired
 func (r *oauthProxy) expirationHandler(w http.ResponseWriter, req *http.Request) {
-	user, _, err := r.getIdentity(req)
+	user, err := r.getIdentity(req)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -492,13 +492,13 @@ func (r *oauthProxy) expirationHandler(w http.ResponseWriter, req *http.Request)
 
 // tokenHandler display access token to screen
 func (r *oauthProxy) tokenHandler(w http.ResponseWriter, req *http.Request) {
-	_, rawToken, err := r.getIdentity(req)
+	user, err := r.getIdentity(req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(rawToken))
+	_, _ = w.Write([]byte(user.rawToken))
 }
 
 // healthHandler is a health check handler for the service
