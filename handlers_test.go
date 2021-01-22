@@ -37,7 +37,7 @@ func TestDebugHandler(t *testing.T) {
 		{URI: "/debug/pprof/symbol", Method: http.MethodPost, ExpectedCode: http.StatusOK},
 		{URI: "/debug/pprof/symbol", Method: http.MethodPost, ExpectedCode: http.StatusOK},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestExpirationHandler(t *testing.T) {
@@ -61,7 +61,7 @@ func TestExpirationHandler(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestOauthRequestNotProxying(t *testing.T) {
@@ -72,7 +72,7 @@ func TestOauthRequestNotProxying(t *testing.T) {
 		{URI: "/oauth/expiring", Method: http.MethodPost},
 		{URI: "/oauth%2F///../test%2F%2Foauth"},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLoginHandlerDisabled(t *testing.T) {
@@ -82,7 +82,7 @@ func TestLoginHandlerDisabled(t *testing.T) {
 		{URI: c.WithOAuthURI(loginURL), Method: http.MethodPost, ExpectedCode: http.StatusNotImplemented},
 		{URI: c.WithOAuthURI(loginURL), ExpectedCode: http.StatusMethodNotAllowed},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLoginHandlerNotDisabled(t *testing.T) {
@@ -91,7 +91,7 @@ func TestLoginHandlerNotDisabled(t *testing.T) {
 	requests := []fakeRequest{
 		{URI: "/oauth/login", Method: http.MethodPost, ExpectedCode: http.StatusBadRequest},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLoginHandler(t *testing.T) {
@@ -133,7 +133,7 @@ func TestLoginHandler(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLogoutHandlerBadRequest(t *testing.T) {
@@ -143,7 +143,7 @@ func TestLogoutHandlerBadRequest(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLogoutHandlerBadToken(t *testing.T) {
@@ -165,7 +165,7 @@ func TestLogoutHandlerBadToken(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLogoutHandlerGood(t *testing.T) {
@@ -183,7 +183,7 @@ func TestLogoutHandlerGood(t *testing.T) {
 			ExpectedLocation: "http://example.com",
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestTokenHandler(t *testing.T) {
@@ -217,7 +217,7 @@ func TestTokenHandler(t *testing.T) {
 			ExpectedCode:   http.StatusOK,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestServiceRedirect(t *testing.T) {
@@ -233,13 +233,13 @@ func TestServiceRedirect(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestAuthorizationURLWithSkipToken(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.SkipTokenVerification = true
-	newFakeProxy(c).RunTests(t, []fakeRequest{
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, []fakeRequest{
 		{
 			URI:          c.WithOAuthURI(authorizationURL),
 			ExpectedCode: http.StatusNotAcceptable,
@@ -284,7 +284,7 @@ func TestAuthorizationURL(t *testing.T) {
 			ExpectedCode: http.StatusNotFound,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestCallbackURL(t *testing.T) {
@@ -318,7 +318,7 @@ func TestCallbackURL(t *testing.T) {
 			ExpectedCode:     http.StatusSeeOther,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestHealthHandler(t *testing.T) {
@@ -335,5 +335,5 @@ func TestHealthHandler(t *testing.T) {
 			ExpectedCode: http.StatusMethodNotAllowed,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }

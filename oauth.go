@@ -16,6 +16,8 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
+	"net/http"
 	"strings"
 	"time"
 
@@ -83,13 +85,25 @@ func getRefreshedToken(conf *oauth2.Config, t string) (jwt.JSONWebToken, string,
 }
 
 // exchangeAuthenticationCode exchanges the authentication code with the oauth server for a access token
-func exchangeAuthenticationCode(client *oauth2.Config, code string) (*oauth2.Token, error) {
-	return getToken(client, GrantTypeAuthCode, code)
+func exchangeAuthenticationCode(client *oauth2.Config, code string, skipOpenIDProviderTLSVerify bool) (*oauth2.Token, error) {
+	return getToken(client, GrantTypeAuthCode, code, skipOpenIDProviderTLSVerify)
 }
 
 // getToken retrieves a code from the provider, extracts and verified the token
-func getToken(config *oauth2.Config, grantType, code string) (*oauth2.Token, error) {
+func getToken(config *oauth2.Config, grantType, code string, skipOpenIDProviderTLSVerify bool) (*oauth2.Token, error) {
+
 	ctx := context.Background()
+
+	if skipOpenIDProviderTLSVerify {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		sslcli := &http.Client{Transport: tr}
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
+	} else {
+		ctx = context.Background()
+	}
+
 	start := time.Now()
 	token, err := config.Exchange(ctx, code)
 	if err != nil {

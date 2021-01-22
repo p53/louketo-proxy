@@ -35,6 +35,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/oauth2"
 
 	httplog "log"
 
@@ -694,6 +695,15 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 	// see https://github.com/coreos/go-oidc/issues/214
 	// see https://github.com/coreos/go-oidc/pull/260
 	ctx, cancel := context.WithTimeout(context.Background(), r.config.OpenIDProviderTimeout)
+
+	if r.config.SkipOpenIDProviderTLSVerify {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		sslcli := &http.Client{Transport: tr}
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
+	}
+
 	defer cancel()
 	var provider *oidc3.Provider
 

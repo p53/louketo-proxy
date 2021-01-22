@@ -84,12 +84,13 @@ type fakeProxy struct {
 	cookies map[string]*http.Cookie
 }
 
-func newFakeProxy(c *Config) *fakeProxy {
+func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	log.SetOutput(ioutil.Discard)
 	if c == nil {
 		c = newFakeKeycloakConfig()
 	}
-	auth := newFakeAuthServer()
+
+	auth := newFakeAuthServer(authConfig)
 	c.DiscoveryURL = auth.getLocation()
 	c.RevocationEndpoint = auth.getRevocationURL()
 	c.Verbose = true
@@ -356,7 +357,7 @@ func TestMetricsMiddleware(t *testing.T) {
 			ExpectedContentContains: "proxy_request_status_total",
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestOauthRequests(t *testing.T) {
@@ -378,7 +379,7 @@ func TestOauthRequests(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestOauthRequestsWithBaseURI(t *testing.T) {
@@ -416,7 +417,7 @@ func TestOauthRequestsWithBaseURI(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestMethodExclusions(t *testing.T) {
@@ -440,7 +441,7 @@ func TestMethodExclusions(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestPreserveURLEncoding(t *testing.T) {
@@ -534,7 +535,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 		},
 	}
 
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestStrangeRoutingError(t *testing.T) {
@@ -608,7 +609,7 @@ func TestStrangeRoutingError(t *testing.T) {
 		},
 	}
 
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestNoProxyingRequests(t *testing.T) {
@@ -641,7 +642,7 @@ func TestNoProxyingRequests(t *testing.T) {
 			ExpectedCode: http.StatusSeeOther,
 		},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 const testAdminURI = "/admin/test"
@@ -711,7 +712,7 @@ func TestStrangeAdminRequests(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestWhiteListedRequests(t *testing.T) {
@@ -757,7 +758,7 @@ func TestWhiteListedRequests(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestRequireAnyRoles(t *testing.T) {
@@ -789,7 +790,7 @@ func TestRequireAnyRoles(t *testing.T) {
 			ExpectedCode: http.StatusForbidden,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestGroupPermissionsMiddleware(t *testing.T) {
@@ -901,7 +902,7 @@ func TestGroupPermissionsMiddleware(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestRolePermissionsMiddleware(t *testing.T) {
@@ -1122,7 +1123,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			ExpectedProxy: true,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestCrossSiteHandler(t *testing.T) {
@@ -1187,7 +1188,7 @@ func TestCrossSiteHandler(t *testing.T) {
 		cfg.CorsMethods = c.Cors.AllowedMethods
 		cfg.CorsOrigins = c.Cors.AllowedOrigins
 
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
@@ -1200,7 +1201,7 @@ func TestCheckRefreshTokens(t *testing.T) {
 			<-time.After(1000 * time.Millisecond)
 		}
 	}
-	p := newFakeProxy(cfg)
+	p := newFakeProxy(cfg, &fakeAuthConfig{})
 	p.idp.setTokenExpiration(1000 * time.Millisecond)
 
 	requests := []fakeRequest{
@@ -1269,7 +1270,7 @@ func testEncryptedToken(t *testing.T, cfg *Config) {
 		}
 		return assert.Contains(t, user.claims, "aud") && assert.Contains(t, user.claims, "email")
 	}
-	p := newFakeProxy(cfg)
+	p := newFakeProxy(cfg, &fakeAuthConfig{})
 	p.idp.setTokenExpiration(1000 * time.Millisecond)
 
 	requests := []fakeRequest{
@@ -1344,7 +1345,7 @@ func TestCustomHeadersHandler(t *testing.T) {
 	for _, c := range requests {
 		cfg := newFakeKeycloakConfig()
 		cfg.AddClaims = c.Match
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
@@ -1413,7 +1414,7 @@ func TestAdmissionHandlerRoles(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 // check to see if custom headers are hitting the upstream
@@ -1467,7 +1468,7 @@ func TestCustomHeaders(t *testing.T) {
 		cfg := newFakeKeycloakConfig()
 		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
 		cfg.Headers = c.Headers
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
@@ -1607,7 +1608,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 		cfg := newFakeKeycloakConfig()
 		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
 		cfg.MatchClaims = c.Matches
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
@@ -1670,6 +1671,6 @@ func TestGzipCompression(t *testing.T) {
 		cfg := newFakeKeycloakConfig()
 		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
 		cfg.EnableCompression = c.EnableCompression
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }

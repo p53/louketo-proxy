@@ -16,6 +16,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -114,7 +115,10 @@ var defTestTokenClaims = DefaultTestTokenClaims{
 
 func TestNewKeycloakProxy(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.DiscoveryURL = newFakeAuthServer().getLocation()
+	authConfig := &fakeAuthConfig{}
+	authConfig.EnableTLS = false
+
+	cfg.DiscoveryURL = newFakeAuthServer(authConfig).getLocation()
 	cfg.Listen = "127.0.0.1:0"
 	cfg.ListenHTTP = ""
 
@@ -128,7 +132,7 @@ func TestNewKeycloakProxy(t *testing.T) {
 }
 
 func TestReverseProxyHeaders(t *testing.T) {
-	p := newFakeProxy(nil)
+	p := newFakeProxy(nil, &fakeAuthConfig{})
 	token := newTestToken(p.idp.getLocation())
 	token.addRealmRoles([]string{fakeAdminRole})
 	jwt, _ := token.getToken()
@@ -169,7 +173,7 @@ func TestForwardingProxy(t *testing.T) {
 			ExpectedContentContains: "Bearer ey",
 		},
 	}
-	p := newFakeProxy(cfg)
+	p := newFakeProxy(cfg, &fakeAuthConfig{})
 	<-time.After(time.Duration(100) * time.Millisecond)
 	p.RunTests(t, requests)
 }
@@ -193,7 +197,35 @@ func TestForbiddenTemplate(t *testing.T) {
 			ExpectedContentContains: "403 Permission Denied",
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
+}
+
+func TestSkipOpenIDProviderTLSVerify(t *testing.T) {
+	c := newFakeKeycloakConfig()
+	c.SkipOpenIDProviderTLSVerify = true
+	requests := []fakeRequest{
+		{
+			URI:           "/auth_all/test",
+			HasLogin:      true,
+			ExpectedProxy: true,
+			Redirects:     true,
+			ExpectedCode:  http.StatusOK,
+		},
+	}
+	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+	c.SkipOpenIDProviderTLSVerify = false
+
+	defer func() {
+		if r := recover(); r != nil {
+			check := strings.Contains(
+				r.(string),
+				"failed to retrieve the provider configuration from discovery url",
+			)
+			assert.True(t, check)
+		}
+	}()
+
+	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 
 func TestRequestIDHeader(t *testing.T) {
@@ -211,13 +243,13 @@ func TestRequestIDHeader(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestAuthTokenHeaderDisabled(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.EnableTokenHeader = false
-	p := newFakeProxy(c)
+	p := newFakeProxy(c, &fakeAuthConfig{})
 	token := newTestToken(p.idp.getLocation())
 	jwt, _ := token.getToken()
 
@@ -248,7 +280,7 @@ func TestAudienceHeader(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestDefaultDenial(t *testing.T) {
@@ -273,7 +305,7 @@ func TestDefaultDenial(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(config).RunTests(t, requests)
+	newFakeProxy(config, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestAuthorizationTemplate(t *testing.T) {
@@ -294,7 +326,7 @@ func TestAuthorizationTemplate(t *testing.T) {
 			ExpectedContentContains: "Sign In",
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestProxyProtocol(t *testing.T) {
@@ -321,7 +353,7 @@ func TestProxyProtocol(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestTokenEncryption(t *testing.T) {
@@ -349,7 +381,7 @@ func TestTokenEncryption(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestCustomResponseHeaders(t *testing.T) {
@@ -357,7 +389,7 @@ func TestCustomResponseHeaders(t *testing.T) {
 	c.ResponseHeaders = map[string]string{
 		"CustomReponseHeader": "True",
 	}
-	p := newFakeProxy(c)
+	p := newFakeProxy(c, &fakeAuthConfig{})
 
 	requests := []fakeRequest{
 		{
@@ -379,7 +411,7 @@ func TestSkipClientIDDisabled(t *testing.T) {
 	// client for which was access token released, but this is not according spec
 	// as access_token could be also other type not just JWT
 	c := newFakeKeycloakConfig()
-	p := newFakeProxy(c)
+	p := newFakeProxy(c, &fakeAuthConfig{})
 	// create two token, one with a bad client id
 	bad := newTestToken(p.idp.getLocation())
 	bad.claims.Aud = "bad_client_id"
@@ -422,7 +454,7 @@ func TestSkipClientIDDisabled(t *testing.T) {
 
 func TestSkipIssuer(t *testing.T) {
 	c := newFakeKeycloakConfig()
-	p := newFakeProxy(c)
+	p := newFakeProxy(c, &fakeAuthConfig{})
 	// create two token, one with a bad client id
 	bad := newTestToken(p.idp.getLocation())
 	bad.claims.Iss = "bad_issuer"
@@ -464,7 +496,7 @@ func TestSkipIssuer(t *testing.T) {
 }
 
 func TestAuthTokenHeaderEnabled(t *testing.T) {
-	p := newFakeProxy(nil)
+	p := newFakeProxy(nil, &fakeAuthConfig{})
 	token := newTestToken(p.idp.getLocation())
 	signed, _ := token.getToken()
 
@@ -485,7 +517,7 @@ func TestAuthTokenHeaderEnabled(t *testing.T) {
 func TestDisableAuthorizationCookie(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.EnableAuthorizationCookies = false
-	p := newFakeProxy(c)
+	p := newFakeProxy(c, &fakeAuthConfig{})
 	token := newTestToken(p.idp.getLocation())
 	signed, _ := token.getToken()
 
@@ -511,10 +543,17 @@ func newTestService() string {
 }
 
 func newTestProxyService(config *Config) (*oauthProxy, *fakeAuthServer, string) {
-	auth := newFakeAuthServer()
 	if config == nil {
 		config = newFakeKeycloakConfig()
 	}
+
+	authConfig := &fakeAuthConfig{}
+	if config.SkipOpenIDProviderTLSVerify {
+		authConfig.EnableTLS = true
+	}
+
+	auth := newFakeAuthServer(authConfig)
+
 	config.DiscoveryURL = auth.getLocation()
 	config.RevocationEndpoint = auth.getRevocationURL()
 	config.Verbose = false
@@ -553,23 +592,25 @@ func newFakeHTTPRequest(method, path string) *http.Request {
 
 func newFakeKeycloakConfig() *Config {
 	return &Config{
-		ClientID:                   fakeClientID,
-		ClientSecret:               fakeSecret,
-		CookieAccessName:           "kc-access",
-		CookieRefreshName:          "kc-state",
-		DisableAllLogging:          true,
-		DiscoveryURL:               "127.0.0.1:0",
-		EnableAuthorizationCookies: true,
-		EnableAuthorizationHeader:  true,
-		EnableLogging:              false,
-		EnableLoginHandler:         true,
-		EnableTokenHeader:          true,
-		EnableCompression:          false,
-		Listen:                     "127.0.0.1:0",
-		OAuthURI:                   "/oauth",
-		OpenIDProviderTimeout:      time.Second * 320,
-		Scopes:                     []string{},
-		Verbose:                    false,
+		ClientID:                    fakeClientID,
+		ClientSecret:                fakeSecret,
+		CookieAccessName:            "kc-access",
+		CookieRefreshName:           "kc-state",
+		DisableAllLogging:           true,
+		DiscoveryURL:                "127.0.0.1:0",
+		EnableAuthorizationCookies:  true,
+		EnableAuthorizationHeader:   true,
+		EnableLogging:               false,
+		EnableLoginHandler:          true,
+		EnableTokenHeader:           true,
+		EnableCompression:           false,
+		Listen:                      "127.0.0.1:0",
+		OAuthURI:                    "/oauth",
+		OpenIDProviderTimeout:       time.Second * 320,
+		SkipOpenIDProviderTLSVerify: false,
+		SkipUpstreamTLSVerify:       false,
+		Scopes:                      []string{},
+		Verbose:                     false,
 		Resources: []*Resource{
 			{
 				URL:     fakeAdminRoleURL,
@@ -614,7 +655,13 @@ func makeTestCodeFlowLogin(location string) (*http.Response, error) {
 			return nil, err
 		}
 		// step: make the request
-		resp, err = http.DefaultTransport.RoundTrip(req)
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{
+				//nolint:gas
+				InsecureSkipVerify: true,
+			},
+		}
+		resp, err = tr.RoundTrip(req)
 		if err != nil {
 			return nil, err
 		}
@@ -622,7 +669,7 @@ func makeTestCodeFlowLogin(location string) (*http.Response, error) {
 			return nil, fmt.Errorf("no redirection found in resp, status code %d", resp.StatusCode)
 		}
 		location = resp.Header.Get("Location")
-		if !strings.HasPrefix(location, "http") {
+		if !strings.HasPrefix(location, "http") && !strings.HasPrefix(location, "https") {
 			location = fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, location)
 		}
 	}
