@@ -17,8 +17,11 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDebugHandler(t *testing.T) {
@@ -178,6 +181,20 @@ func TestSkipOpenIDProviderTLSVerifyLoginHandler(t *testing.T) {
 		},
 	}
 	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+
+	c.SkipOpenIDProviderTLSVerify = false
+
+	defer func() {
+		if r := recover(); r != nil {
+			check := strings.Contains(
+				r.(string),
+				"failed to retrieve the provider configuration from discovery url",
+			)
+			assert.True(t, check)
+		}
+	}()
+
+	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 
 func TestLogoutHandlerBadRequest(t *testing.T) {
@@ -246,6 +263,20 @@ func TestSkipOpenIDProviderTLSVerifyLogoutHandler(t *testing.T) {
 			ExpectedLocation: "http://example.com",
 		},
 	}
+	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+
+	c.SkipOpenIDProviderTLSVerify = false
+
+	defer func() {
+		if r := recover(); r != nil {
+			check := strings.Contains(
+				r.(string),
+				"failed to retrieve the provider configuration from discovery url",
+			)
+			assert.True(t, check)
+		}
+	}()
+
 	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 

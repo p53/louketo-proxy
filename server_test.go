@@ -178,6 +178,44 @@ func TestForwardingProxy(t *testing.T) {
 	p.RunTests(t, requests)
 }
 
+func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
+	cfg := newFakeKeycloakConfig()
+	cfg.EnableForwarding = true
+	cfg.ForwardingDomains = []string{}
+	cfg.ForwardingUsername = validUsername
+	cfg.ForwardingPassword = validPassword
+	cfg.SkipOpenIDProviderTLSVerify = true
+	s := httptest.NewServer(&fakeUpstreamService{})
+	requests := []fakeRequest{
+		{
+			URL:                     s.URL + "/test",
+			ProxyRequest:            true,
+			ExpectedProxy:           true,
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "Bearer ey",
+		},
+	}
+	p := newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true})
+	<-time.After(time.Duration(100) * time.Millisecond)
+	p.RunTests(t, requests)
+
+	cfg.SkipOpenIDProviderTLSVerify = false
+
+	defer func() {
+		if r := recover(); r != nil {
+			check := strings.Contains(
+				r.(string),
+				"failed to retrieve the provider configuration from discovery url",
+			)
+			assert.True(t, check)
+		}
+	}()
+
+	p = newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true})
+	<-time.After(time.Duration(100) * time.Millisecond)
+	p.RunTests(t, requests)
+}
+
 func TestForbiddenTemplate(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.ForbiddenPage = "templates/forbidden.html.tmpl"

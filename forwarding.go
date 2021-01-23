@@ -17,11 +17,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -87,6 +89,15 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 // forwardProxyHandler is responsible for signing outbound requests
 func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 	ctx := context.Background()
+
+	if r.config.SkipOpenIDProviderTLSVerify {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		sslcli := &http.Client{Transport: tr}
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
+	}
+
 	conf := r.newOAuth2Config(r.config.RedirectionURL)
 
 	// the loop state
@@ -119,7 +130,12 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 					zap.String("username", r.config.ForwardingUsername))
 
 				// step: login into the service
-				resp, err := conf.PasswordCredentialsToken(ctx, r.config.ForwardingUsername, r.config.ForwardingPassword)
+				resp, err := conf.PasswordCredentialsToken(
+					ctx,
+					r.config.ForwardingUsername,
+					r.config.ForwardingPassword,
+				)
+
 				if err != nil {
 					r.log.Error("failed to login to authentication service", zap.Error(err))
 					// step: back-off and reschedule
@@ -169,7 +185,7 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 						zap.String("expires", state.expiration.Format(time.RFC3339)))
 
 					// step: attempt to refresh the access
-					token, rawToken, newRefreshToken, expiration, _, err := getRefreshedToken(conf, state.refresh)
+					token, rawToken, newRefreshToken, expiration, _, err := getRefreshedToken(conf, r, state.refresh)
 					state.rawToken = rawToken
 					if err != nil {
 						state.login = true
