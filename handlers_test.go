@@ -136,6 +136,50 @@ func TestLoginHandler(t *testing.T) {
 	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
+func TestSkipOpenIDProviderTLSVerifyLoginHandler(t *testing.T) {
+	c := newFakeKeycloakConfig()
+	c.SkipOpenIDProviderTLSVerify = true
+	uri := c.WithOAuthURI(loginURL)
+	requests := []fakeRequest{
+		{
+			URI:          uri,
+			Method:       http.MethodPost,
+			ExpectedCode: http.StatusBadRequest,
+		},
+		{
+			URI:          uri,
+			Method:       http.MethodPost,
+			FormValues:   map[string]string{"username": "test"},
+			ExpectedCode: http.StatusBadRequest,
+		},
+		{
+			URI:          uri,
+			Method:       http.MethodPost,
+			FormValues:   map[string]string{"password": "test"},
+			ExpectedCode: http.StatusBadRequest,
+		},
+		{
+			URI:    uri,
+			Method: http.MethodPost,
+			FormValues: map[string]string{
+				"password": "test",
+				"username": "test",
+			},
+			ExpectedCode: http.StatusOK,
+		},
+		{
+			URI:    uri,
+			Method: http.MethodPost,
+			FormValues: map[string]string{
+				"password": "test",
+				"username": "notmypassword",
+			},
+			ExpectedCode: http.StatusUnauthorized,
+		},
+	}
+	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+}
+
 func TestLogoutHandlerBadRequest(t *testing.T) {
 	requests := []fakeRequest{
 		{
@@ -184,6 +228,25 @@ func TestLogoutHandlerGood(t *testing.T) {
 		},
 	}
 	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
+}
+
+func TestSkipOpenIDProviderTLSVerifyLogoutHandler(t *testing.T) {
+	c := newFakeKeycloakConfig()
+	c.SkipOpenIDProviderTLSVerify = true
+	requests := []fakeRequest{
+		{
+			URI:          c.WithOAuthURI(logoutURL),
+			HasToken:     true,
+			ExpectedCode: http.StatusOK,
+		},
+		{
+			URI:              c.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
+			HasToken:         true,
+			ExpectedCode:     http.StatusSeeOther,
+			ExpectedLocation: "http://example.com",
+		},
+	}
+	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 
 func TestTokenHandler(t *testing.T) {

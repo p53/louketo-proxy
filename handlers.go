@@ -18,6 +18,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -283,7 +284,20 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 // loginHandler provide's a generic endpoint for clients to perform a user_credentials login to the provider
 func (r *oauthProxy) loginHandler(w http.ResponseWriter, req *http.Request) {
 	errorMsg, code, err := func() (string, int, error) {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			r.config.OpenIDProviderTimeout,
+		)
+
+		if r.config.SkipOpenIDProviderTLSVerify {
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			sslcli := &http.Client{Transport: tr}
+			ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
+		}
+
+		defer cancel()
 
 		if !r.config.EnableLoginHandler {
 			return "attempt to login when login handler is disabled", http.StatusNotImplemented, errors.New("login handler disabled")
@@ -428,7 +442,15 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 
 	// step: do we have a revocation endpoint?
 	if revocationURL != "" {
-		client := &http.Client{Timeout: 5 * time.Second}
+		client := &http.Client{
+			Timeout: r.config.OpenIDProviderTimeout,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: r.config.SkipOpenIDProviderTLSVerify,
+				},
+			},
+		}
+
 		if err != nil {
 			r.log.Error("unable to retrieve the openid client", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
