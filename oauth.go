@@ -91,7 +91,6 @@ func exchangeAuthenticationCode(client *oauth2.Config, code string, skipOpenIDPr
 
 // getToken retrieves a code from the provider, extracts and verified the token
 func getToken(config *oauth2.Config, grantType, code string, skipOpenIDProviderTLSVerify bool) (*oauth2.Token, error) {
-
 	ctx := context.Background()
 
 	if skipOpenIDProviderTLSVerify {
