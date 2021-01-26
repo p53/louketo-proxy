@@ -216,7 +216,7 @@ func (r *fakeAuthServer) authHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *fakeAuthServer) logoutHandler(w http.ResponseWriter, req *http.Request) {
-	if refreshToken := req.FormValue("refresh_token"); refreshToken == "" {
+	if refreshToken := req.FormValue("token"); refreshToken == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

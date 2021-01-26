@@ -384,6 +384,7 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 
 	// step: can either use the id token or the refresh token
 	identityToken := user.rawToken
+
 	//nolint:vetshadow
 	if refresh, _, err := r.retrieveRefreshToken(req, user); err == nil {
 		identityToken = refresh
@@ -403,7 +404,7 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// set the default revocation url
-	revokeDefault := fmt.Sprintf("%s/protocol/openid-connect/logout", strings.TrimSuffix(r.config.DiscoveryURL, "/.well-known/openid-configuration"))
+	revokeDefault := fmt.Sprintf("%s/protocol/openid-connect/revoke", strings.TrimSuffix(r.config.DiscoveryURL, "/.well-known/openid-configuration"))
 	revocationURL := defaultTo(r.config.RevocationEndpoint, revokeDefault)
 
 	// @check if we should redirect to the provider
@@ -438,7 +439,14 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 		encodedSecret := url.QueryEscape(r.config.ClientSecret)
 
 		// step: construct the url for revocation
-		request, err := http.NewRequest(http.MethodPost, revocationURL, bytes.NewBufferString(fmt.Sprintf("refresh_token=%s", identityToken)))
+		request, err := http.NewRequest(
+			http.MethodPost,
+			revocationURL,
+			bytes.NewBufferString(
+				fmt.Sprintf("token=%s", identityToken),
+			),
+		)
+
 		if err != nil {
 			r.log.Error("unable to construct the revocation request", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -463,9 +471,11 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 			r.log.Info("successfully logged out of the endpoint", zap.String("email", user.email))
 		default:
 			content, _ := ioutil.ReadAll(response.Body)
-			r.log.Error("invalid response from revocation endpoint",
+			r.log.Error(
+				"invalid response from revocation endpoint",
 				zap.Int("status", response.StatusCode),
-				zap.String("response", fmt.Sprintf("%s", content)))
+				zap.String("response", fmt.Sprintf("%s", content)),
+			)
 		}
 		defer response.Body.Close()
 	}
