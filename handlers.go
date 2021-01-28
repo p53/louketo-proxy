@@ -459,15 +459,20 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 
 		start := time.Now()
 		response, err := client.Do(request)
+
 		if err != nil {
 			r.log.Error("unable to post to revocation endpoint", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
+		defer response.Body.Close()
+
 		oauthLatencyMetric.WithLabelValues("revocation").Observe(time.Since(start).Seconds())
 
 		// step: check the response
 		switch response.StatusCode {
-		case http.StatusNoContent:
+		case http.StatusOK:
 			r.log.Info("successfully logged out of the endpoint", zap.String("email", user.email))
 		default:
 			content, _ := ioutil.ReadAll(response.Body)
@@ -476,9 +481,11 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 				zap.Int("status", response.StatusCode),
 				zap.String("response", fmt.Sprintf("%s", content)),
 			)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-		defer response.Body.Close()
 	}
+
 	// step: should we redirect the user
 	if redirectURL != "" {
 		r.redirectToURL(redirectURL, w, req, http.StatusSeeOther)

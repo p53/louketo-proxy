@@ -186,6 +186,40 @@ func TestLogoutHandlerGood(t *testing.T) {
 	newFakeProxy(nil).RunTests(t, requests)
 }
 
+func TestRevocation(t *testing.T) {
+	c := newFakeKeycloakConfig()
+	c.RevocationEndpoint = ""
+	requests := []fakeRequest{
+		{
+			URI:          c.WithOAuthURI(logoutURL),
+			HasToken:     true,
+			ExpectedCode: http.StatusOK,
+		},
+		{
+			URI:              c.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
+			HasToken:         true,
+			ExpectedCode:     http.StatusSeeOther,
+			ExpectedLocation: "http://example.com",
+		},
+	}
+	newFakeProxy(c).RunTests(t, requests)
+
+	c.RevocationEndpoint = "http://non-existent.com/revoke"
+	requests = []fakeRequest{
+		{
+			URI:          c.WithOAuthURI(logoutURL),
+			HasToken:     true,
+			ExpectedCode: http.StatusInternalServerError,
+		},
+		{
+			URI:          c.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
+			HasToken:     true,
+			ExpectedCode: http.StatusInternalServerError,
+		},
+	}
+	newFakeProxy(c).RunTests(t, requests)
+}
+
 func TestTokenHandler(t *testing.T) {
 	uri := newFakeKeycloakConfig().WithOAuthURI(tokenURL)
 	goodToken, err := newTestToken("example").getToken()
