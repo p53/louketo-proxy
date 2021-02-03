@@ -39,6 +39,8 @@ LABEL Name=gatekeeper \
 COPY --from=build-env ${HOMEDIR} ${HOMEDIR}
 COPY --from=build-env /etc/passwd /etc/passwd
 COPY --from=build-env /etc/group /etc/group
+COPY --from=build-env /usr/share/ca-certificates /usr/share/ca-certificates
+COPY --from=build-env /etc/ssl/certs /etc/ssl/certs
 
 WORKDIR ${HOMEDIR}
 USER 1000
