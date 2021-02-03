@@ -58,13 +58,13 @@ func (r *oauthProxy) newOAuth2Config(redirectionURL string) *oauth2.Config {
 // NOTE: we may be able to extract the specific (non-standard) claim refresh_expires_in and refresh_expires
 // from response.RawBody.
 // When not available, keycloak provides us with the same (for now) expiry value for ID token.
-func getRefreshedToken(conf *oauth2.Config, r *oauthProxy, t string) (jwt.JSONWebToken, string, string, time.Time, time.Duration, error) {
+func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, t string) (jwt.JSONWebToken, string, string, time.Time, time.Duration, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
-		r.config.OpenIDProviderTimeout,
+		proxyConfig.OpenIDProviderTimeout,
 	)
 
-	if r.config.SkipOpenIDProviderTLSVerify {
+	if proxyConfig.SkipOpenIDProviderTLSVerify {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
