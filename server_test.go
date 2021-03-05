@@ -277,7 +277,7 @@ func TestForwardingProxy(t *testing.T) {
 				cfg.ForwardingDomains = []string{}
 				cfg.ForwardingUsername = validUsername
 				cfg.ForwardingPassword = validPassword
-				cfg.ForwardingGrantType = "password"
+				cfg.ForwardingGrantType = GrantTypeUserCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -296,7 +296,7 @@ func TestForwardingProxy(t *testing.T) {
 				cfg.ForwardingDomains = []string{}
 				cfg.ForwardingUsername = validUsername
 				cfg.ForwardingPassword = validPassword
-				cfg.ForwardingGrantType = "password"
+				cfg.ForwardingGrantType = GrantTypeUserCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -323,7 +323,7 @@ func TestForwardingProxy(t *testing.T) {
 				cfg.ForwardingDomains = []string{}
 				cfg.ClientID = validUsername
 				cfg.ClientSecret = validPassword
-				cfg.ForwardingGrantType = "client_credentials"
+				cfg.ForwardingGrantType = GrantTypeClientCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -342,7 +342,7 @@ func TestForwardingProxy(t *testing.T) {
 				cfg.ForwardingDomains = []string{}
 				cfg.ClientID = validUsername
 				cfg.ClientSecret = validPassword
-				cfg.ForwardingGrantType = "client_credentials"
+				cfg.ForwardingGrantType = GrantTypeClientCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{

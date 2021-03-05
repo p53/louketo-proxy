@@ -310,15 +310,15 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 			"error_description": "invalid user credentials",
 		})
 	case GrantTypeClientCreds:
-		client_id := req.FormValue("client_id")
-		client_secret := req.FormValue("client_secret")
+		clientID := req.FormValue("client_id")
+		clientSecret := req.FormValue("client_secret")
 
-		if client_id == "" || client_secret == "" {
+		if clientID == "" || clientSecret == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		if client_id == validUsername && client_secret == validPassword {
+		if clientID == validUsername && clientSecret == validPassword {
 			renderJSON(http.StatusOK, w, req, tokenResponse{
 				IDToken:      jwt,
 				AccessToken:  jwt,
