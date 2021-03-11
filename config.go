@@ -83,6 +83,7 @@ func (r *Config) WithOAuthURI(uri string) string {
 }
 
 // isValid validates if the config is valid
+// nolint:gocyclo
 func (r *Config) isValid() error {
 	if r.Listen == "" {
 		return errors.New("you have not specified the listening interface")

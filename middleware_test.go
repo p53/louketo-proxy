@@ -424,6 +424,79 @@ func TestOauthRequests(t *testing.T) {
 	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
+func TestAdminListener(t *testing.T) {
+	cfg := newFakeKeycloakConfig()
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestAdminOnSameListener",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+				},
+				{
+					URI:          "/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			Name: "TestAdminOnDifferentListener",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+				c.ListenAdmin = "127.0.0.1:12300"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:          "/oauth/health",
+					Redirects:    true,
+					ExpectedCode: http.StatusNotFound,
+				},
+				{
+					URI:          "/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusNotFound,
+				},
+				{
+					URL:                     "http://127.0.0.1:12300/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+				},
+				{
+					URL:          "http://127.0.0.1:12300/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		c := cfg
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
+}
+
 func TestOauthRequestsWithBaseURI(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.BaseURI = "/base-uri"
