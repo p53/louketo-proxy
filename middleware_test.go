@@ -494,7 +494,7 @@ func TestAdminListener(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.EnableMetrics = true
 				c.ListenAdmin = "127.0.0.1:12301"
-				c.ListenAdminScheme = "https"
+				c.ListenAdminScheme = secureScheme
 				c.TLSAdminCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
 				c.TLSAdminPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
 				c.TLSAdminCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
@@ -515,37 +515,38 @@ func TestAdminListener(t *testing.T) {
 				},
 			},
 		},
-		// {
-		// 	Name: "TestAdminOnDifferentListenerWithHTTPSandCommonCreds",
-		// 	ProxySettings: func(c *Config) {
-		// 		c.EnableMetrics = true
-		// 		c.ListenAdmin = "127.0.0.1:12302"
-		// 		c.ListenAdminScheme = "https"
-		// 		c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
-		// 		c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
-		// 		c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
-		// 	},
-		// 	ExecutionSettings: []fakeRequest{
-		// 		{
-		// 			URL:                     "https://127.0.0.1:12302/oauth/health",
-		// 			Redirects:               true,
-		// 			ExpectedCode:            http.StatusOK,
-		// 			ExpectedContentContains: "OK",
-		// 			RequestCA:               fakeCA,
-		// 		},
-		// 		{
-		// 			URL:          "https://127.0.0.1:12302/oauth/metrics",
-		// 			Redirects:    true,
-		// 			ExpectedCode: http.StatusOK,
-		// 			RequestCA:    fakeCA,
-		// 		},
-		// 	},
-		// },
+		{
+			Name: "TestAdminOnDifferentListenerWithHTTPSandCommonCreds",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+				c.ListenAdmin = "127.0.0.1:12302"
+				c.ListenAdminScheme = secureScheme
+				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     "https://127.0.0.1:12302/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+					RequestCA:               fakeCA,
+				},
+				{
+					URL:          "https://127.0.0.1:12302/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+					RequestCA:    fakeCA,
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
 		testCase := testCase
-		c := cfg
+		cfgCopy := *cfg
+		c := &cfgCopy
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
@@ -1565,7 +1566,8 @@ func TestAccessTokenEncryption(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
-		c := cfg
+		cfgCopy := *cfg
+		c := &cfgCopy
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {

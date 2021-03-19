@@ -248,7 +248,8 @@ func TestAuthTokenHeader(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
-		c := cfg
+		cfgCopy := *cfg
+		c := &cfgCopy
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
