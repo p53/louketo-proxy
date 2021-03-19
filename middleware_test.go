@@ -19,20 +19,23 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	resty "github.com/go-resty/resty/v2"
 	uuid "github.com/gofrs/uuid"
 	"github.com/oleiade/reflections"
 	"github.com/rs/cors"
 	strcase "github.com/stoewer/go-strcase"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
-	resty "gopkg.in/resty.v1"
+
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
@@ -61,6 +64,7 @@ type fakeRequest struct {
 	Roles                         []string
 	SkipClientIDCheck             bool
 	SkipIssuerCheck               bool
+	RequestCA                     string
 	TokenClaims                   map[string]interface{}
 	URI                           string
 	URL                           string
@@ -153,6 +157,10 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 					return conn, nil
 				},
 			})
+		}
+
+		if c.RequestCA != "" {
+			client.SetRootCertificateFromString(c.RequestCA)
 		}
 
 		// are we performing a oauth login beforehand
@@ -481,6 +489,58 @@ func TestAdminListener(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "TestAdminOnDifferentListenerWithHTTPS",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+				c.ListenAdmin = "127.0.0.1:12301"
+				c.ListenAdminScheme = "https"
+				c.TLSAdminCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSAdminPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSAdminCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     "https://127.0.0.1:12301/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+					RequestCA:               fakeCA,
+				},
+				{
+					URL:          "https://127.0.0.1:12301/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+					RequestCA:    fakeCA,
+				},
+			},
+		},
+		// {
+		// 	Name: "TestAdminOnDifferentListenerWithHTTPSandCommonCreds",
+		// 	ProxySettings: func(c *Config) {
+		// 		c.EnableMetrics = true
+		// 		c.ListenAdmin = "127.0.0.1:12302"
+		// 		c.ListenAdminScheme = "https"
+		// 		c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+		// 		c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+		// 		c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+		// 	},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URL:                     "https://127.0.0.1:12302/oauth/health",
+		// 			Redirects:               true,
+		// 			ExpectedCode:            http.StatusOK,
+		// 			ExpectedContentContains: "OK",
+		// 			RequestCA:               fakeCA,
+		// 		},
+		// 		{
+		// 			URL:          "https://127.0.0.1:12302/oauth/metrics",
+		// 			Redirects:    true,
+		// 			ExpectedCode: http.StatusOK,
+		// 			RequestCA:    fakeCA,
+		// 		},
+		// 	},
+		// },
 	}
 
 	for _, testCase := range testCases {
@@ -490,6 +550,65 @@ func TestAdminListener(t *testing.T) {
 			testCase.Name,
 			func(t *testing.T) {
 				testCase.ProxySettings(c)
+
+				certFile := ""
+				privFile := ""
+				caFile := ""
+
+				if c.TLSAdminCertificate != "" {
+					certFile = c.TLSAdminCertificate
+				}
+
+				if c.TLSCertificate != "" {
+					certFile = c.TLSCertificate
+				}
+
+				if c.TLSAdminPrivateKey != "" {
+					privFile = c.TLSAdminPrivateKey
+				}
+
+				if c.TLSPrivateKey != "" {
+					privFile = c.TLSPrivateKey
+				}
+
+				if c.TLSAdminCaCertificate != "" {
+					caFile = c.TLSAdminCaCertificate
+				}
+
+				if c.TLSCaCertificate != "" {
+					caFile = c.TLSCaCertificate
+				}
+
+				if certFile != "" {
+					fakeCertByte := []byte(fakeCert)
+					err := ioutil.WriteFile(certFile, fakeCertByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing certificate %s", err)
+					}
+					defer os.Remove(certFile)
+				}
+
+				if privFile != "" {
+					fakeKeyByte := []byte(fakePrivateKey)
+					err := ioutil.WriteFile(privFile, fakeKeyByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing privateKey %s", err)
+					}
+					defer os.Remove(privFile)
+				}
+
+				if caFile != "" {
+					fakeCAByte := []byte(fakeCA)
+					err := ioutil.WriteFile(caFile, fakeCAByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing cacertificate %s", err)
+					}
+					defer os.Remove(caFile)
+				}
+
 				p := newFakeProxy(c, &fakeAuthConfig{})
 				p.RunTests(t, testCase.ExecutionSettings)
 			},

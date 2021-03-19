@@ -9,6 +9,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.10-0.20200417215612-7f4cf4dd2b52
 	github.com/garyburd/redigo v1.6.0 // indirect
 	github.com/go-chi/chi v3.3.3+incompatible
+	github.com/go-resty/resty/v2 v2.5.0
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/oleiade/reflections v1.0.1
 	github.com/onsi/ginkgo v1.8.0 // indirect

@@ -750,6 +750,9 @@ func newFakeKeycloakConfig() *Config {
 		Listen:                      "127.0.0.1:0",
 		ListenAdmin:                 "",
 		ListenAdminScheme:           "http",
+		TLSAdminCertificate:         "",
+		TLSAdminPrivateKey:          "",
+		TLSAdminCaCertificate:       "",
 		OAuthURI:                    "/oauth",
 		OpenIDProviderTimeout:       time.Second * 5,
 		SkipOpenIDProviderTLSVerify: false,
@@ -891,7 +894,7 @@ func (t *fakeToken) getToken() (string, error) {
 	}
 
 	var priv interface{}
-	priv, err0 := x509.ParsePKCS1PrivateKey(input)
+	priv, err0 := x509.ParsePKCS8PrivateKey(input)
 
 	if err0 != nil {
 		return "", err0
@@ -924,7 +927,7 @@ func (t *fakeToken) getUnsignedToken() (string, error) {
 	}
 
 	var priv interface{}
-	priv, err0 := x509.ParsePKCS1PrivateKey(input)
+	priv, err0 := x509.ParsePKCS8PrivateKey(input)
 
 	if err0 != nil {
 		return "", err0
