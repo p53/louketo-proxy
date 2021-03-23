@@ -1,3 +1,4 @@
+
 # Gatekeeper
 
 Gatekeeper is a proxy which integrates with OpenID Connect (OIDC) Providers, it supports both access tokens in a browser cookie or bearer tokens.
@@ -31,12 +32,19 @@ client-id: <CLIENT_ID>
 client-secret: <CLIENT_SECRET>
 # the interface definition you wish the proxy to listen, all interfaces is specified as ':<port>', unix sockets as unix://<REL_PATH>|</ABS PATH>
 listen: :3000
+# port on which metrics and health endpoints will be available, if not specified it will be on above specified port
+listen-admin: :4000
 # whether to enable refresh tokens
 enable-refresh-tokens: true
 # the location of a certificate you wish the proxy to use for TLS support
 tls-cert:
 # the location of a private key for TLS
 tls-private-key:
+# TLS options related to admin listener
+tls-admin-cert:
+tls-admin-private-key:
+tls-admin-ca-certificate:
+tls-admin-client-certificate:
 # the redirection URL, essentially the site URL, note: /oauth/callback is added at the end
 redirection-url: http://127.0.0.1:3000
 # the encryption key used to encode the session state
@@ -204,11 +212,9 @@ option uses a **contains** comparison on domains. So, if you wanted to
 match all domains under \*.svc.cluster.local you can use:
 `--forwarding-domain=svc.cluster.local`.
 
-At present, the service performs a login using OAuth *client\_credentials*
-grant type, so your IdP service must support direct (username/password)
-logins.
+You can choose between two types of OAuth authentications: *password* grant type (default) or *client\_credentials* grant type.
 
-Example setup:
+Example setup password grant:
 
 You have a collection of micro-services which are permitted to speak to
 one another; you have already set up the credentials, roles, and clients
@@ -216,7 +222,7 @@ in Keycloak, providing granular role controls over issue tokens.
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:1.2.2
+  image: quay.io/gogatekeeper/gatekeeper:1.3.0
   args:
   - --enable-forwarding=true
   - --forwarding-username=projecta
@@ -237,8 +243,37 @@ in Keycloak, providing granular role controls over issue tokens.
 - name: projecta
   image: some_images
 
-# test the forward proxy
-$ curl -k --proxy http://127.0.0.1:3000 https://test.projesta.svc.cluster.local
+```
+
+Example setup client credentials grant:
+
+``` yaml
+- name: gatekeeper
+  image: quay.io/gogatekeeper/gatekeeper:1.3.0
+  args:
+  - --enable-forwarding=true
+  - --forwarding-domains=projecta.svc.cluster.local
+  - --forwarding-domains=projectb.svc.cluster.local
+  - --client-id=xxxxxx
+  - --client-secret=xxxx
+  - --discovery-url=http://keycloak:8080/auth/realms/master
+  - --tls-ca-certificate=/etc/secrets/ca.pem
+  - --tls-ca-key=/etc/secrets/ca-key.pem
+  - --forwarding-grant-type=client_credentials
+  # Note: if you don't specify any forwarding domains, all domains will be signed; Also the code checks is the
+  # domain 'contains' the value (it's not a regex) so if you wanted to sign all requests to svc.cluster.local, just use
+  # svc.cluster.local
+  volumeMounts:
+  - name: keycloak-socket
+    mountPoint: /var/run/keycloak
+- name: projecta
+  image: some_images
+
+```    
+Test the forward proxy:
+
+```
+curl -k --proxy http://127.0.0.1:3000 https://test.projesta.svc.cluster.local
 ```
 
 On the receiver side, you could set up the Gatekeeper Proxy
@@ -468,6 +503,16 @@ variable would be accessible from `{{ .title }}`.
 <a href="{{ .redirect }}">Sign-in</a>
 </body>
 </html>
+```
+
+### Custom Error Page for Bad Request
+
+One use case for this is that: inside keycloak server have "required user actions" set to "Terms and Conditions". That means, if it is the first time an user access app X, he will need to accept the T&C or decline. If he accepts the terms, he can login fine to app X. However, if he declines it, he gets an empty error page with "bad request".
+
+You can use built-in template or your custom:
+
+```
+--error-page=templates/error.html.tmpl
 ```
 
 ## White-listed URL’s
