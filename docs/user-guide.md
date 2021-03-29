@@ -1,4 +1,3 @@
-
 # Gatekeeper
 
 Gatekeeper is a proxy which integrates with OpenID Connect (OIDC) Providers, it supports both access tokens in a browser cookie or bearer tokens.
@@ -199,6 +198,15 @@ resources does not matter, the router will handle that for you.
 By default, the access and refresh cookies are session-only and disposed
 of on browser close; you can disable this feature using the
 `--enable-session-cookies` option.
+
+## Cookie Names
+
+There are two parameters which you can use to set up cookie names for access token and refresh token.
+
+```
+--cookie-access-name=myAccessTokenCookie
+--cookie-refresh-name=myRefreshTokenCookie
+```
 
 ## Forward-signing proxy
 
