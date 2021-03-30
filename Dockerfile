@@ -36,7 +36,7 @@ LABEL Name=gatekeeper \
       Url=https://github.com/gogatekeeper/gatekeeper \
       Help=https://github.com/gogatekeeper/gatekeeper/issues
 
-COPY --from=build-env ${HOMEDIR} ${HOMEDIR}
+COPY --chown=1000:1000 --from=build-env ${HOMEDIR} ${HOMEDIR}
 COPY --from=build-env /etc/passwd /etc/passwd
 COPY --from=build-env /etc/group /etc/group
 COPY --from=build-env /usr/share/ca-certificates /usr/share/ca-certificates
