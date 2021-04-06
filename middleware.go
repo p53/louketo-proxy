@@ -52,15 +52,37 @@ var gzPool = sync.Pool{
 type gzipResponseWriter struct {
 	io.Writer
 	http.ResponseWriter
+	bytes int
+	code  int
+	tee   io.Writer
 }
 
 func (w *gzipResponseWriter) WriteHeader(status int) {
 	w.Header().Del("Content-Length")
 	w.ResponseWriter.WriteHeader(status)
+	w.code = status
 }
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	return w.Writer.Write(b)
+	n, err := w.Writer.Write(b)
+	w.bytes += n
+	return n, err
+}
+
+func (w *gzipResponseWriter) BytesWritten() int {
+	return w.bytes
+}
+
+func (w *gzipResponseWriter) Status() int {
+	return w.code
+}
+
+func (w *gzipResponseWriter) Tee(writ io.Writer) {
+	w.tee = writ
+}
+
+func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 // gzipMiddleware is responsible for compressing a response

@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"strings"
@@ -1899,64 +1900,122 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 }
 
 func TestGzipCompression(t *testing.T) {
+	cfg := newFakeKeycloakConfig()
+	s := httptest.NewServer(&fakeUpstreamService{})
+
 	requests := []struct {
-		EnableCompression bool
-		Request           fakeRequest
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
 	}{
 		{
-			EnableCompression: true,
-			Request: fakeRequest{
-				URI:           "/gambol99.htm",
-				ExpectedProxy: true,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
-				},
-				ExpectedHeaders: map[string]string{
-					"Content-Encoding": "gzip",
+			Name: "TestCompressionWithCustomURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = true
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/gambol99.htm",
+					ExpectedProxy: true,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedHeaders: map[string]string{
+						"Content-Encoding": "gzip",
+					},
 				},
 			},
 		},
 		{
-			EnableCompression: true,
-			Request: fakeRequest{
-				URI:           testAdminURI,
-				ExpectedProxy: false,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
-				},
-				ExpectedHeaders: map[string]string{
-					"Content-Encoding": "gzip",
+			Name: "TestCompressionWithAdminURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = true
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           testAdminURI,
+					ExpectedProxy: false,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedHeaders: map[string]string{
+						"Content-Encoding": "gzip",
+					},
 				},
 			},
 		},
 		{
-			EnableCompression: false,
-			Request: fakeRequest{
-				URI:           "/gambol99.htm",
-				ExpectedProxy: true,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
+			Name: "TestCompressionWithLogging",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = true
+				c.EnableLogging = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "/test",
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedHeaders: map[string]string{
+						"Content-Encoding": "gzip",
+					},
 				},
-				ExpectedNoProxyHeaders: []string{"Content-Encoding"},
 			},
 		},
 		{
-			EnableCompression: false,
-			Request: fakeRequest{
-				URI:           testAdminURI,
-				ExpectedProxy: false,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
+			Name: "TestWithoutCompressionCustomURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = false
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/gambol99.htm",
+					ExpectedProxy: true,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedNoProxyHeaders: []string{"Content-Encoding"},
 				},
-				ExpectedNoProxyHeaders: []string{"Content-Encoding"},
+			},
+		},
+		{
+			Name: "TestWithoutCompressionWithAdminURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = false
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           testAdminURI,
+					ExpectedProxy: false,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedNoProxyHeaders: []string{"Content-Encoding"},
+				},
 			},
 		},
 	}
 
-	for _, c := range requests {
-		cfg := newFakeKeycloakConfig()
-		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
-		cfg.EnableCompression = c.EnableCompression
-		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
+	for _, testCase := range requests {
+		testCase := testCase
+		c := cfg
+		c.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
+
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
 	}
 }
