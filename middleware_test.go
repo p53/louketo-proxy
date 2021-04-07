@@ -392,7 +392,24 @@ func TestMetricsMiddleware(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.EnableMetrics = true
 	cfg.LocalhostMetrics = true
+	cfg.EnableRefreshTokens = true
+	cfg.EnableEncryptedToken = true
+	cfg.EncryptionKey = testEncryptionKey
 	requests := []fakeRequest{
+		{
+			URI:           fakeAuthAllURL,
+			HasLogin:      true,
+			Redirects:     true,
+			OnResponse:    delay,
+			ExpectedProxy: true,
+			ExpectedCode:  http.StatusOK,
+		},
+		{
+			URI:           fakeAuthAllURL,
+			Redirects:     false,
+			ExpectedProxy: true,
+			ExpectedCode:  http.StatusOK,
+		},
 		{
 			URI: cfg.WithOAuthURI(metricsURL),
 			Headers: map[string]string{
@@ -406,8 +423,35 @@ func TestMetricsMiddleware(t *testing.T) {
 			ExpectedCode:            http.StatusOK,
 			ExpectedContentContains: "proxy_request_status_total",
 		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"issued\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"exchange\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"login\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"logout\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"renew\"",
+		},
 	}
-	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
+	p := newFakeProxy(cfg, &fakeAuthConfig{})
+	p.idp.setTokenExpiration(1000 * time.Millisecond)
+	p.RunTests(t, requests)
 }
 
 func TestOauthRequests(t *testing.T) {

@@ -75,6 +75,7 @@ func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, t string) (jwt.
 
 	defer cancel()
 
+	start := time.Now()
 	tkn, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: t}).Token()
 
 	if err != nil {
@@ -83,6 +84,11 @@ func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, t string) (jwt.
 		}
 		return jwt.JSONWebToken{}, "", "", time.Time{}, time.Duration(0), err
 	}
+
+	taken := time.Since(start).Seconds()
+	oauthTokensMetric.WithLabelValues("renew").Inc()
+	oauthLatencyMetric.WithLabelValues("renew").Observe(taken)
+
 	refreshExpiresIn := time.Until(tkn.Expiry)
 	token, err := jwt.ParseSigned(tkn.AccessToken)
 
