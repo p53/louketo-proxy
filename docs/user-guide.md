@@ -12,6 +12,9 @@ install Gatekeeper Proxy):
 ``` bash
     $ bin/gatekeeper help
 ```
+
+You can view all settings also in this table [Settings](settings.md)
+
 ## Requirements
 
   - Go 1.13 or higher
