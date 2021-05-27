@@ -29,7 +29,7 @@ import (
 func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, error) {
 	var isBearer bool
 	// step: check for a bearer token or cookie with jwt token
-	access, isBearer, err := getTokenInRequest(req, r.config.CookieAccessName)
+	access, isBearer, err := getTokenInRequest(req, r.config.CookieAccessName, r.config.SkipAuthorizationHeader)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +74,11 @@ func (r *oauthProxy) getRefreshTokenFromCookie(req *http.Request) (string, error
 }
 
 // getTokenInRequest returns the access token from the http request
-func getTokenInRequest(req *http.Request, name string) (string, bool, error) {
+func getTokenInRequest(req *http.Request, name string, skipAuthorizationHeader bool) (string, bool, error) {
 	bearer := true
 	// step: check for a token in the authorization header
 	token, err := getTokenInBearer(req)
-	if err != nil {
+	if err != nil || skipAuthorizationHeader {
 		if err != ErrSessionNotFound {
 			return "", false, err
 		}
