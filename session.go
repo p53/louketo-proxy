@@ -29,7 +29,7 @@ import (
 func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, error) {
 	var isBearer bool
 	// step: check for a bearer token or cookie with jwt token
-	access, isBearer, err := getTokenInRequest(req, r.config.CookieAccessName, r.config.SkipAuthorizationHeader)
+	access, isBearer, err := getTokenInRequest(req, r.config.CookieAccessName, r.config.SkipAuthorizationHeaderIdentity)
 	if err != nil {
 		return nil, err
 	}
@@ -74,14 +74,20 @@ func (r *oauthProxy) getRefreshTokenFromCookie(req *http.Request) (string, error
 }
 
 // getTokenInRequest returns the access token from the http request
-func getTokenInRequest(req *http.Request, name string, skipAuthorizationHeader bool) (string, bool, error) {
+func getTokenInRequest(req *http.Request, name string, skipAuthorizationHeaderIdentity bool) (string, bool, error) {
 	bearer := true
-	// step: check for a token in the authorization header
-	token, err := getTokenInBearer(req)
-	if err != nil || skipAuthorizationHeader {
-		if err != ErrSessionNotFound {
+	token := ""
+	var err error
+
+	if !skipAuthorizationHeaderIdentity {
+		token, err = getTokenInBearer(req)
+		if err != nil && err != ErrSessionNotFound {
 			return "", false, err
 		}
+	}
+
+	// step: check for a token in the authorization header
+	if err != nil || (err == nil && skipAuthorizationHeaderIdentity) {
 		if token, err = getTokenInCookie(req, name); err != nil {
 			return token, false, err
 		}

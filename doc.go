@@ -316,7 +316,7 @@ type Config struct {
 	// according RFC client id should not be checked on access token, this will be default true in future
 	SkipAccessTokenClientIDCheck bool `json:"skip-access-token-clientid-check" yaml:"skip-access-token-clientid-check" usage:"according RFC client id should not be checked on access token, this will be default true in future"`
 	// skip authorization header (e.g. if authorization header is used by application behind gatekeeper)
-	SkipAuthorizationHeader bool `json:"skip-authorization-header" yaml:"skip-authorization-header" usage:"skip authorization header (e.g. if authorization header is used by application behind gatekeeper)"`
+	SkipAuthorizationHeaderIdentity bool `json:"skip-authorization-header-identity" yaml:"skip-authorization-header-identity" usage:"skip authorization header identity, means that we won't be extracting token from authorization header (e.g. if authorization header is used only by application behind gatekeeper)"`
 	// UpstreamKeepalives specifies whether we use keepalives on the upstream
 	UpstreamKeepalives bool `json:"upstream-keepalives" yaml:"upstream-keepalives" usage:"enables or disables the keepalive connections for upstream endpoint"`
 	// UpstreamTimeout is the maximum amount of time a dial will wait for a connect to complete

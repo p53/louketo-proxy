@@ -83,6 +83,7 @@
 |    --skip-token-verification               | TESTING ONLY; bypass token verification, only expiration and roles enforced | false | |
 |    --skip-access-token-issuer-check        | according RFC issuer should not be checked on access token, this will be default true in future | | false | |
 |    --skip-access-token-clientid-check      | according RFC client id should not be checked on access token, this will be default true in future | false | |
+| --skip-authorization-header-identity | skip authorization header identity, means that we won't be extracting token from authorization header, only from cookie or fail if even no cookie present (e.g. if authorization header is used only by application behind gatekeeper)"` | false | |
 |    --upstream-keepalives                    | enables or disables the keepalive connections for upstream endpoint | true | |
 |    --upstream-timeout value                 | maximum amount of time a dial will wait for a connect to complete | 10s | |
 |    --upstream-keepalive-timeout value       | specifies the keep-alive period for an active network connection | 10s | |
