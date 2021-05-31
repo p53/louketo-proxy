@@ -103,44 +103,106 @@ func TestLoginHandlerNotDisabled(t *testing.T) {
 func TestLoginHandler(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	uri := c.WithOAuthURI(loginURL)
-	requests := []fakeRequest{
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
 		{
-			URI:          uri,
-			Method:       http.MethodPost,
-			ExpectedCode: http.StatusBadRequest,
-		},
-		{
-			URI:          uri,
-			Method:       http.MethodPost,
-			FormValues:   map[string]string{"username": "test"},
-			ExpectedCode: http.StatusBadRequest,
-		},
-		{
-			URI:          uri,
-			Method:       http.MethodPost,
-			FormValues:   map[string]string{"password": "test"},
-			ExpectedCode: http.StatusBadRequest,
-		},
-		{
-			URI:    uri,
-			Method: http.MethodPost,
-			FormValues: map[string]string{
-				"password": "test",
-				"username": "test",
+			Name:          "TestFailLoginWithoutCredentials",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:          uri,
+					Method:       http.MethodPost,
+					ExpectedCode: http.StatusBadRequest,
+				},
 			},
-			ExpectedCode: http.StatusOK,
 		},
 		{
-			URI:    uri,
-			Method: http.MethodPost,
-			FormValues: map[string]string{
-				"password": "test",
-				"username": "notmypassword",
+			Name:          "TestFailLoginWithoutPassword",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:          uri,
+					Method:       http.MethodPost,
+					FormValues:   map[string]string{"username": "test"},
+					ExpectedCode: http.StatusBadRequest,
+				},
 			},
-			ExpectedCode: http.StatusUnauthorized,
+		},
+		{
+			Name:          "TestFailLoginWithoutUsername",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:          uri,
+					Method:       http.MethodPost,
+					FormValues:   map[string]string{"password": "test"},
+					ExpectedCode: http.StatusBadRequest,
+				},
+			},
+		},
+		{
+			Name:          "TestLoginWithGoodCredentials",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:    uri,
+					Method: http.MethodPost,
+					FormValues: map[string]string{
+						"password": "test",
+						"username": "test",
+					},
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			Name: "TestLoginWithSkipTokenVerification",
+			ProxySettings: func(c *Config) {
+				c.SkipTokenVerification = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:    uri,
+					Method: http.MethodPost,
+					FormValues: map[string]string{
+						"password": "test",
+						"username": "test",
+					},
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			Name:          "TestFailLoginWithBadPassword",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:    uri,
+					Method: http.MethodPost,
+					FormValues: map[string]string{
+						"password": "test",
+						"username": "notmypassword",
+					},
+					ExpectedCode: http.StatusUnauthorized,
+				},
+			},
 		},
 	}
-	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }
 
 func TestSkipOpenIDProviderTLSVerifyLoginHandler(t *testing.T) {

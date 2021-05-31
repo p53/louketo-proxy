@@ -105,11 +105,11 @@ func newProxy(config *Config) (*oauthProxy, error) {
 	}
 
 	// initialize the openid client
-	if !config.SkipTokenVerification {
-		if svc.provider, svc.idpClient, err = svc.newOpenIDProvider(); err != nil {
-			return nil, err
-		}
-	} else {
+	if svc.provider, svc.idpClient, err = svc.newOpenIDProvider(); err != nil {
+		return nil, err
+	}
+
+	if config.SkipTokenVerification {
 		log.Warn("TESTING ONLY CONFIG - access token verification has been disabled")
 	}
 

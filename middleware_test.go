@@ -110,10 +110,6 @@ func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 		panic("failed to create the proxy service, error: " + err.Error())
 	}
 	c.RedirectionURL = fmt.Sprintf("http://%s", proxy.listener.Addr().String())
-	// step: we need to update the client configs
-	if proxy.provider, proxy.idpClient, err = proxy.newOpenIDProvider(); err != nil {
-		panic("failed to recreate the openid client, error: " + err.Error())
-	}
 
 	return &fakeProxy{c, auth, proxy, make(map[string]*http.Cookie)}
 }
