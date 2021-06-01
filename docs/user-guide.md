@@ -233,7 +233,7 @@ in Keycloak, providing granular role controls over issue tokens.
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:1.3.1
+  image: quay.io/gogatekeeper/gatekeeper:1.3.2
   args:
   - --enable-forwarding=true
   - --forwarding-username=projecta
@@ -260,7 +260,7 @@ Example setup client credentials grant:
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:1.3.1
+  image: quay.io/gogatekeeper/gatekeeper:1.3.2
   args:
   - --enable-forwarding=true
   - --forwarding-domains=projecta.svc.cluster.local
@@ -349,6 +349,12 @@ you prefer to encrypt the session cookie, use the
 `--enable-encrypted-token` and `--encryption-key` options. Note that the
 access token forwarded in the X-Auth-Token header to upstream is
 unaffected.
+
+## Bearer token passthrough
+
+If your Bearer token is intended for your upstream application and not for gatekeeper
+you can use option ``--skip-authorization-header-identity``. Please be aware that
+token is still required to be in cookies.
 
 ## Upstream headers
 
