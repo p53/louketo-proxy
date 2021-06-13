@@ -282,7 +282,7 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 
 		switch r.useStore() {
 		case true:
-			if err = r.StoreRefreshToken(accessToken, encrypted, expiration); err != nil {
+			if err = r.StoreRefreshToken(rawToken, encrypted, expiration); err != nil {
 				r.log.Warn(
 					"failed to save the refresh token in the store",
 					zap.Error(err),
@@ -429,7 +429,7 @@ func (r *oauthProxy) loginHandler(w http.ResponseWriter, req *http.Request) {
 
 			switch r.useStore() {
 			case true:
-				if err = r.StoreRefreshToken(accessToken, encrypted, expiration); err != nil {
+				if err = r.StoreRefreshToken(token.AccessToken, encrypted, expiration); err != nil {
 					r.log.Warn("failed to save the refresh token in the store", zap.Error(err))
 				}
 			default:
@@ -721,6 +721,7 @@ func (r *oauthProxy) retrieveRefreshToken(req *http.Request, user *userContext) 
 	default:
 		token, err = r.getRefreshTokenFromCookie(req)
 	}
+
 	if err != nil {
 		return
 	}
