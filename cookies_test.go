@@ -26,7 +26,7 @@ import (
 
 func TestCookieDomainHostHeader(t *testing.T) {
 	svc := newTestService()
-	resp, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
@@ -49,7 +49,7 @@ func TestCookieBasePath(t *testing.T) {
 
 	_, _, svc := newTestProxyService(cfg)
 
-	resp, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
@@ -70,7 +70,7 @@ func TestCookieWithoutBasePath(t *testing.T) {
 
 	_, _, svc := newTestProxyService(cfg)
 
-	resp, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
@@ -89,7 +89,7 @@ func TestCookieWithoutBasePath(t *testing.T) {
 func TestCookieDomain(t *testing.T) {
 	p, _, svc := newTestProxyService(nil)
 	p.config.CookieDomain = "domain.com"
-	resp, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
@@ -280,4 +280,124 @@ func TestGetMaxCookieChunkLength(t *testing.T) {
 	p.config.CookieDomain = ""
 	assert.Equal(t, p.getMaxCookieChunkLength(req, ""), 4021,
 		"cookie chunk calculation is not correct")
+}
+
+func TestCustomCookieNames(t *testing.T) {
+	cfg := newFakeKeycloakConfig()
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestCustomStateCookiePresent",
+			ProxySettings: func(c *Config) {
+				c.Verbose = true
+				c.EnableLogging = true
+				c.CookieOAuthStateName = "customState"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL,
+					HasLogin:      true,
+					Redirects:     true,
+					OnResponse:    delay,
+					ExpectedProxy: true,
+					ExpectedCode:  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+						"customState": func(t *testing.T, c *Config, value string) bool {
+							return assert.NotEqual(t, "", value)
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "TestCustomAccessCookiePresent",
+			ProxySettings: func(c *Config) {
+				c.Verbose = true
+				c.EnableLogging = true
+				c.CookieAccessName = "customAccess"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL,
+					HasLogin:      true,
+					Redirects:     true,
+					OnResponse:    delay,
+					ExpectedProxy: true,
+					ExpectedCode:  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+						"customAccess": func(t *testing.T, c *Config, value string) bool {
+							return assert.NotEqual(t, "", value)
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "TestCustomRefreshCookiePresent",
+			ProxySettings: func(c *Config) {
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EnableRefreshTokens = true
+				c.CookieRefreshName = "customRefresh"
+				c.EncryptionKey = testEncryptionKey
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL,
+					HasLogin:      true,
+					Redirects:     true,
+					OnResponse:    delay,
+					ExpectedProxy: true,
+					ExpectedCode:  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+						"customRefresh": func(t *testing.T, c *Config, value string) bool {
+							return assert.NotEqual(t, "", value)
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "TestCustomRedirectUriCookiePresent",
+			ProxySettings: func(c *Config) {
+				c.Verbose = true
+				c.EnableLogging = true
+				c.CookieRequestUriName = "customRedirect"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL,
+					HasLogin:      true,
+					Redirects:     true,
+					OnResponse:    delay,
+					ExpectedProxy: true,
+					ExpectedCode:  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+						"customRedirect": func(t *testing.T, c *Config, value string) bool {
+							return assert.NotEqual(t, "", value)
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		cfgCopy := *cfg
+		c := &cfgCopy
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.idp.setTokenExpiration(1000 * time.Millisecond)
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }

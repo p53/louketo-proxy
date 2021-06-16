@@ -957,18 +957,28 @@ func newFakeKeycloakConfig() *Config {
 	}
 }
 
-func makeTestCodeFlowLogin(location string) (*http.Response, error) {
+func makeTestCodeFlowLogin(location string) (*http.Response, []*http.Cookie, error) {
+	flowCookies := make([]*http.Cookie, 0)
+
 	u, err := url.Parse(location)
+
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// step: get the redirect
 	var resp *http.Response
 	for count := 0; count < 4; count++ {
 		req, err := http.NewRequest(http.MethodGet, location, nil)
+
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+
+		if resp != nil {
+			cookies := resp.Cookies()
+			flowCookies = append(flowCookies, cookies...)
+		}
+
 		// step: make the request
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{
@@ -976,19 +986,24 @@ func makeTestCodeFlowLogin(location string) (*http.Response, error) {
 				InsecureSkipVerify: true,
 			},
 		}
+
 		resp, err = tr.RoundTrip(req)
+
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
+
 		if resp.StatusCode != http.StatusSeeOther {
-			return nil, fmt.Errorf("no redirection found in resp, status code %d", resp.StatusCode)
+			return nil, nil, fmt.Errorf("no redirection found in resp, status code %d", resp.StatusCode)
 		}
+
 		location = resp.Header.Get("Location")
+
 		if !strings.HasPrefix(location, "http") && !strings.HasPrefix(location, "https") {
 			location = fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, location)
 		}
 	}
-	return resp, nil
+	return resp, flowCookies, nil
 }
 
 // fakeUpstreamResponse is the response from fake upstream

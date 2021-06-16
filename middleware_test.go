@@ -353,7 +353,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 }
 
 func (f *fakeProxy) performUserLogin(uri string) error {
-	resp, err := makeTestCodeFlowLogin(f.getServiceURL() + uri)
+	resp, flowCookies, err := makeTestCodeFlowLogin(f.getServiceURL() + uri)
 	if err != nil {
 		return err
 	}
@@ -367,6 +367,11 @@ func (f *fakeProxy) performUserLogin(uri string) error {
 			}
 		}
 	}
+
+	for i, cook := range flowCookies {
+		f.cookies[cook.Name] = flowCookies[i]
+	}
+
 	defer resp.Body.Close()
 
 	return nil
