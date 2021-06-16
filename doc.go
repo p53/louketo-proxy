@@ -173,26 +173,26 @@ type Config struct {
 	// OAuthURI is the uri for the oauth endpoints for the proxy
 	OAuthURI string `json:"oauth-uri" yaml:"oauth-uri" usage:"the uri for proxy oauth endpoints" env:"OAUTH_URI"`
 	// Scopes is a list of scope we should request
-	Scopes []string `json:"scopes" yaml:"scopes" usage:"list of scopes requested when authenticating the user" env:"SCOPES"`
+	Scopes []string `json:"scopes" yaml:"scopes" usage:"list of scopes requested when authenticating the user"`
 	// Upstream is the upstream endpoint i.e whom were proxying to
 	Upstream string `json:"upstream-url" yaml:"upstream-url" usage:"url for the upstream endpoint you wish to proxy" env:"UPSTREAM_URL"`
 	// UpstreamCA is the path to a CA certificate in PEM format to validate the upstream certificate
 	UpstreamCA string `json:"upstream-ca" yaml:"upstream-ca" usage:"the path to a file container a CA certificate to validate the upstream tls endpoint" env:"UPSTREAM_CA"`
 	// Resources is a list of protected resources
-	Resources []*Resource `json:"resources" yaml:"resources" usage:"list of resources 'uri=/admin*|methods=GET,PUT|roles=role1,role2'" env:"RESOURCES"`
+	Resources []*Resource `json:"resources" yaml:"resources" usage:"list of resources 'uri=/admin*|methods=GET,PUT|roles=role1,role2'"`
 	// Headers permits adding customs headers across the board
-	Headers map[string]string `json:"headers" yaml:"headers" usage:"custom headers to the upstream request, key=value" env:"HEADERS"`
+	Headers map[string]string `json:"headers" yaml:"headers" usage:"custom headers to the upstream request, key=value"`
 	// PreserveHost preserves the host header of the proxied request in the upstream request
 	PreserveHost bool `json:"preserve-host" yaml:"preserve-host" usage:"preserve the host header of the proxied request in the upstream request" env:"PRESERVE_HOST"`
 	// RequestIDHeader is the header name for request ids
 	RequestIDHeader string `json:"request-id-header" yaml:"request-id-header" usage:"the http header name for request id" env:"REQUEST_ID_HEADER"`
 	// ResponseHeader is a map of response headers to add to the response
-	ResponseHeaders map[string]string `json:"response-headers" yaml:"response-headers" usage:"custom headers to added to the http response key=value" env:"RESPONSE_HEADERS"`
+	ResponseHeaders map[string]string `json:"response-headers" yaml:"response-headers" usage:"custom headers to added to the http response key=value"`
 
 	// EnableSelfSignedTLS indicates we should create a self-signed ceritificate for the service
 	EnabledSelfSignedTLS bool `json:"enable-self-signed-tls" yaml:"enable-self-signed-tls" usage:"create self signed certificates for the proxy" env:"ENABLE_SELF_SIGNED_TLS"`
 	// SelfSignedTLSHostnames is the list of hostnames to place on the certificate
-	SelfSignedTLSHostnames []string `json:"self-signed-tls-hostnames" yaml:"self-signed-tls-hostnames" usage:"a list of hostnames to place on the self-signed certificate" env:"SELF_SIGNED_TLS_HOSTNAMES"`
+	SelfSignedTLSHostnames []string `json:"self-signed-tls-hostnames" yaml:"self-signed-tls-hostnames" usage:"a list of hostnames to place on the self-signed certificate"`
 	// SelfSignedTLSExpiration is the expiration time of the tls certificate before rotation occurs
 	SelfSignedTLSExpiration time.Duration `json:"self-signed-tls-expiration" yaml:"self-signed-tls-expiration" usage:"the expiration of the certificate before rotation" env:"SELF_SIGNED_TLS_EXPIRATION"`
 
@@ -261,9 +261,9 @@ type Config struct {
 	SameSiteCookie string `json:"same-site-cookie" yaml:"same-site-cookie" usage:"enforces cookies to be send only to same site requests according to the policy (can be Strict|Lax|None)" env:"SAME_SITE_COOKIE"`
 
 	// MatchClaims is a series of checks, the claims in the token must match those here
-	MatchClaims map[string]string `json:"match-claims" yaml:"match-claims" usage:"keypair values for matching access token claims e.g. aud=myapp, iss=http://example.*" env:"MATCH_CLAIMS"`
+	MatchClaims map[string]string `json:"match-claims" yaml:"match-claims" usage:"keypair values for matching access token claims e.g. aud=myapp, iss=http://example.*"`
 	// AddClaims is a series of claims that should be added to the auth headers
-	AddClaims []string `json:"add-claims" yaml:"add-claims" usage:"extra claims from the token and inject into headers, e.g given_name -> X-Auth-Given-Name" env:"ADD_CLAIMS"`
+	AddClaims []string `json:"add-claims" yaml:"add-claims" usage:"extra claims from the token and inject into headers, e.g given_name -> X-Auth-Given-Name"`
 
 	// TLSCertificate is the location for a tls certificate
 	TLSCertificate string `json:"tls-cert" yaml:"tls-cert" usage:"path to ths TLS certificate" env:"TLS_CERTIFICATE"`
@@ -288,19 +288,19 @@ type Config struct {
 	TLSAdminClientCertificate string `json:"tls-admin-client-certificate" yaml:"tls-admin-client-certificate" usage:"path to the client certificate for outbound connections in reverse and forwarding proxy modes" env:"TLS_ADMIN_CLIENT_CERTIFICATE"`
 
 	// CorsOrigins is a list of origins permitted
-	CorsOrigins []string `json:"cors-origins" yaml:"cors-origins" usage:"origins to add to the CORE origins control (Access-Control-Allow-Origin)" env:"CORS_ORIGINS"`
+	CorsOrigins []string `json:"cors-origins" yaml:"cors-origins" usage:"origins to add to the CORE origins control (Access-Control-Allow-Origin)"`
 	// CorsMethods is a set of access control methods
-	CorsMethods []string `json:"cors-methods" yaml:"cors-methods" usage:"methods permitted in the access control (Access-Control-Allow-Methods)" env:"CORS_METHODS"`
+	CorsMethods []string `json:"cors-methods" yaml:"cors-methods" usage:"methods permitted in the access control (Access-Control-Allow-Methods)"`
 	// CorsHeaders is a set of cors headers
-	CorsHeaders []string `json:"cors-headers" yaml:"cors-headers" usage:"set of headers to add to the CORS access control (Access-Control-Allow-Headers)" env:"CORS_HEADERS"`
+	CorsHeaders []string `json:"cors-headers" yaml:"cors-headers" usage:"set of headers to add to the CORS access control (Access-Control-Allow-Headers)"`
 	// CorsExposedHeaders are the exposed header fields
-	CorsExposedHeaders []string `json:"cors-exposed-headers" yaml:"cors-exposed-headers" usage:"expose cors headers access control (Access-Control-Expose-Headers)" env:"CORS_EXPOSED_HEADERS"`
+	CorsExposedHeaders []string `json:"cors-exposed-headers" yaml:"cors-exposed-headers" usage:"expose cors headers access control (Access-Control-Expose-Headers)"`
 	// CorsCredentials set the credentials flag
 	CorsCredentials bool `json:"cors-credentials" yaml:"cors-credentials" usage:"credentials access control header (Access-Control-Allow-Credentials)" env:"CORS_CREDENTIALS"`
 	// CorsMaxAge is the age for CORS
 	CorsMaxAge time.Duration `json:"cors-max-age" yaml:"cors-max-age" usage:"max age applied to cors headers (Access-Control-Max-Age)" env:"CORS_MAX_AGE"`
 	// Hostnames is a list of hostname's the service should response to
-	Hostnames []string `json:"hostnames" yaml:"hostnames" usage:"list of hostnames the service will respond to" env:"HOSTNAMES"`
+	Hostnames []string `json:"hostnames" yaml:"hostnames" usage:"list of hostnames the service will respond to"`
 
 	// Store is a url for a store resource, used to hold the refresh tokens
 	StoreURL string `json:"store-url" yaml:"store-url" usage:"url for the storage subsystem, e.g redis://127.0.0.1:6379, file:///etc/tokens.file" env:"STORE_URL"`
@@ -360,7 +360,7 @@ type Config struct {
 	// ErrorPage is the relative url for the custom error page
 	ErrorPage string `json:"error-page" yaml:"error-page" usage:"path to custom template displayed for http.StatusBadRequest" env:"ERROR_PAGE"`
 	// Tags is passed to the templates
-	Tags map[string]string `json:"tags" yaml:"tags" usage:"keypairs passed to the templates at render,e.g title=Page" env:"TAGS"`
+	Tags map[string]string `json:"tags" yaml:"tags" usage:"keypairs passed to the templates at render,e.g title=Page"`
 
 	ForwardingGrantType string `json:"forwarding-grant-type" yaml:"forwarding-grant-type" usage:"grant-type to use when logging into the openid provider, can be one of password, client_credentials" env:"FORWARDING_GRANT_TYPE"`
 	// ForwardingUsername is the username to login to the oauth service
@@ -368,7 +368,7 @@ type Config struct {
 	// ForwardingPassword is the password to use for the above
 	ForwardingPassword string `json:"forwarding-password" yaml:"forwarding-password" usage:"password to use when logging into the openid provider" env:"FORWARDING_PASSWORD"`
 	// ForwardingDomains is a collection of domains to signs
-	ForwardingDomains []string `json:"forwarding-domains" yaml:"forwarding-domains" usage:"list of domains which should be signed; everything else is relayed unsigned" env:"FORWARDING_DOMAINS"`
+	ForwardingDomains []string `json:"forwarding-domains" yaml:"forwarding-domains" usage:"list of domains which should be signed; everything else is relayed unsigned"`
 
 	// DisableAllLogging indicates no logging at all
 	DisableAllLogging bool `json:"disable-all-logging" yaml:"disable-all-logging" usage:"disables all logging to stdout and stderr" env:"DISABLE_ALL_LOGGING"`

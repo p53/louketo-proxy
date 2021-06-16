@@ -16,16 +16,16 @@
 |    --openid-provider-timeout value         | timeout for openid configuration on .well-known/openid-configuration | 30s | PROXY_OPENID_PROVIDER_TIMEOUT
 |    --base-uri value                        | common prefix for all URIs | | PROXY_BASE_URI
 |    --oauth-uri value                       | the uri for proxy oauth endpoints | /oauth | PROXY_OAUTH_URI
-|    --scopes value                          | list of scopes requested when authenticating the user | | PROXY_SCOPES
+|    --scopes value                          | list of scopes requested when authenticating the user | |
 |    --upstream-url value                    | url for the upstream endpoint you wish to proxy | | PROXY_UPSTREAM_URL
 |    --upstream-ca value                     | the path to a file container a CA certificate to validate the upstream tls endpoint | | PROXY_UPSTREAM_CA
-|    --resources value                       | list of resources 'uri=/admin*\|methods=GET,PUT\|roles=role1,role2' | | PROXY_RESOURCES
-|    --headers value                         | custom headers to the upstream request, key=value | | PROXY_HEADERS
+|    --resources value                       | list of resources 'uri=/admin*\|methods=GET,PUT\|roles=role1,role2' | |
+|    --headers value                         | custom headers to the upstream request, key=value | |
 |    --preserve-host                         | preserve the host header of the proxied request in the upstream request | false | PROXY_PRESERVE_HOST
 |    --request-id-header value               | the http header name for request id | X-Request-ID | PROXY_REQUEST_ID_HEADER
 |    --response-headers value                | custom headers to added to the http response key=value | | PROXY_RESPONSE_HEADERS
 |    --enable-self-signed-tls                | create self signed certificates for the proxy | false | PROXY_ENABLE_SELF_SIGNED_TLS
-|    --self-signed-tls-hostnames value       | a list of hostnames to place on the self-signed certificate | | PROXY_SELF_SIGNED_TLS_HOSTNAMES
+|    --self-signed-tls-hostnames value       | a list of hostnames to place on the self-signed certificate | |
 |    --self-signed-tls-expiration value      | the expiration of the certificate before rotation | 3h0m0s | PROXY_SELF_SIGNED_TLS_EXPIRATION
 |    --enable-request-id                     | indicates we should add a request id if none found | false | PROXY_ENABLE_REQUEST_ID |
 |    --enable-logout-redirect                | indicates we should redirect to the identity provider for logging out | false | PROXY_ENABLE_LOGOUT_REDIRECT
@@ -58,8 +58,8 @@
 |    --secure-cookie                         | enforces the cookie to be secure | true | PROXY_SECURE_COOKIE
 |    --http-only-cookie                      | enforces the cookie is in http only mode | true | PROXY_HTTP_ONLY_COOKIE
 |    --same-site-cookie value                | enforces cookies to be send only to same site requests according to the policy (can be \| Strict\|Lax\|None) | Lax | PROXY_SAME_SITE_COOKIE
-|    --match-claims value                    | keypair values for matching access token claims e.g. aud=myapp, iss=http://example.* | | PROXY_MATCH_CLAIMS
-|    --add-claims value                      | extra claims from the token and inject into headers, e.g given_name -> X-Auth-Given-Name | | PROXY_ADD_CLAIMS
+|    --match-claims value                    | keypair values for matching access token claims e.g. aud=myapp, iss=http://example.* | |
+|    --add-claims value                      | extra claims from the token and inject into headers, e.g given_name -> X-Auth-Given-Name | |
 |    --tls-cert value                        | path to ths TLS certificate | | PROXY_TLS_CERTIFICATE
 |    --tls-private-key value                 | path to the private key for TLS | | PROXY_TLS_PRIVATE_KEY
 |    --tls-ca-certificate value              | path to the ca certificate used for signing requests | | PROXY_TLS_CA_CERTIFICATE
@@ -70,13 +70,13 @@
 |    --tls-admin-private-key value           | path to the private key for TLS | | PROXY_TLS_ADMIN_PRIVATE_KEY |
 |    --tls-admin-ca-certificate value        | path to the ca certificate used for signing requests | | PROXY_TLS_ADMIN_CA_CERTIFICATE |
 |    --tls-admin-client-certificate value    | path to the client certificate for outbound connections in reverse and forwarding proxy modes | | PROXY_TLS_ADMIN_CLIENT_CERTIFICATE |
-|    --cors-origins value                    | origins to add to the CORE origins control (Access-Control-Allow-Origin) | | PROXY_CORS_ORIGINS
-|    --cors-methods value                    | methods permitted in the access control (Access-Control-Allow-Methods) | | PROXY_CORS_METHODS
-|    --cors-headers value                    | set of headers to add to the CORS access control (Access-Control-Allow-Headers) | | PROXY_CORS_HEADERS
-|    --cors-exposed-headers value            | expose cors headers access control (Access-Control-Expose-Headers) | | PROXY_CORS_EXPOSED_HEADERS
+|    --cors-origins value                    | origins to add to the CORE origins control (Access-Control-Allow-Origin) | |
+|    --cors-methods value                    | methods permitted in the access control (Access-Control-Allow-Methods) | |
+|    --cors-headers value                    | set of headers to add to the CORS access control (Access-Control-Allow-Headers) | |
+|    --cors-exposed-headers value            | expose cors headers access control (Access-Control-Expose-Headers) | |
 |    --cors-credentials                      | credentials access control header (Access-Control-Allow-Credentials) | false | PROXY_CORS_CREDENTIALS
 |    --cors-max-age value                    | max age applied to cors headers (Access-Control-Max-Age) | 0s | PROXY_CORS_MAX_AGE
-|    --hostnames value                       | list of hostnames the service will respond to | | PROXY_HOSTNAMES
+|    --hostnames value                       | list of hostnames the service will respond to | |
 |    --store-url value                       | url for the storage subsystem, e.g redis://127.0.0.1:6379, file:///etc/tokens.file | | PROXY_STORE_URL
 |    --encryption-key value                  | encryption key used to encryption the session state | | PROXY_ENCRYPTION_KEY
 |    --no-redirects                          | do not have back redirects when no authentication is present, 401 them | false | PROXY_NO_REDIRECTS
@@ -102,11 +102,11 @@
 |    --sign-in-page value                     | path to custom template displayed for signin | | PROXY_SIGN_IN_PAGE
 |    --forbidden-page value                   | path to custom template used for access forbidden | | PROXY_FORBIDDEN_PAGE
 |    --error-page value                       | path to custom template displayed for http.StatusBadRequest | | PROXY_ERROR_PAGE
-|    --tags value                             | keypairs passed to the templates at render,e.g title=Page | | PROXY_TAGS
+|    --tags value                             | keypairs passed to the templates at render,e.g title=Page | |
 |    --forwarding-grant-type value            | grant-type to use when logging into the openid provider, can be one of password, client_credentials | password | PROXY_FORWARDING_GRANT_TYPE
 |    --forwarding-username value              | username to use when logging into the openid provider | | PROXY_FORWARDING_USERNAME
 |    --forwarding-password value              | password to use when logging into the openid provider | | PROXY_FORWARDING_PASSWORD
-|    --forwarding-domains value               | list of domains which should be signed; everything else is relayed unsigned | | PROXY_FORWARDING_DOMAINS
+|    --forwarding-domains value               | list of domains which should be signed; everything else is relayed unsigned | |
 |    --disable-all-logging                    | disables all logging to stdout and stderr | false | PROXY_DISABLE_ALL_LOGGING
 |    --help, -h                               | show help
 |    --version, -v                            | print the version
