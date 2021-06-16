@@ -55,6 +55,8 @@
 |    --cookie-domain value                   | domain the access cookie is available to, defaults host header | | PROXY_COOKIE_DOMAIN
 |    --cookie-access-name value              | name of the cookie use to hold the access token | kc-access | PROXY_COOKIE_ACCESS_NAME
 |    --cookie-refresh-name value             | name of the cookie used to hold the encrypted refresh token | kc-state | PROXY_COOKIE_REFRESH_NAME
+|    --cookie-oauth-state-name value         | name of the cookie used to hold the Oauth request state | OAuth_Token_Request_State | COOKIE_OAUTH_STATE_NAME
+|    --cookie-request-uri-name value             | name of the cookie used to hold the request uri | request_uri | COOKIE_REQUEST_URI_NAME
 |    --secure-cookie                         | enforces the cookie to be secure | true | PROXY_SECURE_COOKIE
 |    --http-only-cookie                      | enforces the cookie is in http only mode | true | PROXY_HTTP_ONLY_COOKIE
 |    --same-site-cookie value                | enforces cookies to be send only to same site requests according to the policy (can be \| Strict\|Lax\|None) | Lax | PROXY_SAME_SITE_COOKIE
