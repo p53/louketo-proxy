@@ -59,7 +59,7 @@ func (r *oauthProxy) getRedirectionURL(w http.ResponseWriter, req *http.Request)
 		redirect = r.config.RedirectionURL
 	}
 
-	state, _ := req.Cookie(requestStateCookie)
+	state, _ := req.Cookie(r.config.CookieOAuthStateName)
 	if state != nil && req.URL.Query().Get("state") != state.Value {
 		r.log.Error("state parameter mismatch")
 		w.WriteHeader(http.StatusForbidden)
@@ -300,7 +300,7 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 	// step: decode the request variable
 	redirectURI := "/"
 	if req.URL.Query().Get("state") != "" {
-		if encodedRequestURI, _ := req.Cookie(requestURICookie); encodedRequestURI != nil {
+		if encodedRequestURI, _ := req.Cookie(r.config.CookieRequestUriName); encodedRequestURI != nil {
 			decoded, _ := base64.StdEncoding.DecodeString(encodedRequestURI.Value)
 			redirectURI = string(decoded)
 		}

@@ -37,6 +37,8 @@ func newDefaultConfig() *Config {
 		AccessTokenDuration:           time.Duration(720) * time.Hour,
 		CookieAccessName:              accessCookie,
 		CookieRefreshName:             refreshCookie,
+		CookieOAuthStateName:          requestStateCookie,
+		CookieRequestUriName:          requestURICookie,
 		EnableAuthorizationCookies:    true,
 		EnableAuthorizationHeader:     true,
 		EnableDefaultDeny:             true,
