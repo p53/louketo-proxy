@@ -3,6 +3,7 @@ module github.com/gogatekeeper/gatekeeper
 require (
 	github.com/PuerkitoBio/purell v1.1.2-0.20201208131035-5a810c9252c4
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
+	github.com/alicebob/miniredis/v2 v2.14.5
 	github.com/armon/go-proxyproto v0.0.0-20200108142055-f0b8253b1507
 	github.com/coreos/go-oidc/v3 v3.0.0-alpha.1.0.20200720190252-3bc5a7eb4df0
 	github.com/elazarl/goproxy v0.0.0-20210110162100-a92cc753f88e

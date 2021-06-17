@@ -29,6 +29,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	resty "github.com/go-resty/resty/v2"
 	uuid "github.com/gofrs/uuid"
 	"github.com/oleiade/reflections"
@@ -1543,6 +1544,13 @@ func checkRefreshTokenEncryption(t *testing.T, cfg *Config, value string) bool {
 
 func TestAccessTokenEncryption(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
+	redisServer, err := miniredis.Run()
+
+	if err != nil {
+		t.Fatalf("Starting redis failed %s", err)
+	}
+
+	defer redisServer.Close()
 
 	testCases := []struct {
 		Name              string
@@ -1558,6 +1566,36 @@ func TestAccessTokenEncryption(t *testing.T) {
 				c.EnableLogging = true
 				c.EncryptionKey = testEncryptionKey
 				c.StoreURL = "boltdb:////tmp/test.boltdb"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                           fakeAuthAllURL,
+					HasLogin:                      true,
+					Redirects:                     true,
+					OnResponse:                    delay,
+					ExpectedProxy:                 true,
+					ExpectedCode:                  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+				{
+					URI:                      fakeAuthAllURL,
+					Redirects:                false,
+					ExpectedProxy:            true,
+					ExpectedCode:             http.StatusOK,
+					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+			},
+		},
+		{
+			Name: "TestEnableEncryptedTokenWithRedis",
+			ProxySettings: func(c *Config) {
+				c.EnableRefreshTokens = true
+				c.EnableEncryptedToken = true
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EncryptionKey = testEncryptionKey
+				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			ExecutionSettings: []fakeRequest{
 				{
