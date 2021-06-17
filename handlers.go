@@ -300,7 +300,7 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 	// step: decode the request variable
 	redirectURI := "/"
 	if req.URL.Query().Get("state") != "" {
-		if encodedRequestURI, _ := req.Cookie(r.config.CookieRequestUriName); encodedRequestURI != nil {
+		if encodedRequestURI, _ := req.Cookie(r.config.CookieRequestURIName); encodedRequestURI != nil {
 			decoded, _ := base64.StdEncoding.DecodeString(encodedRequestURI.Value)
 			redirectURI = string(decoded)
 		}

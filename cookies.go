@@ -126,7 +126,7 @@ func (r *oauthProxy) writeStateParameterCookie(req *http.Request, w http.Respons
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	requestURI := base64.StdEncoding.EncodeToString([]byte(req.URL.RequestURI()))
-	r.dropCookie(w, req.Host, r.config.CookieRequestUriName, requestURI, 0)
+	r.dropCookie(w, req.Host, r.config.CookieRequestURIName, requestURI, 0)
 	r.dropCookie(w, req.Host, r.config.CookieOAuthStateName, uuid.String(), 0)
 	return uuid.String()
 }

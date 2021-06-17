@@ -255,8 +255,8 @@ type Config struct {
 	CookieRefreshName string `json:"cookie-refresh-name" yaml:"cookie-refresh-name" usage:"name of the cookie used to hold the encrypted refresh token" env:"COOKIE_REFRESH_NAME"`
 	// CookieOAuthStateName is the name of the Oauth Token request state
 	CookieOAuthStateName string `json:"cookie-oauth-state-name" yaml:"cookie-oauth-state-name" usage:"name of the cookie used to hold the Oauth request state" env:"COOKIE_OAUTH_STATE_NAME"`
-	// CookieRequestUriName is the name of the Request Uri cookie
-	CookieRequestUriName string `json:"cookie-request-uri-name" yaml:"cookie-request-uri-name" usage:"name of the cookie used to hold the request uri" env:"COOKIE_REQUEST_URI_NAME"`
+	// CookieRequestURIName is the name of the Request Uri cookie
+	CookieRequestURIName string `json:"cookie-request-uri-name" yaml:"cookie-request-uri-name" usage:"name of the cookie used to hold the request uri" env:"COOKIE_REQUEST_URI_NAME"`
 	// SecureCookie enforces the cookie as secure
 	SecureCookie bool `json:"secure-cookie" yaml:"secure-cookie" usage:"enforces the cookie to be secure" env:"SECURE_COOKIE"`
 	// HTTPOnlyCookie enforces the cookie as http only

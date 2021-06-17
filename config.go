@@ -38,7 +38,7 @@ func newDefaultConfig() *Config {
 		CookieAccessName:              accessCookie,
 		CookieRefreshName:             refreshCookie,
 		CookieOAuthStateName:          requestStateCookie,
-		CookieRequestUriName:          requestURICookie,
+		CookieRequestURIName:          requestURICookie,
 		EnableAuthorizationCookies:    true,
 		EnableAuthorizationHeader:     true,
 		EnableDefaultDeny:             true,

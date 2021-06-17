@@ -366,7 +366,7 @@ func TestCustomCookieNames(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.Verbose = true
 				c.EnableLogging = true
-				c.CookieRequestUriName = "customRedirect"
+				c.CookieRequestURIName = "customRedirect"
 			},
 			ExecutionSettings: []fakeRequest{
 				{
