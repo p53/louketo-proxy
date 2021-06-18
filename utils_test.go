@@ -88,22 +88,22 @@ func TestDecodeKeyPairs(t *testing.T) {
 
 func TestGetRequestHostURL(t *testing.T) {
 	cs := []struct {
-		Expected   string
-		HostHeader string
-		Hostname   string
-		TLS        *tls.ConnectionState
+		Expected string
+		Hostname string
+		Headers  map[string]string
+		TLS      *tls.ConnectionState
 	}{
 		{
 			Expected: "http://www.test.com",
-			Hostname: "www.test.com",
+			Headers:  map[string]string{"X-Forwarded-Host": "www.test.com"},
 		},
 		{
 			Expected: "http://",
 		},
 		{
-			Expected:   "http://www.override.com",
-			HostHeader: "www.override.com",
-			Hostname:   "www.test.com",
+			Expected: "http://www.override.com",
+			Headers:  map[string]string{"X-Forwarded-Host": "www.override.com"},
+			Hostname: "www.test.com",
 		},
 		{
 			Expected: "https://www.test.com",
@@ -111,10 +111,17 @@ func TestGetRequestHostURL(t *testing.T) {
 			TLS:      &tls.ConnectionState{},
 		},
 		{
-			Expected:   "https://www.override.com",
-			HostHeader: "www.override.com",
-			Hostname:   "www.test.com",
-			TLS:        &tls.ConnectionState{},
+			Expected: "https://www.override.com",
+			Headers:  map[string]string{"X-Forwarded-Host": "www.override.com"},
+			Hostname: "www.test.com",
+			TLS:      &tls.ConnectionState{},
+		},
+		{
+			Expected: "https://www.override.com",
+			Headers: map[string]string{
+				"X-Forwarded-Host":  "www.override.com",
+				"X-Forwarded-Proto": "https"},
+			Hostname: "www.override.com",
 		},
 	}
 	for i, c := range cs {
@@ -123,9 +130,11 @@ func TestGetRequestHostURL(t *testing.T) {
 			Host:   c.Hostname,
 			TLS:    c.TLS,
 		}
-		if c.HostHeader != "" {
-			request.Header = make(http.Header)
-			request.Header.Set("X-Forwarded-Host", c.HostHeader)
+		if c.Headers != nil {
+			for key, value := range c.Headers {
+				request.Header = make(http.Header)
+				request.Header.Set(key, value)
+			}
 		}
 		assert.Equal(t, c.Expected, getRequestHostURL(request), "case %d, expected: %s, got: %s", i, c.Expected, getRequestHostURL(request))
 	}
