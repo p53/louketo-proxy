@@ -550,21 +550,93 @@ func TestLogoutHandlerBadToken(t *testing.T) {
 }
 
 func TestLogoutHandlerGood(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	requests := []fakeRequest{
+	cfg := newFakeKeycloakConfig()
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
 		{
-			URI:          c.WithOAuthURI(logoutURL),
-			HasToken:     true,
-			ExpectedCode: http.StatusOK,
+			Name:          "TestLogoutWithoutRedirect",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:          cfg.WithOAuthURI(logoutURL),
+					HasToken:     true,
+					ExpectedCode: http.StatusOK,
+				},
+			},
 		},
 		{
-			URI:              c.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
-			HasToken:         true,
-			ExpectedCode:     http.StatusSeeOther,
-			ExpectedLocation: "http://example.com",
+			Name:          "TestLogoutWithRedirectQueryParam",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:              cfg.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
+					HasToken:         true,
+					ExpectedCode:     http.StatusSeeOther,
+					ExpectedLocation: "http://example.com",
+				},
+			},
+		},
+		{
+			Name: "TestLogoutWithEnabledLogoutRedirectAndRedirectionURL",
+			ProxySettings: func(c *Config) {
+				c.RedirectionURL = "http://example.com"
+				c.EnableLogoutRedirect = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:              cfg.WithOAuthURI(logoutURL),
+					HasToken:         true,
+					ExpectedCode:     http.StatusSeeOther,
+					ExpectedLocation: "example.com",
+				},
+			},
+		},
+		{
+			Name: "TestLogoutWithEnabledLogoutRedirectWithHostHeaders",
+			ProxySettings: func(c *Config) {
+				c.EnableLogoutRedirect = true
+				c.RedirectionURL = ""
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:              cfg.WithOAuthURI(logoutURL),
+					HasToken:         true,
+					ExpectedCode:     http.StatusSeeOther,
+					ExpectedLocation: "http://127.0.0.1",
+				},
+			},
+		},
+		{
+			Name:          "TestLogoutWithEmptyRedirectQueryParam",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:          cfg.WithOAuthURI(logoutURL) + "?redirect=",
+					HasToken:     true,
+					ExpectedCode: http.StatusSeeOther,
+				},
+			},
 		},
 	}
-	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		cfgCopy := *cfg
+		c := &cfgCopy
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				proxy := newFakeProxy(c, &fakeAuthConfig{})
+				testCase.ProxySettings(c)
+				proxy.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }
 
 func TestSkipOpenIDProviderTLSVerifyLogoutHandler(t *testing.T) {

@@ -113,17 +113,17 @@ func createCertificate(key *rsa.PrivateKey, hostnames []string, expire time.Dura
 
 // getRequestHostURL returns the hostname from the request
 func getRequestHostURL(r *http.Request) string {
-	hostname := r.Host
-	if r.Header.Get("X-Forwarded-Host") != "" {
-		hostname = r.Header.Get("X-Forwarded-Host")
-	}
-
 	scheme := unsecureScheme
+
 	if r.TLS != nil {
 		scheme = secureScheme
 	}
 
-	return fmt.Sprintf("%s://%s", scheme, hostname)
+	redirect := fmt.Sprintf("%s://%s",
+		defaultTo(r.Header.Get("X-Forwarded-Proto"), scheme),
+		defaultTo(r.Header.Get("X-Forwarded-Host"), r.Host))
+
+	return redirect
 }
 
 // readConfigFile reads and parses the configuration file
