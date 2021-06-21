@@ -655,8 +655,32 @@ func (r *oauthProxy) tokenHandler(w http.ResponseWriter, req *http.Request) {
 		r.accessError(w, req)
 		return
 	}
+
+	token, err := jwt.ParseSigned(user.rawToken)
+
+	if err != nil {
+		r.accessError(w, req)
+		return
+	}
+
+	jsonMap := make(map[string]interface{})
+	err = token.UnsafeClaimsWithoutVerification(&jsonMap)
+
+	if err != nil {
+		r.accessError(w, req)
+		return
+	}
+
+	result, err := json.Marshal(jsonMap)
+
+	if err != nil {
+		r.accessError(w, req)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(user.rawToken))
+
+	_, _ = w.Write(result)
 }
 
 // healthHandler is a health check handler for the service

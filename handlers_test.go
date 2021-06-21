@@ -720,6 +720,12 @@ func TestTokenHandler(t *testing.T) {
 			HasToken:     true,
 			RawToken:     goodToken,
 			ExpectedCode: http.StatusOK,
+			ExpectedContent: func(body string, testNum int) {
+				assert.NotEqual(t, body, goodToken)
+				jsonMap := make(map[string]interface{})
+				err := json.Unmarshal([]byte(body), &jsonMap)
+				require.NoError(t, err)
+			},
 		},
 		{
 			URI:          uri,
@@ -735,6 +741,12 @@ func TestTokenHandler(t *testing.T) {
 			HasToken:       true,
 			HasCookieToken: true,
 			ExpectedCode:   http.StatusOK,
+			ExpectedContent: func(body string, testNum int) {
+				assert.NotEqual(t, body, goodToken)
+				jsonMap := make(map[string]interface{})
+				err := json.Unmarshal([]byte(body), &jsonMap)
+				require.NoError(t, err)
+			},
 		},
 	}
 	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
