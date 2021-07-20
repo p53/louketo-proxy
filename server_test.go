@@ -613,6 +613,12 @@ func TestDefaultDenial(t *testing.T) {
 			Redirects:    false,
 			ExpectedCode: http.StatusUnauthorized,
 		},
+		{
+			Method:       "get",
+			URI:          "/not_permited",
+			Redirects:    false,
+			ExpectedCode: http.StatusUnauthorized,
+		},
 	}
 	newFakeProxy(config, &fakeAuthConfig{}).RunTests(t, requests)
 }
