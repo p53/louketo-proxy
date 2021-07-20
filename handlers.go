@@ -502,8 +502,7 @@ func emptyHandler(w http.ResponseWriter, req *http.Request) {}
 
 // emptyHandler is responsible for doing nothing
 func unauthorizedHandler(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
+	w.WriteHeader(http.StatusUnauthorized)
 }
 
 // logoutHandler performs a logout
