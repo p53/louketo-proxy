@@ -283,8 +283,6 @@ func TestGetMaxCookieChunkLength(t *testing.T) {
 }
 
 func TestCustomCookieNames(t *testing.T) {
-	cfg := newFakeKeycloakConfig()
-
 	testCases := []struct {
 		Name              string
 		ProxySettings     func(c *Config)
@@ -388,11 +386,10 @@ func TestCustomCookieNames(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
-		cfgCopy := *cfg
-		c := &cfgCopy
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
+				c := newFakeKeycloakConfig()
 				testCase.ProxySettings(c)
 				p := newFakeProxy(c, &fakeAuthConfig{})
 				p.idp.setTokenExpiration(1000 * time.Millisecond)

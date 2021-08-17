@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -102,6 +103,8 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 
 	conf := r.newOAuth2Config(r.config.RedirectionURL)
 
+	var mu sync.Mutex
+
 	// the loop state
 	var state struct {
 		// the access token
@@ -172,7 +175,10 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 					continue
 				}
 
+				mu.Lock()
 				state.rawToken = resp.AccessToken
+				mu.Unlock()
+
 				// step: parse the token
 				token, err := jwt.ParseSigned(resp.AccessToken)
 				if err != nil {
@@ -241,7 +247,10 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 
 					// step: attempt to refresh the access
 					token, rawToken, newRefreshToken, expiration, _, err := getRefreshedToken(conf, r.config, state.refresh)
+
+					mu.Lock()
 					state.rawToken = rawToken
+					mu.Unlock()
 
 					if err != nil {
 						state.login = true
@@ -317,7 +326,9 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 		req.URL.Host = hostname
 		// is the host being signed?
 		if len(r.config.ForwardingDomains) == 0 || containsSubString(hostname, r.config.ForwardingDomains) {
+			mu.Lock()
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.rawToken))
+			mu.Unlock()
 			req.Header.Set("X-Forwarded-Agent", prog)
 		}
 	}

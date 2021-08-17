@@ -36,7 +36,6 @@ import (
 	"github.com/rs/cors"
 	strcase "github.com/stoewer/go-strcase"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 
 	"gopkg.in/square/go-jose.v2/jwt"
 )
@@ -101,11 +100,12 @@ func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	auth := newFakeAuthServer(authConfig)
 	c.DiscoveryURL = auth.getLocation()
 	c.Verbose = true
+	c.DisableAllLogging = true
 	proxy, err := newProxy(c)
 	if err != nil {
 		panic("failed to create fake proxy service, error: " + err.Error())
 	}
-	proxy.log = zap.NewNop()
+	// proxy.log = zap.NewNop()
 	proxy.upstream = &fakeUpstreamService{}
 	if err = proxy.Run(); err != nil {
 		panic("failed to create the proxy service, error: " + err.Error())
@@ -480,8 +480,6 @@ func TestOauthRequests(t *testing.T) {
 }
 
 func TestAdminListener(t *testing.T) {
-	cfg := newFakeKeycloakConfig()
-
 	testCases := []struct {
 		Name              string
 		ProxySettings     func(c *Config)
@@ -591,9 +589,7 @@ func TestAdminListener(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		testCase := testCase
-		cfgCopy := *cfg
-		c := &cfgCopy
+		c := newFakeKeycloakConfig()
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
@@ -1686,8 +1682,7 @@ func TestAccessTokenEncryption(t *testing.T) {
 			testCase.Name,
 			func(t *testing.T) {
 				testCase.ProxySettings(c)
-				p := newFakeProxy(c, &fakeAuthConfig{})
-				p.idp.setTokenExpiration(1000 * time.Millisecond)
+				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 1000 * time.Millisecond})
 				p.RunTests(t, testCase.ExecutionSettings)
 			},
 		)

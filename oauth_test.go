@@ -140,7 +140,8 @@ type fakeOidcDiscoveryResponse struct {
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 type fakeAuthConfig struct {
-	EnableTLS bool
+	EnableTLS  bool
+	Expiration time.Duration
 }
 
 // newFakeAuthServer simulates a oauth service
@@ -191,6 +192,10 @@ func newFakeAuthServer(config *fakeAuthConfig) *fakeAuthServer {
 	}
 	service.location = location
 	service.expiration = time.Duration(1) * time.Hour
+
+	if config.Expiration.Seconds() > 0 {
+		service.expiration = config.Expiration
+	}
 
 	return service
 }

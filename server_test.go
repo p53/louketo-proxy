@@ -264,7 +264,6 @@ func TestAuthTokenHeader(t *testing.T) {
 
 func TestForwardingProxy(t *testing.T) {
 	s := httptest.NewServer(&fakeUpstreamService{})
-	cfg := newFakeKeycloakConfig()
 
 	testCases := []struct {
 		Name              string
@@ -274,11 +273,11 @@ func TestForwardingProxy(t *testing.T) {
 		{
 			Name: "TestPasswordGrant",
 			ProxySettings: func(c *Config) {
-				cfg.EnableForwarding = true
-				cfg.ForwardingDomains = []string{}
-				cfg.ForwardingUsername = validUsername
-				cfg.ForwardingPassword = validPassword
-				cfg.ForwardingGrantType = GrantTypeUserCreds
+				c.EnableForwarding = true
+				c.ForwardingDomains = []string{}
+				c.ForwardingUsername = validUsername
+				c.ForwardingPassword = validPassword
+				c.ForwardingGrantType = GrantTypeUserCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -293,11 +292,11 @@ func TestForwardingProxy(t *testing.T) {
 		{
 			Name: "TestPasswordGrantWithRefreshing",
 			ProxySettings: func(c *Config) {
-				cfg.EnableForwarding = true
-				cfg.ForwardingDomains = []string{}
-				cfg.ForwardingUsername = validUsername
-				cfg.ForwardingPassword = validPassword
-				cfg.ForwardingGrantType = GrantTypeUserCreds
+				c.EnableForwarding = true
+				c.ForwardingDomains = []string{}
+				c.ForwardingUsername = validUsername
+				c.ForwardingPassword = validPassword
+				c.ForwardingGrantType = GrantTypeUserCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -320,11 +319,11 @@ func TestForwardingProxy(t *testing.T) {
 		{
 			Name: "TestClientCredentialsGrant",
 			ProxySettings: func(c *Config) {
-				cfg.EnableForwarding = true
-				cfg.ForwardingDomains = []string{}
-				cfg.ClientID = validUsername
-				cfg.ClientSecret = validPassword
-				cfg.ForwardingGrantType = GrantTypeClientCreds
+				c.EnableForwarding = true
+				c.ForwardingDomains = []string{}
+				c.ClientID = validUsername
+				c.ClientSecret = validPassword
+				c.ForwardingGrantType = GrantTypeClientCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -339,11 +338,11 @@ func TestForwardingProxy(t *testing.T) {
 		{
 			Name: "TestClientCredentialsGrantWithRefreshing",
 			ProxySettings: func(c *Config) {
-				cfg.EnableForwarding = true
-				cfg.ForwardingDomains = []string{}
-				cfg.ClientID = validUsername
-				cfg.ClientSecret = validPassword
-				cfg.ForwardingGrantType = GrantTypeClientCreds
+				c.EnableForwarding = true
+				c.ForwardingDomains = []string{}
+				c.ClientID = validUsername
+				c.ClientSecret = validPassword
+				c.ForwardingGrantType = GrantTypeClientCreds
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -367,13 +366,12 @@ func TestForwardingProxy(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
-		c := cfg
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
+				c := newFakeKeycloakConfig()
 				testCase.ProxySettings(c)
-				p := newFakeProxy(c, &fakeAuthConfig{})
-				p.idp.setTokenExpiration(900 * time.Millisecond)
+				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 900 * time.Millisecond})
 				<-time.After(time.Duration(100) * time.Millisecond)
 				p.RunTests(t, testCase.ExecutionSettings)
 			},
