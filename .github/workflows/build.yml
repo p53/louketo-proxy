@@ -10,7 +10,7 @@ jobs:
     # Test the latest release of Go
     strategy:
       matrix:
-        go: [ '1.15', '1.14' ]
+        go: [ '1.16', '1.15' ]
     steps:
       # Setup the workflow to use the specific version of Go
       - name: Set up Go 1.x
@@ -27,7 +27,7 @@ jobs:
       # Run tests and generates a coverage profile
       - name: Test
         run: |
-          go test -v -coverprofile=profile.cov ./...
+          go test -v -race -coverprofile=profile.cov ./...
       # Run Go benchmarks
       - name: Benchmark
         run: |
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.15', '1.14' ]
+        go: [ '1.16', '1.15' ]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
