@@ -589,6 +589,7 @@ func TestAdminListener(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		testCase := testCase
 		c := newFakeKeycloakConfig()
 		t.Run(
 			testCase.Name,
