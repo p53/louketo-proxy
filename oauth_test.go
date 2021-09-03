@@ -35,8 +35,8 @@ import (
 	"golang.org/x/oauth2"
 
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/assert"
 	jose2 "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"

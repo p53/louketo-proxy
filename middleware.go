@@ -31,7 +31,7 @@ import (
 
 	"github.com/PuerkitoBio/purell"
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/unrolled/secure"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

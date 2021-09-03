@@ -43,8 +43,8 @@ import (
 	proxyproto "github.com/armon/go-proxyproto"
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/elazarl/goproxy"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
@@ -240,6 +240,7 @@ func (r *oauthProxy) createReverseProxy() error {
 		if r.config.ListenAdmin == "" {
 			e.Mount("/", adminEngine)
 		}
+		e.NotFound(http.NotFound)
 	})
 
 	// step: define profiling subrouter

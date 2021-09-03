@@ -34,7 +34,7 @@ import (
 	"time"
 
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"gopkg.in/square/go-jose.v2/jwt"

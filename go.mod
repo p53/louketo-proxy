@@ -9,7 +9,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20210110162100-a92cc753f88e
 	github.com/fsnotify/fsnotify v1.4.10-0.20200417215612-7f4cf4dd2b52
 	github.com/garyburd/redigo v1.6.0 // indirect
-	github.com/go-chi/chi v3.3.3+incompatible
+	github.com/go-chi/chi/v5 v5.0.4
 	github.com/go-resty/resty/v2 v2.5.0
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/oleiade/reflections v1.0.1
@@ -30,7 +30,6 @@ require (
 	golang.org/x/text v0.3.5 // indirect
 	gopkg.in/bsm/ratelimit.v1 v1.0.0-20160220154919-db14e161995a // indirect
 	gopkg.in/redis.v4 v4.2.4
-	gopkg.in/resty.v1 v1.12.0
 	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v2 v2.3.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
