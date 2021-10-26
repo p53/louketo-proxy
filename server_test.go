@@ -669,6 +669,85 @@ func TestProxyProtocol(t *testing.T) {
 	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
+func TestXForwarded(t *testing.T) {
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestEmptyXForwarded",
+			ProxySettings: func(c *Config) {
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL + "/test",
+					HasToken:      true,
+					ExpectedProxy: true,
+					ExpectedProxyHeaders: map[string]string{
+						"X-Forwarded-For": "127.0.0.1",
+						"X-Real-IP":       "127.0.0.1",
+					},
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			Name: "TestXForwardedPresent",
+			ProxySettings: func(c *Config) {
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL + "/test",
+					HasToken:      true,
+					ExpectedProxy: true,
+					Headers: map[string]string{
+						"X-Forwarded-For": "189.10.10.1",
+					},
+					ExpectedProxyHeaders: map[string]string{
+						"X-Forwarded-For": "189.10.10.1",
+						"X-Real-IP":       "189.10.10.1",
+					},
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			Name: "TestXRealIP",
+			ProxySettings: func(c *Config) {
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL + "/test",
+					HasToken:      true,
+					ExpectedProxy: true,
+					Headers: map[string]string{
+						"X-Real-IP": "189.10.10.1",
+					},
+					ExpectedProxyHeaders: map[string]string{
+						"X-Forwarded-For": "189.10.10.1",
+						"X-Real-IP":       "189.10.10.1",
+					},
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				c := newFakeKeycloakConfig()
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
+}
+
 func TestTokenEncryption(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.EnableEncryptedToken = true
