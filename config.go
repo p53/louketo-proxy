@@ -195,7 +195,7 @@ func (r *Config) isValid() error {
 				return errors.New("you have not specified the discovery url")
 			}
 			r.RedirectionURL = strings.TrimSuffix(r.RedirectionURL, "/")
-			
+
 			if !r.EnableSecurityFilter {
 				if r.EnableHTTPSRedirect {
 					return errors.New("the security filter must be switch on for this feature: http-redirect")

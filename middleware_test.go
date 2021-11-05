@@ -103,7 +103,7 @@ func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	if authConfig.EnableProxy {
 		c.OpenIDProviderProxy = auth.getProxyURL()
 	}
-	
+
 	c.DiscoveryURL = auth.getLocation()
 	c.Verbose = true
 	c.DisableAllLogging = true
