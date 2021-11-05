@@ -213,10 +213,6 @@ func (r *fakeAuthServer) Close() {
 	r.server.Close()
 }
 
-func (r *fakeAuthServer) getHost() string {
-	return r.location.Host
-}
-
 func (r *fakeAuthServer) getProxyURL() string {
 	return r.proxyLocation
 }

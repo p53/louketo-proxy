@@ -640,7 +640,7 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 			r.log.Error(
 				"invalid response from revocation endpoint",
 				zap.Int("status", response.StatusCode),
-				zap.String("response", fmt.Sprintf("%s", content)),
+				zap.String("response", string(content)),
 			)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
