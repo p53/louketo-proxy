@@ -781,7 +781,10 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 
 	// step: fix up the url if required, the underlining lib will add the .well-known/openid-configuration to the discovery url for us.
 	if strings.HasSuffix(r.config.DiscoveryURL, "/.well-known/openid-configuration") {
-		r.config.DiscoveryURL = strings.TrimSuffix(r.config.DiscoveryURL, "/.well-known/openid-configuration")
+		r.config.DiscoveryURL = strings.TrimSuffix(
+			r.config.DiscoveryURL,
+			"/.well-known/openid-configuration",
+		)
 	}
 
 	// step: create a idp http client
@@ -790,8 +793,12 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 			Proxy: func(_ *http.Request) (*url.URL, error) {
 				if r.config.OpenIDProviderProxy != "" {
 					idpProxyURL, erp := url.Parse(r.config.OpenIDProviderProxy)
+
 					if erp != nil {
-						r.log.Warn("invalid proxy address for open IDP provider proxy", zap.Error(erp))
+						r.log.Warn(
+							"invalid proxy address for open IDP provider proxy",
+							zap.Error(erp),
+						)
 						return nil, nil
 					}
 					return idpProxyURL, nil
@@ -809,15 +816,36 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 
 	// see https://github.com/coreos/go-oidc/issues/214
 	// see https://github.com/coreos/go-oidc/pull/260
-	ctx, cancel := context.WithTimeout(context.Background(), r.config.OpenIDProviderTimeout)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		r.config.OpenIDProviderTimeout,
+	)
+
+	tr := &http.Transport{
+		Proxy: func(_ *http.Request) (*url.URL, error) {
+			if r.config.OpenIDProviderProxy != "" {
+				idpProxyURL, erp := url.Parse(r.config.OpenIDProviderProxy)
+
+				if erp != nil {
+					r.log.Warn(
+						"invalid open IDP provider proxy for oidc3 provider",
+						zap.Error(erp),
+					)
+					return nil, nil
+				}
+				return idpProxyURL, nil
+			}
+
+			return nil, nil
+		},
+	}
 
 	if r.config.SkipOpenIDProviderTLSVerify {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		sslcli := &http.Client{Transport: tr}
-		ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
+
+	sslcli := &http.Client{Transport: tr}
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
 
 	defer cancel()
 	var provider *oidc3.Provider
@@ -831,13 +859,20 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 				zap.String("url", r.config.DiscoveryURL),
 				zap.String("timeout", r.config.OpenIDProviderTimeout.String()),
 			)
+
 			provider, err = oidc3.NewProvider(ctx, r.config.DiscoveryURL)
+
 			if err == nil {
 				break // break and complete
 			}
-			r.log.Warn("failed to get provider configuration from discovery", zap.Error(err))
+
+			r.log.Warn(
+				"failed to get provider configuration from discovery",
+				zap.Error(err),
+			)
 			time.Sleep(time.Second * 3)
 		}
+
 		completeCh <- true
 	}()
 	// wait for timeout or successful retrieval
