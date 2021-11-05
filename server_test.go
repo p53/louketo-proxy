@@ -535,6 +535,46 @@ func TestSkipOpenIDProviderTLSVerify(t *testing.T) {
 	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 
+func TestOpenIDProviderProxy(t *testing.T) {
+	c := newFakeKeycloakConfig()
+	c.SkipOpenIDProviderTLSVerify = true
+	c.OpenIDProviderProxy = "http://127.0.0.1:1000"
+
+	requests := []fakeRequest{
+		{
+			URI:           "/auth_all/test",
+			HasLogin:      true,
+			ExpectedProxy: true,
+			Redirects:     true,
+			ExpectedCode:  http.StatusOK,
+		},
+	}
+
+	fakeAuthConf := &fakeAuthConfig{
+		EnableTLS:   false,
+		EnableProxy: true,
+	}
+
+	newFakeProxy(c, fakeAuthConf).RunTests(t, requests)
+
+	fakeAuthConf = &fakeAuthConfig{
+		EnableTLS:   false,
+		EnableProxy: false,
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			check := strings.Contains(
+				r.(string),
+				"failed to retrieve the provider configuration from discovery url",
+			)
+			assert.True(t, check)
+		}
+	}()
+
+	newFakeProxy(c, fakeAuthConf).RunTests(t, requests)
+}
+
 func TestRequestIDHeader(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.EnableRequestID = true

@@ -93,23 +93,32 @@ type fakeProxy struct {
 
 func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	log.SetOutput(ioutil.Discard)
+
 	if c == nil {
 		c = newFakeKeycloakConfig()
 	}
 
 	auth := newFakeAuthServer(authConfig)
+
+	if authConfig.EnableProxy {
+		c.OpenIDProviderProxy = auth.getProxyURL()
+	}
+	
 	c.DiscoveryURL = auth.getLocation()
 	c.Verbose = true
 	c.DisableAllLogging = true
 	proxy, err := newProxy(c)
+
 	if err != nil {
 		panic("failed to create fake proxy service, error: " + err.Error())
 	}
+
 	// proxy.log = zap.NewNop()
 	proxy.upstream = &fakeUpstreamService{}
 	if err = proxy.Run(); err != nil {
 		panic("failed to create the proxy service, error: " + err.Error())
 	}
+
 	c.RedirectionURL = fmt.Sprintf("http://%s", proxy.listener.Addr().String())
 
 	return &fakeProxy{c, auth, proxy, make(map[string]*http.Cookie)}

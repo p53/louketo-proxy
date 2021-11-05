@@ -37,16 +37,18 @@ import (
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jochasinga/relay"
 	"github.com/stretchr/testify/assert"
 	jose2 "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 type fakeAuthServer struct {
-	location   *url.URL
-	key        jose2.JSONWebKey
-	server     *httptest.Server
-	expiration time.Duration
+	location      *url.URL
+	proxyLocation string
+	key           jose2.JSONWebKey
+	server        *httptest.Server
+	expiration    time.Duration
 }
 
 const fakePrivateKey = `
@@ -140,8 +142,9 @@ type fakeOidcDiscoveryResponse struct {
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 type fakeAuthConfig struct {
-	EnableTLS  bool
-	Expiration time.Duration
+	EnableTLS   bool
+	EnableProxy bool
+	Expiration  time.Duration
 }
 
 // newFakeAuthServer simulates a oauth service
@@ -186,6 +189,12 @@ func newFakeAuthServer(config *fakeAuthConfig) *fakeAuthServer {
 		service.server = httptest.NewServer(r)
 	}
 
+	if config.EnableProxy {
+		delay := time.Duration(0) * time.Second
+		proxy := relay.NewProxy(delay, service.server)
+		service.proxyLocation = proxy.URL
+	}
+
 	location, err := url.Parse(service.server.URL)
 	if err != nil {
 		panic("unable to create fake oauth service, error: " + err.Error())
@@ -202,6 +211,14 @@ func newFakeAuthServer(config *fakeAuthConfig) *fakeAuthServer {
 
 func (r *fakeAuthServer) Close() {
 	r.server.Close()
+}
+
+func (r *fakeAuthServer) getHost() string {
+	return r.location.Host
+}
+
+func (r *fakeAuthServer) getProxyURL() string {
+	return r.proxyLocation
 }
 
 func (r *fakeAuthServer) getLocation() string {
