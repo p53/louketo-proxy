@@ -38,8 +38,8 @@ jobs:
             -p "8081:80@loadbalancer"
       - name: "Run E2E tests"
         run: |
-        	k3d kubeconfig merge testcluster --kubeconfig-switch-context
-        	KUBECONFIG=~/.k3d/kubeconfig-testcluster.yaml kubectl apply -f ./e2e/k8s/manifest.yml
+          k3d kubeconfig merge testcluster --kubeconfig-switch-context
+          KUBECONFIG=~/.k3d/kubeconfig-testcluster.yaml kubectl apply -f ./e2e/k8s/manifest.yml
           go test -v --tags=e2e
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
