@@ -281,6 +281,8 @@ type Config struct {
 	TLSClientCertificate string `json:"tls-client-certificate" yaml:"tls-client-certificate" usage:"path to the client certificate for outbound connections in reverse and forwarding proxy modes" env:"TLS_CLIENT_CERTIFICATE"`
 	// SkipUpstreamTLSVerify skips the verification of any upstream tls
 	SkipUpstreamTLSVerify bool `json:"skip-upstream-tls-verify" yaml:"skip-upstream-tls-verify" usage:"skip the verification of any upstream TLS" env:"SKIP_UPSTREAM_TLS_VERIFY"`
+	// TLSMinVersion specifies server minimal TLS version
+	TLSMinVersion string `json:"tls-min-version" yaml:"tls-min-version" usage:"specify server minimal TLS version" env:"TLS_MIN_VERSION"`
 
 	// TLSAdminCertificate is the location for a tls certificate for admin https endpoint. Defaults to TLSCertificate.
 	TLSAdminCertificate string `json:"tls-admin-cert" yaml:"tls-admin-cert" usage:"path to ths TLS certificate" env:"TLS_ADMIN_CERTIFICATE"`

@@ -527,10 +527,25 @@ type listenerConfig struct {
 	useFileTLS          bool     // indicates we are using certificates from files
 	useLetsEncryptTLS   bool     // indicates we are using letsencrypt
 	useSelfSignedTLS    bool     // indicates we are using the self-signed tls
+	minTLSVersion       uint16   // server minimal TLS version
 }
 
 // makeListenerConfig extracts a listener configuration from a proxy Config
 func makeListenerConfig(config *Config) listenerConfig {
+	var minTLSVersion uint16
+	switch strings.ToLower(config.TLSMinVersion) {
+	case "":
+		minTLSVersion = 0 // zero means default value
+	case "tlsv1.0":
+		minTLSVersion = tls.VersionTLS10
+	case "tlsv1.1":
+		minTLSVersion = tls.VersionTLS11
+	case "tlsv1.2":
+		minTLSVersion = tls.VersionTLS12
+	case "tlsv1.3":
+		minTLSVersion = tls.VersionTLS13
+	}
+
 	return listenerConfig{
 		hostnames:           config.Hostnames,
 		letsEncryptCacheDir: config.LetsEncryptCacheDir,
@@ -546,6 +561,7 @@ func makeListenerConfig(config *Config) listenerConfig {
 		clientCert:        config.TLSClientCertificate,
 		useLetsEncryptTLS: config.UseLetsEncrypt,
 		useSelfSignedTLS:  config.EnabledSelfSignedTLS,
+		minTLSVersion:     minTLSVersion,
 	}
 }
 
@@ -649,6 +665,7 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 			// which are tuned to avoid attacks. Does nothing on clients.
 			PreferServerCipherSuites: true,
 			NextProtos:               []string{"h2", "http/1.1"},
+			MinVersion:               config.minTLSVersion,
 		}
 
 		listener = tls.NewListener(listener, tlsConfig)
