@@ -282,7 +282,7 @@ type Config struct {
 	// SkipUpstreamTLSVerify skips the verification of any upstream tls
 	SkipUpstreamTLSVerify bool `json:"skip-upstream-tls-verify" yaml:"skip-upstream-tls-verify" usage:"skip the verification of any upstream TLS" env:"SKIP_UPSTREAM_TLS_VERIFY"`
 	// TLSMinVersion specifies server minimal TLS version
-	TLSMinVersion string `json:"tls-min-version" yaml:"tls-min-version" usage:"specify server minimal TLS version" env:"TLS_MIN_VERSION"`
+	TLSMinVersion string `json:"tls-min-version" yaml:"tls-min-version" usage:"specify server minimal TLS version one of tlsv1.0,tlsv1.1,tlsv1.2,tlsv1.3" env:"TLS_MIN_VERSION"`
 
 	// TLSAdminCertificate is the location for a tls certificate for admin https endpoint. Defaults to TLSCertificate.
 	TLSAdminCertificate string `json:"tls-admin-cert" yaml:"tls-admin-cert" usage:"path to ths TLS certificate" env:"TLS_ADMIN_CERTIFICATE"`

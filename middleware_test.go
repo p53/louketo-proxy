@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -72,9 +73,12 @@ type fakeRequest struct {
 	URI                           string
 	URL                           string
 	Username                      string
+	TLSMin                        uint16
+	TLSMax                        uint16
 	ExpectedCode                  int
 	ExpectedContent               func(body string, testNum int)
 	ExpectedContentContains       string
+	ExpectedRequestError          string
 	ExpectedCookies               map[string]string
 	ExpectedHeaders               map[string]string
 	ExpectedLocation              string
@@ -131,7 +135,7 @@ func (f *fakeProxy) getServiceURL() string {
 }
 
 // RunTests performs a series of requests against a fake proxy service
-// nolint:funlen
+// nolint:gocyclo,funlen
 func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 	defer func() {
 		f.idp.Close()
@@ -151,16 +155,30 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 		}
 		// create a http client
 		client := resty.New()
+
+		if c.TLSMin != 0 {
+			client.SetTLSClientConfig(&tls.Config{MinVersion: c.TLSMin})
+		}
+
+		if c.TLSMax != 0 {
+			client.SetTLSClientConfig(&tls.Config{MaxVersion: c.TLSMax})
+		}
+
 		request := client.SetRedirectPolicy(resty.NoRedirectPolicy()).R()
 
 		if c.ProxyProtocol != "" {
 			client.SetTransport(&http.Transport{
 				Dial: func(network, addr string) (net.Conn, error) {
 					conn, err := net.Dial("tcp", addr)
+
 					if err != nil {
 						return nil, err
 					}
-					header := fmt.Sprintf("PROXY TCP4 %s 10.0.0.1 1000 2000\r\n", c.ProxyProtocol)
+
+					header := fmt.Sprintf(
+						"PROXY TCP4 %s 10.0.0.1 1000 2000\r\n",
+						c.ProxyProtocol,
+					)
 					_, _ = conn.Write([]byte(header))
 
 					return conn, nil
@@ -175,53 +193,75 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 		// are we performing a oauth login beforehand
 		if c.HasLogin {
 			if err := f.performUserLogin(c.URI); err != nil {
-				t.Errorf("case %d, unable to login to oauth server, error: %s", i, err)
+				t.Errorf(
+					"case %d, unable to login to oauth server, error: %s",
+					i,
+					err,
+				)
 				return
 			}
 		}
+
 		if len(f.cookies) > 0 {
 			for _, k := range f.cookies {
 				client.SetCookie(k)
 			}
 		}
+
 		if c.ExpectedProxy {
 			request.SetResult(&upstream)
 		}
+
 		if c.ProxyRequest {
 			client.SetProxy(f.getServiceURL())
 		}
+
 		if c.BasicAuth {
 			request.SetBasicAuth(c.Username, c.Password)
 		}
+
 		if c.RawToken != "" {
 			setRequestAuthentication(f.config, client, request, &c, c.RawToken)
 		}
+
 		if len(c.Cookies) > 0 {
 			client.SetCookies(c.Cookies)
 		}
+
 		if len(c.Headers) > 0 {
 			request.SetHeaders(c.Headers)
 		}
+
 		if c.FormValues != nil {
 			request.SetFormData(c.FormValues)
 		}
+
 		if c.HasToken {
 			token := newTestToken(f.idp.getLocation())
+
 			if c.TokenClaims != nil && len(c.TokenClaims) > 0 {
 				for i := range c.TokenClaims {
-					err := reflections.SetField(&token.claims, strcase.UpperCamelCase(i), c.TokenClaims[i])
+					err := reflections.SetField(
+						&token.claims,
+						strcase.UpperCamelCase(i),
+						c.TokenClaims[i],
+					)
 					assert.NoError(t, err)
 				}
 			}
+
 			if len(c.Roles) > 0 {
 				token.addRealmRoles(c.Roles)
 			}
+
 			if len(c.Groups) > 0 {
 				token.addGroups(c.Groups)
 			}
+
 			if c.Expires > 0 || c.Expires < 0 {
 				token.setExpiration(time.Now().Add(c.Expires))
 			}
+
 			if c.NotSigned {
 				authToken, err := token.getUnsignedToken()
 				assert.NoError(t, err)
@@ -236,68 +276,165 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 		// step: execute the request
 		var resp *resty.Response
 		var err error
+
 		switch c.URL {
 		case "":
 			resp, err = request.Execute(c.Method, f.getServiceURL()+c.URI)
 		default:
 			resp, err = request.Execute(c.Method, c.URL)
 		}
-		if err != nil {
+
+		if c.ExpectedRequestError != "" {
+			if !strings.Contains(err.Error(), c.ExpectedRequestError) {
+				assert.Fail(
+					t,
+					"case %d, expected error %s, got error: %s",
+					i,
+					c.ExpectedRequestError,
+					err,
+				)
+			}
+		} else if err != nil {
 			if !strings.Contains(err.Error(), "auto redirect is disabled") {
-				assert.NoError(t, err, "case %d, unable to make request, error: %s", i, err)
+				assert.NoError(
+					t,
+					err,
+					"case %d, unable to make request, error: %s",
+					i,
+					err,
+				)
 				continue
 			}
 		}
+
 		status := resp.StatusCode()
+
 		if c.ExpectedCode != 0 {
-			assert.Equal(t, c.ExpectedCode, status, "case %d, expected status code: %d, got: %d", i, c.ExpectedCode, status)
+			assert.Equal(
+				t,
+				c.ExpectedCode,
+				status,
+				"case %d, expected status code: %d, got: %d",
+				i,
+				c.ExpectedCode,
+				status,
+			)
 		}
+
 		if c.ExpectedLocation != "" {
 			l, _ := url.Parse(resp.Header().Get("Location"))
-			assert.True(t, strings.Contains(l.String(), c.ExpectedLocation), "expected location to contain %s", l.String())
+			assert.True(
+				t,
+				strings.Contains(
+					l.String(),
+					c.ExpectedLocation,
+				),
+				"expected location to contain %s",
+				l.String(),
+			)
+
 			if l.Query().Get("state") != "" {
 				state, err := uuid.FromString(l.Query().Get("state"))
+
 				if err != nil {
-					assert.Fail(t, "expected state parameter with valid UUID, got: %s with error %s", state.String(), err)
+					assert.Fail(
+						t,
+						"expected state parameter with valid UUID, got: %s with error %s",
+						state.String(),
+						err,
+					)
 				}
 			}
 		}
+
 		if len(c.ExpectedHeaders) > 0 {
 			for k, v := range c.ExpectedHeaders {
 				e := resp.Header().Get(k)
-				assert.Equal(t, v, e, "case %d, expected header %s=%s, got: %s", i, k, v, e)
+
+				assert.Equal(
+					t,
+					v,
+					e,
+					"case %d, expected header %s=%s, got: %s",
+					i,
+					k,
+					v,
+					e,
+				)
 			}
 		}
+
 		if c.ExpectedProxy {
-			assert.NotEmpty(t, resp.Header().Get(testProxyAccepted), "case %d, did not proxy request", i)
+			assert.NotEmpty(
+				t,
+				resp.Header().Get(testProxyAccepted),
+				"case %d, did not proxy request",
+				i,
+			)
 		} else {
-			assert.Empty(t, resp.Header().Get(testProxyAccepted), "case %d, should NOT proxy request", i)
+			assert.Empty(
+				t,
+				resp.Header().Get(testProxyAccepted),
+				"case %d, should NOT proxy request",
+				i,
+			)
 		}
+
 		if c.ExpectedProxyHeaders != nil && len(c.ExpectedProxyHeaders) > 0 {
 			for k, v := range c.ExpectedProxyHeaders {
 				headers := upstream.Headers
+
 				switch v {
 				case "":
-					assert.NotEmpty(t, headers.Get(k), "case %d, expected the proxy header: %s to exist", i, k)
+					assert.NotEmpty(
+						t,
+						headers.Get(k),
+						"case %d, expected the proxy header: %s to exist",
+						i,
+						k,
+					)
 				default:
-					assert.Equal(t, v, headers.Get(k), "case %d, expected proxy header %s=%s, got: %s", i, k, v, headers.Get(k))
+					assert.Equal(
+						t,
+						v,
+						headers.Get(k),
+						"case %d, expected proxy header %s=%s, got: %s",
+						i,
+						k,
+						v,
+						headers.Get(k),
+					)
 				}
 			}
 		}
-		if c.ExpectedProxyHeadersValidator != nil && len(c.ExpectedProxyHeadersValidator) > 0 {
+
+		if c.ExpectedProxyHeadersValidator != nil &&
+			len(c.ExpectedProxyHeadersValidator) > 0 {
+			// comment
 			for k, v := range c.ExpectedProxyHeadersValidator {
 				headers := upstream.Headers
 				switch v {
 				case nil:
-					assert.NotNil(t, v, "Validation function is nil, forgot to configure?")
+					assert.NotNil(
+						t,
+						v,
+						"Validation function is nil, forgot to configure?",
+					)
 				default:
 					v(t, f.config, headers.Get(k))
 				}
 			}
 		}
+
 		if len(c.ExpectedNoProxyHeaders) > 0 {
 			for _, k := range c.ExpectedNoProxyHeaders {
-				assert.Empty(t, upstream.Headers.Get(k), "case %d, header: %s was not expected to exist", i, k)
+				assert.Empty(
+					t,
+					upstream.Headers.Get(k),
+					"case %d, header: %s was not expected to exist",
+					i,
+					k,
+				)
 			}
 		}
 
@@ -305,26 +442,60 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 			e := string(resp.Body())
 			c.ExpectedContent(e, i)
 		}
+
 		if c.ExpectedContentContains != "" {
 			e := string(resp.Body())
-			assert.Contains(t, e, c.ExpectedContentContains, "case %d, expected content: %s, got: %s", i, c.ExpectedContentContains, e)
+
+			assert.Contains(
+				t,
+				e,
+				c.ExpectedContentContains,
+				"case %d, expected content: %s, got: %s",
+				i,
+				c.ExpectedContentContains,
+				e,
+			)
 		}
+
 		if len(c.ExpectedCookies) > 0 {
 			for k, v := range c.ExpectedCookies {
 				cookie := findCookie(k, resp.Cookies())
-				if !assert.NotNil(t, cookie, "case %d, expected cookie %s not found", i, k) {
+
+				if !assert.NotNil(
+					t,
+					cookie,
+					"case %d, expected cookie %s not found",
+					i,
+					k,
+				) {
 					continue
 				}
+
 				if v != "" {
-					assert.Equal(t, cookie.Value, v, "case %d, expected cookie value: %s, got: %s", i, v, cookie.Value)
+					assert.Equal(
+						t,
+						cookie.Value,
+						v,
+						"case %d, expected cookie value: %s, got: %s",
+						i,
+						v,
+						cookie.Value,
+					)
 				}
 			}
 		}
+
 		if len(c.ExpectedCookiesValidator) > 0 {
 			for k, v := range c.ExpectedCookiesValidator {
 				cookie := findCookie(k, resp.Cookies())
 
-				if !assert.NotNil(t, cookie, "case %d, expected cookie %s not found", i, k) {
+				if !assert.NotNil(
+					t,
+					cookie,
+					"case %d, expected cookie %s not found",
+					i,
+					k,
+				) {
 					continue
 				}
 
@@ -339,6 +510,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 				}
 			}
 		}
+
 		if len(c.ExpectedLoginCookiesValidator) > 0 {
 			for k, v := range c.ExpectedLoginCookiesValidator {
 				cookie, ok := f.cookies[k]
@@ -358,6 +530,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 				}
 			}
 		}
+
 		if c.OnResponse != nil {
 			c.OnResponse(i, request, resp)
 		}

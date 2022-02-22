@@ -150,9 +150,13 @@ func (r *Config) isValid() error {
 	}
 	switch strings.ToLower(r.TLSMinVersion) {
 	case "":
+	// nolint: goconst
 	case "tlsv1.0":
+	// nolint: goconst
 	case "tlsv1.1":
+	// nolint: goconst
 	case "tlsv1.2":
+	// nolint: goconst
 	case "tlsv1.3":
 	default:
 		return fmt.Errorf("invalid minimal TLS version specified")

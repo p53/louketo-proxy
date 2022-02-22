@@ -18,8 +18,13 @@ limitations under the License.
 package main
 
 import (
+	"crypto/tls"
+	"fmt"
+	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -882,4 +887,148 @@ func TestDisableAuthorizationCookie(t *testing.T) {
 		},
 	}
 	p.RunTests(t, requests)
+}
+
+func TestTLS(t *testing.T) {
+	testProxyAddr := "127.0.0.1:14302"
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestProxyTLS",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.Listen = testProxyAddr
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:          fmt.Sprintf("https://%s/test", testProxyAddr),
+					ExpectedCode: http.StatusUnauthorized,
+					RequestCA:    fakeCA,
+				},
+			},
+		},
+		{
+			Name: "TestProxyTLSMatch",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.Listen = testProxyAddr
+				c.TLSMinVersion = "tlsv1.0"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:          fmt.Sprintf("https://%s/test", testProxyAddr),
+					ExpectedCode: http.StatusUnauthorized,
+					RequestCA:    fakeCA,
+					TLSMin:       tls.VersionTLS10,
+				},
+			},
+		},
+		{
+			Name: "TestProxyTLSDiffer",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.Listen = testProxyAddr
+				c.TLSMinVersion = "tlsv1.2"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:          fmt.Sprintf("https://%s/test", testProxyAddr),
+					ExpectedCode: http.StatusUnauthorized,
+					RequestCA:    fakeCA,
+					TLSMin:       tls.VersionTLS13,
+				},
+			},
+		},
+		{
+			Name: "TestProxyTLSMinNotFullfilled",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.Listen = testProxyAddr
+				c.TLSMinVersion = "tlsv1.3"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                  fmt.Sprintf("https://%s/test", testProxyAddr),
+					ExpectedRequestError: "tls: protocol version not supported",
+					RequestCA:            fakeCA,
+					TLSMax:               tls.VersionTLS12,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		c := newFakeKeycloakConfig()
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+
+				certFile := ""
+				privFile := ""
+				caFile := ""
+
+				if c.TLSCertificate != "" {
+					certFile = c.TLSCertificate
+				}
+
+				if c.TLSPrivateKey != "" {
+					privFile = c.TLSPrivateKey
+				}
+
+				if c.TLSCaCertificate != "" {
+					caFile = c.TLSCaCertificate
+				}
+
+				if certFile != "" {
+					fakeCertByte := []byte(fakeCert)
+					err := ioutil.WriteFile(certFile, fakeCertByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing certificate %s", err)
+					}
+					defer os.Remove(certFile)
+				}
+
+				if privFile != "" {
+					fakeKeyByte := []byte(fakePrivateKey)
+					err := ioutil.WriteFile(privFile, fakeKeyByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing privateKey %s", err)
+					}
+					defer os.Remove(privFile)
+				}
+
+				if caFile != "" {
+					fakeCAByte := []byte(fakeCA)
+					err := ioutil.WriteFile(caFile, fakeCAByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing cacertificate %s", err)
+					}
+					defer os.Remove(caFile)
+				}
+
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }
