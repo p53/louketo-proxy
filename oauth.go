@@ -80,7 +80,7 @@ func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, t string) (jwt.
 	tkn, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: t}).Token()
 
 	if err != nil {
-		if strings.Contains(err.Error(), "refresh token has expired") {
+		if strings.Contains(err.Error(), "invalid_grant") {
 			return jwt.JSONWebToken{}, "", "", time.Time{}, time.Duration(0), ErrRefreshTokenExpired
 		}
 		return jwt.JSONWebToken{}, "", "", time.Time{}, time.Duration(0), err
