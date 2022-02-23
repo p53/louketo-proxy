@@ -688,11 +688,21 @@ func (r *fakeAuthServer) userInfoHandler(w http.ResponseWriter, req *http.Reques
 
 func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) {
 	expires := time.Now().Add(r.expiration)
+	refreshExpires := time.Now().Add(2 * r.expiration)
 	token := newTestToken(r.getLocation())
 	token.setExpiration(expires)
+	refreshToken := newTestToken(r.getLocation())
+	refreshToken.setExpiration(refreshExpires)
 
 	// sign the token with the private key
-	jwt, err := token.getToken()
+	jwtAccess, err := token.getToken()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// sign the token with the private key
+	jwtRefresh, err := refreshToken.getToken()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -710,9 +720,9 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 
 		if username == validUsername && password == validPassword {
 			renderJSON(http.StatusOK, w, req, tokenResponse{
-				IDToken:      jwt,
-				AccessToken:  jwt,
-				RefreshToken: jwt,
+				IDToken:      jwtAccess,
+				AccessToken:  jwtAccess,
+				RefreshToken: jwtRefresh,
 				ExpiresIn:    float64(expires.UTC().Second()),
 			})
 			return
@@ -733,9 +743,9 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 
 		if clientID == validUsername && clientSecret == validPassword {
 			renderJSON(http.StatusOK, w, req, tokenResponse{
-				IDToken:      jwt,
-				AccessToken:  jwt,
-				RefreshToken: jwt,
+				IDToken:      jwtAccess,
+				AccessToken:  jwtAccess,
+				RefreshToken: jwtRefresh,
 				ExpiresIn:    float64(expires.UTC().Second()),
 			})
 			return
@@ -746,12 +756,54 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 			"error_description": "invalid user credentials",
 		})
 	case GrantTypeRefreshToken:
-		fallthrough
+		oldRefreshToken, err := jwt.ParseSigned(req.FormValue("refresh_token"))
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		stdClaims := &jwt.Claims{}
+
+		err = oldRefreshToken.UnsafeClaimsWithoutVerification(stdClaims)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		expiration := time.Until(stdClaims.Expiry.Time())
+
+		if expiration <= 0 {
+			type ExpiredRefresh struct {
+				Error            string `json:"error"`
+				ErrorDescription string `json:"error_description"`
+			}
+
+			expRefresh := ExpiredRefresh{"invalid_grant", "Token is not active"}
+			respBody, err := json.Marshal(expRefresh)
+
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write(respBody)
+
+			return
+		}
+
+		renderJSON(http.StatusOK, w, req, tokenResponse{
+			IDToken:     jwtAccess,
+			AccessToken: jwtAccess,
+			ExpiresIn:   float64(expires.Second()),
+		})
 	case GrantTypeAuthCode:
 		renderJSON(http.StatusOK, w, req, tokenResponse{
-			IDToken:      jwt,
-			AccessToken:  jwt,
-			RefreshToken: jwt,
+			IDToken:      jwtAccess,
+			AccessToken:  jwtAccess,
+			RefreshToken: jwtRefresh,
 			ExpiresIn:    float64(expires.Second()),
 		})
 	default:
