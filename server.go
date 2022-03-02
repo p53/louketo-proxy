@@ -160,12 +160,14 @@ func createLogger(config *Config) (*zap.Logger, error) {
 
 // useDefaultStack sets the default middleware stack for router
 func (r *oauthProxy) useDefaultStack(engine chi.Router) {
+	engine.NotFound(emptyHandler)
+
 	if r.config.EnableDefaultDeny {
-		engine.MethodNotAllowed(unauthorizedHandler)
+		engine.Use(r.methodCheckMiddleware)
 	} else {
 		engine.MethodNotAllowed(emptyHandler)
 	}
-	engine.NotFound(emptyHandler)
+
 	engine.Use(middleware.Recoverer)
 
 	// @check if the request tracking id middleware is enabled

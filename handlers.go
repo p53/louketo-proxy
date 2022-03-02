@@ -500,11 +500,6 @@ func (r *oauthProxy) loginHandler(w http.ResponseWriter, req *http.Request) {
 // emptyHandler is responsible for doing nothing
 func emptyHandler(w http.ResponseWriter, req *http.Request) {}
 
-// emptyHandler is responsible for doing nothing
-func unauthorizedHandler(w http.ResponseWriter, req *http.Request) {
-	w.WriteHeader(http.StatusUnauthorized)
-}
-
 // logoutHandler performs a logout
 //  - if it's just a access token, the cookie is deleted
 //  - if the user has a refresh token, the token is invalidated by the provider

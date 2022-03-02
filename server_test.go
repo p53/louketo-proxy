@@ -562,20 +562,37 @@ func TestDefaultDenial(t *testing.T) {
 	}
 	requests := []fakeRequest{
 		{
-			URI:           "/public/allowed",
-			ExpectedProxy: true,
-			ExpectedCode:  http.StatusOK,
+			URI:                     "/public/allowed",
+			ExpectedProxy:           true,
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "gzip",
 		},
 		{
-			URI:          "/not_permited",
-			Redirects:    false,
-			ExpectedCode: http.StatusUnauthorized,
+			URI:       "/not_permited",
+			Redirects: false,
+			ExpectedContent: func(body string, testNum int) {
+				assert.Equal(t, body, "")
+			},
 		},
+		// lowercase methods should not be valid
 		{
 			Method:       "get",
 			URI:          "/not_permited",
 			Redirects:    false,
-			ExpectedCode: http.StatusUnauthorized,
+			ExpectedCode: http.StatusNotImplemented,
+			ExpectedContent: func(body string, testNum int) {
+				assert.Equal(t, "", body)
+			},
+		},
+		// any "crap" methods should not be valid
+		{
+			Method:       "whAS9023",
+			URI:          "/not_permited",
+			Redirects:    false,
+			ExpectedCode: http.StatusNotImplemented,
+			ExpectedContent: func(body string, testNum int) {
+				assert.Equal(t, "", body)
+			},
 		},
 	}
 	newFakeProxy(config, &fakeAuthConfig{}).RunTests(t, requests)

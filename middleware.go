@@ -637,6 +637,21 @@ func (r *oauthProxy) securityMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// methodCheck middleware
+func (r *oauthProxy) methodCheckMiddleware(next http.Handler) http.Handler {
+	r.log.Info("enabling the method check middleware")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !isValidHTTPMethod(req.Method) {
+			r.log.Warn("method not implemented ", zap.String("method", req.Method))
+			w.WriteHeader(http.StatusNotImplemented)
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
+}
+
 // proxyDenyMiddleware just block everything
 func proxyDenyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
