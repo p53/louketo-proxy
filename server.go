@@ -81,11 +81,18 @@ func init() {
 func newProxy(config *Config) (*oauthProxy, error) {
 	// create the service logger
 	log, err := createLogger(config)
+
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info("starting the service", zap.String("prog", prog), zap.String("author", author), zap.String("version", version))
+	log.Info(
+		"starting the service",
+		zap.String("prog", prog),
+		zap.String("author", author),
+		zap.String("version", version),
+	)
+
 	svc := &oauthProxy{
 		config:         config,
 		log:            log,
@@ -110,11 +117,16 @@ func newProxy(config *Config) (*oauthProxy, error) {
 	}
 
 	if config.SkipTokenVerification {
-		log.Warn("TESTING ONLY CONFIG - access token verification has been disabled")
+		log.Warn(
+			"TESTING ONLY CONFIG - access token verification has been disabled",
+		)
 	}
 
 	if config.ClientID == "" && config.ClientSecret == "" {
-		log.Warn("client credentials are not set, depending on provider (confidential|public) you might be unable to auth")
+		log.Warn(
+			`client credentials are not set, depending on
+			provider (confidential|public) you might be unable to auth`,
+		)
 	}
 
 	// are we running in forwarding mode?
@@ -134,6 +146,7 @@ func newProxy(config *Config) (*oauthProxy, error) {
 // createLogger is responsible for creating the service logger
 func createLogger(config *Config) (*zap.Logger, error) {
 	httplog.SetOutput(ioutil.Discard) // disable the http logger
+
 	if config.DisableAllLogging {
 		return zap.NewNop(), nil
 	}
@@ -143,10 +156,12 @@ func createLogger(config *Config) (*zap.Logger, error) {
 	c.DisableCaller = true
 	// Use human-readable timestamps in the logs until KEYCLOAK-12100 is fixed
 	c.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
 	// are we enabling json logging?
 	if !config.EnableJSONLogging {
 		c.Encoding = "console"
 	}
+
 	// are we running verbose mode?
 	if config.Verbose {
 		httplog.SetOutput(os.Stderr)
@@ -175,12 +190,14 @@ func (r *oauthProxy) useDefaultStack(engine chi.Router) {
 		r.log.Info("enabled the correlation request id middleware")
 		engine.Use(r.requestIDMiddleware(r.config.RequestIDHeader))
 	}
+
 	// @step: enable the entrypoint middleware
 	engine.Use(entrypointMiddleware)
 
 	if r.config.EnableCompression {
 		engine.Use(gzipMiddleware)
 	}
+
 	if r.config.EnableLogging {
 		engine.Use(r.loggingMiddleware)
 	}
@@ -192,10 +209,15 @@ func (r *oauthProxy) useDefaultStack(engine chi.Router) {
 
 // createReverseProxy creates a reverse proxy
 func (r *oauthProxy) createReverseProxy() error {
-	r.log.Info("enabled reverse proxy mode, upstream url", zap.String("url", r.config.Upstream))
+	r.log.Info(
+		"enabled reverse proxy mode, upstream url",
+		zap.String("url", r.config.Upstream),
+	)
+
 	if err := r.createUpstreamProxy(r.endpoint); err != nil {
 		return err
 	}
+
 	engine := chi.NewRouter()
 	r.useDefaultStack(engine)
 
@@ -210,6 +232,7 @@ func (r *oauthProxy) createReverseProxy() error {
 			MaxAge:           int(r.config.CorsMaxAge.Seconds()),
 			Debug:            r.config.Verbose,
 		})
+
 		engine.Use(c.Handler)
 	}
 
@@ -222,10 +245,19 @@ func (r *oauthProxy) createReverseProxy() error {
 
 	// step: define admin subrouter: health and metrics
 	adminEngine := chi.NewRouter()
-	r.log.Info("enabled health service", zap.String("path", path.Clean(r.config.WithOAuthURI(healthURL))))
+
+	r.log.Info(
+		"enabled health service",
+		zap.String("path", path.Clean(r.config.WithOAuthURI(healthURL))),
+	)
+
 	adminEngine.Get(healthURL, r.healthHandler)
+
 	if r.config.EnableMetrics {
-		r.log.Info("enabled the service metrics middleware", zap.String("path", path.Clean(r.config.WithOAuthURI(metricsURL))))
+		r.log.Info(
+			"enabled the service metrics middleware",
+			zap.String("path", path.Clean(r.config.WithOAuthURI(metricsURL))),
+		)
 		adminEngine.Get(metricsURL, r.proxyMetricsHandler)
 	}
 
@@ -242,21 +274,28 @@ func (r *oauthProxy) createReverseProxy() error {
 		if r.config.ListenAdmin == "" {
 			e.Mount("/", adminEngine)
 		}
+
 		e.NotFound(http.NotFound)
 	})
 
 	// step: define profiling subrouter
 	var debugEngine chi.Router
+
 	if r.config.EnableProfiling {
 		r.log.Warn("enabling the debug profiling on " + debugURL)
+
 		debugEngine = chi.NewRouter()
 		debugEngine.Get("/{name}", r.debugHandler)
 		debugEngine.Post("/{name}", r.debugHandler)
 
 		// @check if the server write-timeout is still set and throw a warning
 		if r.config.ServerWriteTimeout > 0 {
-			r.log.Warn("you should disable the server write timeout (--server-write-timeout) when using pprof profiling")
+			r.log.Warn(
+				`you should disable the server write timeout (
+					--server-write-timeout) when using pprof profiling`,
+			)
 		}
+
 		if r.config.ListenAdmin == "" {
 			engine.With(proxyDenyMiddleware).Mount(debugURL, debugEngine)
 		}
@@ -265,6 +304,7 @@ func (r *oauthProxy) createReverseProxy() error {
 	if r.config.ListenAdmin != "" {
 		// mount admin and debug engines separately
 		r.log.Info("mounting admin endpoints on separate listener")
+
 		admin := chi.NewRouter()
 		admin.MethodNotAllowed(emptyHandler)
 		admin.NotFound(emptyHandler)
@@ -276,6 +316,7 @@ func (r *oauthProxy) createReverseProxy() error {
 				e.Mount(debugURL, debugEngine)
 			}
 		})
+
 		r.adminRouter = admin
 	}
 
@@ -288,6 +329,7 @@ func (r *oauthProxy) createReverseProxy() error {
 		return err
 	}
 
+<<<<<<< HEAD
 	// step: add custom http methods
 	if r.config.CustomHTTPMethods != nil {
 		for _, customHTTPMethod := range r.config.CustomHTTPMethods {
@@ -296,8 +338,11 @@ func (r *oauthProxy) createReverseProxy() error {
 		}
 	}
 
+=======
+>>>>>>> Make nicer formatting in server.go
 	// step: provision in the protected resources
 	enableDefaultDeny := r.config.EnableDefaultDeny
+
 	for _, x := range r.config.Resources {
 		if x.URL[len(x.URL)-1:] == "/" {
 			r.log.Warn("the resource url is not a prefix",
@@ -305,6 +350,7 @@ func (r *oauthProxy) createReverseProxy() error {
 				zap.String("change", x.URL),
 				zap.String("amended", strings.TrimRight(x.URL, "/")))
 		}
+
 		if x.URL == "/*" && r.config.EnableDefaultDeny {
 			switch x.WhiteListed {
 			case true:
@@ -317,11 +363,19 @@ func (r *oauthProxy) createReverseProxy() error {
 
 	if enableDefaultDeny {
 		r.log.Info("adding a default denial into the protected resources")
-		r.config.Resources = append(r.config.Resources, &Resource{URL: "/*", Methods: allHTTPMethods})
+
+		r.config.Resources = append(
+			r.config.Resources,
+			&Resource{URL: "/*", Methods: allHTTPMethods},
+		)
 	}
 
 	for _, x := range r.config.Resources {
-		r.log.Info("protecting resource", zap.String("resource", x.String()))
+		r.log.Info(
+			"protecting resource",
+			zap.String("resource", x.String()),
+		)
+
 		e := engine.With(
 			r.authenticationMiddleware(),
 			r.admissionMiddleware(x),
@@ -332,16 +386,23 @@ func (r *oauthProxy) createReverseProxy() error {
 				e.MethodFunc(m, x.URL, emptyHandler)
 				continue
 			}
+
 			engine.MethodFunc(m, x.URL, emptyHandler)
 		}
 	}
 
 	for name, value := range r.config.MatchClaims {
-		r.log.Info("token must contain", zap.String("claim", name), zap.String("value", value))
+		r.log.Info(
+			"token must contain",
+			zap.String("claim", name),
+			zap.String("value", value),
+		)
 	}
+
 	if r.config.RedirectionURL == "" {
 		r.log.Warn("no redirection url has been set, will use host headers")
 	}
+
 	if r.config.EnableEncryptedToken {
 		r.log.Info("session access tokens will be encrypted")
 	}
@@ -351,11 +412,18 @@ func (r *oauthProxy) createReverseProxy() error {
 
 // createForwardingProxy creates a forwarding proxy
 func (r *oauthProxy) createForwardingProxy() error {
-	r.log.Info("enabling forward signing mode, listening on", zap.String("interface", r.config.Listen))
+	r.log.Info(
+		"enabling forward signing mode, listening on",
+		zap.String("interface", r.config.Listen),
+	)
 
 	if r.config.SkipUpstreamTLSVerify {
-		r.log.Warn("tls verification switched off. In forward signing mode it's recommended you verify! (--skip-upstream-tls-verify=false)")
+		r.log.Warn(
+			`tls verification switched off. In forward signing mode it's
+			recommended you verify! (--skip-upstream-tls-verify=false)`,
+		)
 	}
+
 	if err := r.createUpstreamProxy(nil); err != nil {
 		return err
 	}
@@ -369,6 +437,7 @@ func (r *oauthProxy) createForwardingProxy() error {
 	// setup the tls configuration
 	if r.config.TLSCaCertificate != "" && r.config.TLSCaPrivateKey != "" {
 		ca, err := loadCA(r.config.TLSCaCertificate, r.config.TLSCaPrivateKey)
+
 		if err != nil {
 			return fmt.Errorf("unable to load certificate authority, error: %s", err)
 		}
@@ -393,6 +462,7 @@ func (r *oauthProxy) createForwardingProxy() error {
 			start := ctx.UserData.(time.Time)
 			latency := time.Since(start)
 			latencyMetric.Observe(latency.Seconds())
+
 			r.log.Info("client request",
 				zap.String("method", resp.Request.Method),
 				zap.String("path", resp.Request.URL.Path),
@@ -417,6 +487,7 @@ func (r *oauthProxy) createForwardingProxy() error {
 // Run starts the proxy service
 func (r *oauthProxy) Run() error {
 	listener, err := r.createHTTPListener(makeListenerConfig(r.config))
+
 	if err != nil {
 		return err
 	}
@@ -429,11 +500,16 @@ func (r *oauthProxy) Run() error {
 		WriteTimeout: r.config.ServerWriteTimeout,
 		IdleTimeout:  r.config.ServerIdleTimeout,
 	}
+
 	r.server = server
 	r.listener = listener
 
 	go func() {
-		r.log.Info("Gatekeeper proxy service starting", zap.String("interface", r.config.Listen))
+		r.log.Info(
+			"Gatekeeper proxy service starting",
+			zap.String("interface", r.config.Listen),
+		)
+
 		if err = server.Serve(listener); err != nil {
 			if err != http.ErrServerClosed {
 				r.log.Fatal("failed to start the http service", zap.Error(err))
@@ -443,14 +519,20 @@ func (r *oauthProxy) Run() error {
 
 	// step: are we running http service as well?
 	if r.config.ListenHTTP != "" {
-		r.log.Info("Gatekeeper proxy http service starting", zap.String("interface", r.config.ListenHTTP))
+		r.log.Info(
+			"Gatekeeper proxy http service starting",
+			zap.String("interface", r.config.ListenHTTP),
+		)
+
 		httpListener, err := r.createHTTPListener(listenerConfig{
 			listen:        r.config.ListenHTTP,
 			proxyProtocol: r.config.EnableProxyProtocol,
 		})
+
 		if err != nil {
 			return err
 		}
+
 		httpsvc := &http.Server{
 			Addr:         r.config.ListenHTTP,
 			Handler:      r.router,
@@ -458,6 +540,7 @@ func (r *oauthProxy) Run() error {
 			WriteTimeout: r.config.ServerWriteTimeout,
 			IdleTimeout:  r.config.ServerIdleTimeout,
 		}
+
 		go func() {
 			if err := httpsvc.Serve(httpListener); err != nil {
 				r.log.Fatal("failed to start the http redirect service", zap.Error(err))
@@ -468,7 +551,11 @@ func (r *oauthProxy) Run() error {
 	// step: are we running specific admin service as well?
 	// if not, admin endpoints are added as routes in the main service
 	if r.config.ListenAdmin != "" {
-		r.log.Info("keycloak proxy admin service starting", zap.String("interface", r.config.ListenAdmin))
+		r.log.Info(
+			"keycloak proxy admin service starting",
+			zap.String("interface", r.config.ListenAdmin),
+		)
+
 		var (
 			adminListener net.Listener
 			err           error
@@ -480,12 +567,12 @@ func (r *oauthProxy) Run() error {
 				listen:        r.config.ListenAdmin,
 				proxyProtocol: r.config.EnableProxyProtocol,
 			})
+
 			if err != nil {
 				return err
 			}
 		} else {
 			adminListenerConfig := makeListenerConfig(r.config)
-
 			// admin specific overides
 			adminListenerConfig.listen = r.config.ListenAdmin
 
@@ -496,17 +583,21 @@ func (r *oauthProxy) Run() error {
 				adminListenerConfig.certificate = r.config.TLSAdminCertificate
 				adminListenerConfig.privateKey = r.config.TLSAdminPrivateKey
 			}
+
 			if r.config.TLSAdminCaCertificate != "" {
 				adminListenerConfig.ca = r.config.TLSAdminCaCertificate
 			}
+
 			if r.config.TLSAdminClientCertificate != "" {
 				adminListenerConfig.clientCert = r.config.TLSAdminClientCertificate
 			}
+
 			adminListener, err = r.createHTTPListener(adminListenerConfig)
 			if err != nil {
 				return err
 			}
 		}
+
 		adminsvc := &http.Server{
 			Addr:         r.config.ListenAdmin,
 			Handler:      r.adminRouter,
@@ -521,6 +612,7 @@ func (r *oauthProxy) Run() error {
 			}
 		}()
 	}
+
 	return nil
 }
 
@@ -587,12 +679,18 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 	// are we create a unix socket or tcp listener?
 	if strings.HasPrefix(config.listen, "unix://") {
 		socket := config.listen[7:]
+
 		if exists := fileExists(socket); exists {
 			if err = os.Remove(socket); err != nil {
 				return nil, err
 			}
 		}
-		r.log.Info("listening on unix socket", zap.String("interface", config.listen))
+
+		r.log.Info(
+			"listening on unix socket",
+			zap.String("interface", config.listen),
+		)
+
 		if listener, err = net.Listen("unix", socket); err != nil {
 			return nil, err
 		}
@@ -604,7 +702,10 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 
 	// does it require proxy protocol?
 	if config.proxyProtocol {
-		r.log.Info("enabling the proxy protocol on listener", zap.String("interface", config.listen))
+		r.log.Info(
+			"enabling the proxy protocol on listener",
+			zap.String("interface", config.listen),
+		)
 		listener = &proxyproto.Listener{Listener: listener}
 	}
 
@@ -647,21 +748,41 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 		}
 
 		if config.useSelfSignedTLS {
-			r.log.Info("enabling self-signed tls support", zap.Duration("expiration", r.config.SelfSignedTLSExpiration))
+			r.log.Info(
+				"enabling self-signed tls support",
+				zap.Duration("expiration", r.config.SelfSignedTLSExpiration),
+			)
 
-			rotate, err := newSelfSignedCertificate(r.config.SelfSignedTLSHostnames, r.config.SelfSignedTLSExpiration, r.log)
+			rotate, err := newSelfSignedCertificate(
+				r.config.SelfSignedTLSHostnames,
+				r.config.SelfSignedTLSExpiration,
+				r.log,
+			)
+
 			if err != nil {
 				return nil, err
 			}
+
 			getCertificate = rotate.GetCertificate
 		}
 
 		if config.useFileTLS {
-			r.log.Info("tls support enabled", zap.String("certificate", config.certificate), zap.String("private_key", config.privateKey))
-			rotate, err := newCertificateRotator(config.certificate, config.privateKey, r.log)
+			r.log.Info(
+				"tls support enabled",
+				zap.String("certificate", config.certificate),
+				zap.String("private_key", config.privateKey),
+			)
+
+			rotate, err := newCertificateRotator(
+				config.certificate,
+				config.privateKey,
+				r.log,
+			)
+
 			if err != nil {
 				return nil, err
 			}
+
 			// start watching the files for changes
 			if err := rotate.watch(); err != nil {
 				return nil, err
@@ -684,9 +805,11 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 		// @check if we doing mutual tls
 		if config.clientCert != "" {
 			caCert, err := ioutil.ReadFile(config.clientCert)
+
 			if err != nil {
 				return nil, err
 			}
+
 			caCertPool := x509.NewCertPool()
 			caCertPool.AppendCertsFromPEM(caCert)
 			tlsConfig.ClientCAs = caCertPool
@@ -706,12 +829,16 @@ func (r *oauthProxy) createUpstreamProxy(upstream *url.URL) error {
 
 	// are we using a unix socket?
 	if upstream != nil && upstream.Scheme == "unix" {
-		r.log.Info("using unix socket for upstream", zap.String("socket", fmt.Sprintf("%s%s", upstream.Host, upstream.Path)))
+		r.log.Info(
+			"using unix socket for upstream",
+			zap.String("socket", fmt.Sprintf("%s%s", upstream.Host, upstream.Path)),
+		)
 
 		socketPath := fmt.Sprintf("%s%s", upstream.Host, upstream.Path)
 		dialer = func(network, address string) (net.Conn, error) {
 			return net.Dial("unix", socketPath)
 		}
+
 		upstream.Path = ""
 		upstream.Host = "domain-sock"
 		upstream.Scheme = unsecureScheme
@@ -725,10 +852,16 @@ func (r *oauthProxy) createUpstreamProxy(upstream *url.URL) error {
 	// case of update the http transport settings - Also we to place this go-routine?
 	if r.config.TLSClientCertificate != "" {
 		cert, err := ioutil.ReadFile(r.config.TLSClientCertificate)
+
 		if err != nil {
-			r.log.Error("unable to read client certificate", zap.String("path", r.config.TLSClientCertificate), zap.Error(err))
+			r.log.Error(
+				"unable to read client certificate",
+				zap.String("path", r.config.TLSClientCertificate),
+				zap.Error(err),
+			)
 			return err
 		}
+
 		pool := x509.NewCertPool()
 		pool.AppendCertsFromPEM(cert)
 		tlsConfig.ClientCAs = pool
@@ -738,11 +871,17 @@ func (r *oauthProxy) createUpstreamProxy(upstream *url.URL) error {
 	{
 		// @check if we have a upstream ca to verify the upstream
 		if r.config.UpstreamCA != "" {
-			r.log.Info("loading the upstream ca", zap.String("path", r.config.UpstreamCA))
+			r.log.Info(
+				"loading the upstream ca",
+				zap.String("path", r.config.UpstreamCA),
+			)
+
 			ca, err := ioutil.ReadFile(r.config.UpstreamCA)
+
 			if err != nil {
 				return err
 			}
+
 			pool := x509.NewCertPool()
 			pool.AppendCertsFromPEM(ca)
 			tlsConfig.RootCAs = pool
@@ -780,22 +919,38 @@ func (r *oauthProxy) createTemplates() error {
 	var list []string
 
 	if r.config.SignInPage != "" {
-		r.log.Debug("loading the custom sign in page", zap.String("page", r.config.SignInPage))
+		r.log.Debug(
+			"loading the custom sign in page",
+			zap.String("page", r.config.SignInPage),
+		)
+
 		list = append(list, r.config.SignInPage)
 	}
 
 	if r.config.ForbiddenPage != "" {
-		r.log.Debug("loading the custom sign forbidden page", zap.String("page", r.config.ForbiddenPage))
+		r.log.Debug(
+			"loading the custom sign forbidden page",
+			zap.String("page", r.config.ForbiddenPage),
+		)
+
 		list = append(list, r.config.ForbiddenPage)
 	}
 
 	if r.config.ErrorPage != "" {
-		r.log.Debug("loading the custom error page", zap.String("page", r.config.ErrorPage))
+		r.log.Debug(
+			"loading the custom error page",
+			zap.String("page", r.config.ErrorPage),
+		)
+
 		list = append(list, r.config.ErrorPage)
 	}
 
 	if len(list) > 0 {
-		r.log.Info("loading the custom templates", zap.String("templates", strings.Join(list, ",")))
+		r.log.Info(
+			"loading the custom templates",
+			zap.String("templates", strings.Join(list, ",")),
+		)
+
 		r.templates = template.Must(template.ParseFiles(list...))
 	}
 
@@ -896,11 +1051,13 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *http.Client, error) 
 				"failed to get provider configuration from discovery",
 				zap.Error(err),
 			)
+
 			time.Sleep(time.Second * 3)
 		}
 
 		completeCh <- true
 	}()
+
 	// wait for timeout or successful retrieval
 	select {
 	case <-ctx.Done():
