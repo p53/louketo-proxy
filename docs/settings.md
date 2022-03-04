@@ -24,6 +24,7 @@
 |    --preserve-host                         | preserve the host header of the proxied request in the upstream request | false | PROXY_PRESERVE_HOST
 |    --request-id-header value               | the http header name for request id | X-Request-ID | PROXY_REQUEST_ID_HEADER
 |    --response-headers value                | custom headers to added to the http response key=value | | PROXY_RESPONSE_HEADERS
+|    --custom-http-methods                   | list of additional non-standard http methods | |
 |    --enable-self-signed-tls                | create self signed certificates for the proxy | false | PROXY_ENABLE_SELF_SIGNED_TLS
 |    --self-signed-tls-hostnames value       | a list of hostnames to place on the self-signed certificate | |
 |    --self-signed-tls-expiration value      | the expiration of the certificate before rotation | 3h0m0s | PROXY_SELF_SIGNED_TLS_EXPIRATION
@@ -62,6 +63,7 @@
 |    --same-site-cookie value                | enforces cookies to be send only to same site requests according to the policy (can be \| Strict\|Lax\|None) | Lax | PROXY_SAME_SITE_COOKIE
 |    --match-claims value                    | keypair values for matching access token claims e.g. aud=myapp, iss=http://example.* | |
 |    --add-claims value                      | extra claims from the token and inject into headers, e.g given_name -> X-Auth-Given-Name | |
+|    --tls-min-version                       | specify server minimal TLS version one of tlsv1.0,tlsv1.1,tlsv1.2,tlsv1.3 | | TLS_MIN_VERSION |
 |    --tls-cert value                        | path to ths TLS certificate | | PROXY_TLS_CERTIFICATE
 |    --tls-private-key value                 | path to the private key for TLS | | PROXY_TLS_PRIVATE_KEY
 |    --tls-ca-certificate value              | path to the ca certificate used for signing requests | | PROXY_TLS_CA_CERTIFICATE
