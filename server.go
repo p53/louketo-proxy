@@ -329,7 +329,6 @@ func (r *oauthProxy) createReverseProxy() error {
 		return err
 	}
 
-<<<<<<< HEAD
 	// step: add custom http methods
 	if r.config.CustomHTTPMethods != nil {
 		for _, customHTTPMethod := range r.config.CustomHTTPMethods {
@@ -338,8 +337,6 @@ func (r *oauthProxy) createReverseProxy() error {
 		}
 	}
 
-=======
->>>>>>> Make nicer formatting in server.go
 	// step: provision in the protected resources
 	enableDefaultDeny := r.config.EnableDefaultDeny
 
