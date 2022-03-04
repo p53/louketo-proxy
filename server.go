@@ -292,6 +292,7 @@ func (r *oauthProxy) createReverseProxy() error {
 	if r.config.CustomHTTPMethods != nil {
 		for _, customHTTPMethod := range r.config.CustomHTTPMethods {
 			chi.RegisterMethod(customHTTPMethod)
+			allHTTPMethods = append(allHTTPMethods, customHTTPMethod)
 		}
 	}
 

@@ -1052,52 +1052,182 @@ func TestTLS(t *testing.T) {
 }
 
 func TestCustomHTTPMethod(t *testing.T) {
-	config := newFakeKeycloakConfig()
-	config.EnableDefaultDeny = true
-	config.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
-	config.Resources = []*Resource{
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
 		{
-			URL:         "/public/*",
-			Methods:     allHTTPMethods,
-			WhiteListed: true,
+			Name: "TestPublicAllow",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
+				c.Resources = []*Resource{
+					{
+						URL:         "/public/*",
+						Methods:     allHTTPMethods,
+						WhiteListed: true,
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/public/allowed",
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+			},
 		},
 		{
-			URL:     "/api/*",
-			Methods: []string{http.MethodGet, http.MethodPost, http.MethodPut},
+			Name: "TestPublicAllowOnCustomHTTPMethod",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
+				c.Resources = []*Resource{
+					{
+						URL:         "/public/*",
+						Methods:     allHTTPMethods,
+						WhiteListed: true,
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					Method:                  "PROPFIND",
+					URI:                     "/public/allowed",
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+			},
 		},
 		{
-			URL:     "/webdav/*",
-			Methods: []string{"PROPFIND"},
+			Name: "TestDefaultDenialProtectionOnCustomHTTP",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					Method:        "PROPFIND",
+					URI:           "/api/test",
+					ExpectedProxy: false,
+					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+		{
+			Name: "TestDefaultDenialPassOnCustomHTTP",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
+				c.Resources = []*Resource{
+					{
+						URL:     "/api/*",
+						Methods: []string{http.MethodGet, http.MethodPost, http.MethodPut},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					Method:                  "PROPFIND",
+					URI:                     "/api/test",
+					HasLogin:                true,
+					Redirects:               true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+			},
+		},
+		{
+			Name: "TestPassOnCustomHTTP",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
+				c.Resources = []*Resource{
+					{
+						URL:     "/webdav/*",
+						Methods: []string{"PROPFIND"},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					Method:                  "PROPFIND",
+					URI:                     "/webdav/test",
+					HasLogin:                true,
+					Redirects:               true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+			},
+		},
+		{
+			Name: "TestProtectionOnCustomHTTP",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
+				c.Resources = []*Resource{
+					{
+						URL:     "/webdav/*",
+						Methods: []string{"PROPFIND"},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					Method:        "PROPFIND",
+					URI:           "/webdav/test",
+					ExpectedProxy: false,
+					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+		{
+			Name: "TestProtectionOnCustomHTTPWithUnvalidRequestMethod",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
+				c.Resources = []*Resource{
+					{
+						URL:     "/webdav/*",
+						Methods: []string{"PROPFIND"},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					Method:        "XEWED",
+					URI:           "/webdav/test",
+					ExpectedProxy: false,
+					ExpectedCode:  http.StatusNotImplemented,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
 		},
 	}
-	requests := []fakeRequest{
-		{
-			URI:           "/public/allowed",
-			ExpectedProxy: true,
-			ExpectedCode:  http.StatusOK,
-		},
-		{
-			Method: "PROPFIND",
-			URI:    "/public/allowed",
-			// FIXME: It should return 405, see https://github.com/gogatekeeper/gatekeeper/issues/142
-			ExpectedCode: http.StatusUnauthorized,
-		},
-		{
-			Method:    "PROPFIND",
-			URI:       "/api/test",
-			HasLogin:  true,
-			Redirects: true,
-			// FIXME: It should return 405, see https://github.com/gogatekeeper/gatekeeper/issues/142
-			ExpectedCode: http.StatusUnauthorized,
-		},
-		{
-			Method:        "PROPFIND",
-			URI:           "/webdav/test",
-			HasLogin:      true,
-			Redirects:     true,
-			ExpectedProxy: true,
-			ExpectedCode:  http.StatusOK,
-		},
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				c := newFakeKeycloakConfig()
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
 	}
-	newFakeProxy(config, &fakeAuthConfig{}).RunTests(t, requests)
 }

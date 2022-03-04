@@ -21,6 +21,7 @@ package main
 import (
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -138,7 +139,13 @@ func TestIsValid(t *testing.T) {
 	}
 
 	for i, c := range testCases {
-		err := c.Resource.valid(c.CustomHTTPMethods)
+		for _, customHTTPMethod := range c.CustomHTTPMethods {
+			chi.RegisterMethod(customHTTPMethod)
+			allHTTPMethods = append(allHTTPMethods, customHTTPMethod)
+		}
+
+		err := c.Resource.valid()
+
 		if err != nil && c.Ok {
 			t.Errorf("case %d should not have failed, error: %s", i, err)
 		}

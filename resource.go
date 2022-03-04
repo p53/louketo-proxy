@@ -76,7 +76,7 @@ func (r *Resource) parse(resource string) (*Resource, error) {
 }
 
 // valid ensure the resource is valid
-func (r *Resource) valid(customHTTPMethods []string) error {
+func (r *Resource) valid() error {
 	if r.Methods == nil {
 		r.Methods = make([]string, 0)
 	}
@@ -96,7 +96,7 @@ func (r *Resource) valid(customHTTPMethods []string) error {
 	}
 	// step: check the method is valid
 	for _, m := range r.Methods {
-		if !isValidHTTPMethod(m) && !isValidCustomHTTPMethod(m, customHTTPMethods) {
+		if !isValidHTTPMethod(m) {
 			return fmt.Errorf("invalid method %s", m)
 		}
 	}

@@ -246,7 +246,7 @@ func (r *Config) isValid() error {
 
 		// check: ensure each of the resource are valid
 		for _, resource := range r.Resources {
-			if err := resource.valid(r.CustomHTTPMethods); err != nil {
+			if err := resource.valid(); err != nil {
 				return err
 			}
 		}
