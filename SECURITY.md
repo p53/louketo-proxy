@@ -4,7 +4,7 @@
 
 - CVE-2020-14359 keycloak-gatekeeper: gatekeeper bypass via cURL when using lower case HTTP headers
 
-  Inconsistency in EnableDefaultDeny option implementation, it applies default deny on all UPPERCASE HTTP METHODS, not lowercase, this can be workarounded for existing versions by explicitly listing all methods in different letter case (which is error prone and cumbersome). Fix was delivered in version 1.3.4
+  Inconsistency in EnableDefaultDeny option implementation, it applies default deny on all UPPERCASE HTTP METHODS, not lowercase, this can be workarounded for existing versions by explicitly listing all methods in different letter case (which is error prone and cumbersome). Fix was delivered in version 1.4.0
 
 ## Supported Versions
 
@@ -13,7 +13,7 @@ currently being supported with security updates.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.3.    | :white_check_mark: |
+| 1.4.    | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
