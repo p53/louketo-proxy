@@ -55,6 +55,7 @@ const (
 	metricsURL       = "/metrics"
 	tokenURL         = "/token"
 	debugURL         = "/debug/pprof"
+	discoveryURL     = "/discovery"
 
 	claimResourceRoles = "roles"
 

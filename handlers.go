@@ -40,6 +40,13 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+type DiscoveryResponse struct {
+	ExpiredURL string `json:"expired_endpoint"`
+	LogoutURL  string `json:"logout_endpoint"`
+	TokenURL   string `json:"token_endpoint"`
+	LoginURL   string `json:"login_endpoint"`
+}
+
 // getRedirectionURL returns the redirectionURL for the oauth flow
 func (r *oauthProxy) getRedirectionURL(w http.ResponseWriter, req *http.Request) string {
 	var redirect string
@@ -895,4 +902,37 @@ func (r *oauthProxy) retrieveRefreshToken(req *http.Request, user *userContext) 
 func methodNotAllowHandlder(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusMethodNotAllowed)
 	_, _ = w.Write(nil)
+}
+
+// discoveryHandler provides endpoint info
+func (r *oauthProxy) discoveryHandler(w http.ResponseWriter, req *http.Request) {
+	resp := &DiscoveryResponse{
+		ExpiredURL: r.config.WithOAuthURI(strings.TrimPrefix(expiredURL, "/")),
+		LogoutURL:  r.config.WithOAuthURI(strings.TrimPrefix(logoutURL, "/")),
+		TokenURL:   r.config.WithOAuthURI(strings.TrimPrefix(tokenURL, "/")),
+		LoginURL:   r.config.WithOAuthURI(strings.TrimPrefix(loginURL, "/")),
+	}
+
+	respBody, err := json.Marshal(resp)
+
+	if err != nil {
+		r.log.Error(
+			"problem marshalling response",
+			zap.String("error", err.Error()),
+		)
+
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(respBody)
+
+	if err != nil {
+		r.log.Error(
+			"problem during response write",
+			zap.String("error", err.Error()),
+		)
+	}
 }

@@ -270,6 +270,7 @@ func (r *oauthProxy) createReverseProxy() error {
 		e.With(r.authenticationMiddleware()).Get(logoutURL, r.logoutHandler)
 		e.With(r.authenticationMiddleware()).Get(tokenURL, r.tokenHandler)
 		e.Post(loginURL, r.loginHandler)
+		e.Get(discoveryURL, r.discoveryHandler)
 
 		if r.config.ListenAdmin == "" {
 			e.Mount("/", adminEngine)

@@ -877,3 +877,65 @@ func TestHealthHandler(t *testing.T) {
 	}
 	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
+
+func TestDiscoveryURL(t *testing.T) {
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name:          "TestDiscoveryOK",
+			ProxySettings: func(c *Config) {},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/oauth/discovery",
+					ExpectedProxy:           false,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "logout_endpoint",
+				},
+			},
+		},
+		{
+			Name: "TestWithDefaultDenyDiscoveryOK",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/oauth/discovery",
+					ExpectedProxy:           false,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "login_endpoint",
+				},
+			},
+		},
+		{
+			Name: "TestEndpointPathCorrectWithDefaultDenyDiscoveryOK",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/oauth/discovery",
+					ExpectedProxy:           false,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "/oauth/login",
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				c := newFakeKeycloakConfig()
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
+}
