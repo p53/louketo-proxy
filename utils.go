@@ -44,7 +44,6 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/coreos/go-oidc/jose"
 	"github.com/urfave/cli"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -86,7 +85,7 @@ func createCertificate(key *rsa.PrivateKey, hostnames []string, expire time.Dura
 		SignatureAlgorithm:    x509.SHA512WithRSA,
 		Subject: pkix.Name{
 			CommonName:   hostnames[0],
-			Organization: []string{"Louketo Proxy"},
+			Organization: []string{"Gatekeeper"},
 		},
 	}
 
@@ -114,22 +113,23 @@ func createCertificate(key *rsa.PrivateKey, hostnames []string, expire time.Dura
 
 // getRequestHostURL returns the hostname from the request
 func getRequestHostURL(r *http.Request) string {
-	hostname := r.Host
-	if r.Header.Get("X-Forwarded-Host") != "" {
-		hostname = r.Header.Get("X-Forwarded-Host")
-	}
+	scheme := unsecureScheme
 
-	scheme := "http"
 	if r.TLS != nil {
-		scheme = "https"
+		scheme = secureScheme
 	}
 
-	return fmt.Sprintf("%s://%s", scheme, hostname)
+	redirect := fmt.Sprintf("%s://%s",
+		defaultTo(r.Header.Get("X-Forwarded-Proto"), scheme),
+		defaultTo(r.Header.Get("X-Forwarded-Host"), r.Host))
+
+	return redirect
 }
 
 // readConfigFile reads and parses the configuration file
 func readConfigFile(filename string, config *Config) error {
 	content, err := ioutil.ReadFile(filename)
+
 	if err != nil {
 		return err
 	}
@@ -147,14 +147,19 @@ func readConfigFile(filename string, config *Config) error {
 // encryptDataBlock encrypts the plaintext string with the key
 func encryptDataBlock(plaintext, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
+
 	if err != nil {
 		return []byte{}, err
 	}
+
 	gcm, err := cipher.NewGCM(block)
+
 	if err != nil {
 		return []byte{}, err
 	}
+
 	nonce := make([]byte, gcm.NonceSize())
+
 	if _, err = io.ReadFull(cryptorand.Reader, nonce); err != nil {
 		return nil, err
 	}
@@ -165,17 +170,23 @@ func encryptDataBlock(plaintext, key []byte) ([]byte, error) {
 // decryptDataBlock decrypts some cipher text
 func decryptDataBlock(cipherText, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
+
 	if err != nil {
 		return []byte{}, err
 	}
+
 	gcm, err := cipher.NewGCM(block)
+
 	if err != nil {
 		return []byte{}, err
 	}
+
 	nonceSize := gcm.NonceSize()
+
 	if len(cipherText) < nonceSize {
 		return nil, errors.New("failed to decrypt the ciphertext, the text is too short")
 	}
+
 	nonce, input := cipherText[:nonceSize], cipherText[nonceSize:]
 
 	return gcm.Open(nil, nonce, input, nil)
@@ -184,6 +195,7 @@ func decryptDataBlock(cipherText, key []byte) ([]byte, error) {
 // encodeText encodes the session state information into a value for a cookie to consume
 func encodeText(plaintext string, key string) (string, error) {
 	cipherText, err := encryptDataBlock([]byte(plaintext), []byte(key))
+
 	if err != nil {
 		return "", err
 	}
@@ -194,11 +206,13 @@ func encodeText(plaintext string, key string) (string, error) {
 // decodeText decodes the session state cookie value
 func decodeText(state, key string) (string, error) {
 	cipherText, err := base64.RawStdEncoding.DecodeString(state)
+
 	if err != nil {
 		return "", err
 	}
 	// step: decrypt the cookie back in the expiration|token
 	encoded, err := decryptDataBlock(cipherText, []byte(key))
+
 	if err != nil {
 		return "", ErrInvalidSession
 	}
@@ -212,10 +226,12 @@ func decodeKeyPairs(list []string) (map[string]string, error) {
 
 	for _, x := range list {
 		items := strings.Split(x, "=")
-		if len(items) != 2 {
+
+		if len(items) < 2 || items[0] == "" {
 			return kp, fmt.Errorf("invalid tag '%s' should be key=pair", x)
 		}
-		kp[items[0]] = items[1]
+
+		kp[items[0]] = strings.Join(items[1:], "=")
 	}
 
 	return kp, nil
@@ -259,8 +275,10 @@ func hasAccess(need, have []string, all bool) bool {
 	}
 
 	var matched int
+
 	for _, x := range need {
 		found := containedIn(x, have)
+
 		switch found {
 		case true:
 			if !all {
@@ -328,9 +346,11 @@ func transferBytes(src io.Reader, dest io.Writer, wg *sync.WaitGroup) (int64, er
 func tryUpdateConnection(req *http.Request, writer http.ResponseWriter, endpoint *url.URL) error {
 	// step: dial the endpoint
 	server, err := tryDialEndpoint(endpoint)
+
 	if err != nil {
 		return err
 	}
+
 	defer server.Close()
 
 	// @check the the response writer implements the Hijack method
@@ -340,9 +360,11 @@ func tryUpdateConnection(req *http.Request, writer http.ResponseWriter, endpoint
 
 	// @step: get the client connection object
 	client, _, err := writer.(http.Hijacker).Hijack()
+
 	if err != nil {
 		return err
 	}
+
 	defer client.Close()
 
 	// step: write the request to upstream
@@ -363,6 +385,7 @@ func tryUpdateConnection(req *http.Request, writer http.ResponseWriter, endpoint
 // dialAddress extracts the dial address from the url
 func dialAddress(location *url.URL) string {
 	items := strings.Split(location.Host, ":")
+
 	if len(items) != 2 {
 		switch location.Scheme {
 		case unsecureScheme:
@@ -421,16 +444,19 @@ func mergeMaps(dest, source map[string]string) map[string]string {
 // loadCA loads the certificate authority
 func loadCA(cert, key string) (*tls.Certificate, error) {
 	caCert, err := ioutil.ReadFile(cert)
+
 	if err != nil {
 		return nil, err
 	}
 
 	caKey, err := ioutil.ReadFile(key)
+
 	if err != nil {
 		return nil, err
 	}
 
 	ca, err := tls.X509KeyPair(caCert, caKey)
+
 	if err != nil {
 		return nil, err
 	}
@@ -444,17 +470,19 @@ func loadCA(cert, key string) (*tls.Certificate, error) {
 // expires in 1 hours, get me a duration within 80%
 func getWithin(expires time.Time, within float64) time.Duration {
 	left := expires.UTC().Sub(time.Now().UTC()).Seconds()
+
 	if left <= 0 {
 		return time.Duration(0)
 	}
+
 	seconds := int(left * within)
 
 	return time.Duration(seconds) * time.Second
 }
 
 // getHashKey returns a hash of the encodes jwt token
-func getHashKey(token *jose.JWT) string {
-	hash := sha.Sum256([]byte(token.Encode()))
+func getHashKey(token string) string {
+	hash := sha.Sum256([]byte(token))
 	return base64.RawStdEncoding.EncodeToString(hash[:])
 }
 
@@ -466,6 +494,7 @@ func printError(message string, args ...interface{}) *cli.ExitError {
 // realIP retrieves the client ip address from a http request
 func realIP(req *http.Request) string {
 	ra := req.RemoteAddr
+
 	if ip := req.Header.Get(headerXForwardedFor); ip != "" {
 		ra = strings.Split(ip, ", ")[0]
 	} else if ip := req.Header.Get(headerXRealIP); ip != "" {
@@ -473,5 +502,6 @@ func realIP(req *http.Request) string {
 	} else {
 		ra, _, _ = net.SplitHostPort(ra)
 	}
+
 	return ra
 }

@@ -15,11 +15,22 @@ linters-settings:
   # TODO: Revisit after the refactor
   funlen:
     lines: 220
-    statements: 110
-  
+    statements: 120
+
 linters:
   enable-all: true
   disable:
+    - wrapcheck
+    - gosec
+    - gocritic
+    - errorlint
+    - gci
+    - gofumpt
+    - nlreturn
+    - noctx
+    - paralleltest
+    - exhaustive
+    - exhaustivestruct
     - maligned
     - unparam
     - lll

@@ -1,167 +1,153 @@
-/*
-Copyright 2015 All rights reserved.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+//go:build e2e
+// +build e2e
 
 package main
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
-	"net/url"
-	"path"
+	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/cenkalti/backoff"
+	resty "github.com/go-resty/resty/v2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 const (
-	e2eUpstreamURL      = "/upstream"
-	e2eUpstreamListener = "127.0.0.1:12345"
-	e2eProxyListener    = "127.0.0.1:54321"
-	e2eOauthListener    = "127.0.0.1:23456"
-	e2eOauthURL         = "/.well-known/openid-configuration"
+	testRealm        = "test"
+	testClient       = "test-client"
+	testClientSecret = "6447d0c0-d510-42a7-b654-6e3a16b2d7e2"
 )
 
-// checkListenOrBail waits on a endpoint listener to respond.
-// This avoids race conditions with test listieners as go routines
-func checkListenOrBail(endpoint string) bool {
-	const (
-		maxWaitCycles = 10
-		waitTime      = 100 * time.Millisecond
-	)
-	checkListen := http.Client{}
-	//nolint:bodyclose
-	_, err := checkListen.Get(endpoint)
-	limit := 0
-	for err != nil && limit < maxWaitCycles {
-		time.Sleep(waitTime)
-		//nolint:bodyclose
-		_, err = checkListen.Get(endpoint)
-		limit++
-	}
-	return limit < maxWaitCycles
-}
+func TestMain(m *testing.M) {
+	retry := 0
 
-func runTestLouketo(t *testing.T, config *Config) error {
-	proxy, err := newProxy(config)
+	operation := func() error {
+		var err error
+
+		if retry > 0 {
+			fmt.Printf("Retrying connection to keycloak instance %d", retry)
+		}
+
+		client := resty.New()
+		request := client.R()
+		resp, err := request.Execute("GET", "http://localhost:8081")
+
+		status := resp.StatusCode()
+
+		if status != 200 {
+			retry++
+			return err
+		}
+
+		return nil
+	}
+
+	backOff := backoff.NewExponentialBackOff()
+	backOff.MaxElapsedTime = time.Second * 300
+	err := backoff.Retry(operation, backOff)
+
 	if err != nil {
-		return err
+		fmt.Print("Failed to connect to keycloak instance, aborting!")
+		os.Exit(1)
 	}
-	_ = proxy.Run()
-	if !assert.True(t, checkListenOrBail("http://"+config.Listen+"/oauth/login")) {
-		err := fmt.Errorf("cannot connect to test http listener on: %s", "http://"+config.Listen+"/oauth/login")
-		t.Logf("%v", err)
-		t.FailNow()
-		return err
-	}
-	return nil
+
+	time.Sleep(30 * time.Second)
+
+	code := m.Run()
+	os.Exit(code)
 }
 
-func runTestUpstream(t *testing.T) error {
+func TestE2E(t *testing.T) {
+	server := httptest.NewServer(&fakeUpstreamService{})
+	rand.Seed(time.Now().UnixNano())
+	min := 1024
+	max := 65000
+	portNum := fmt.Sprintf("%d", rand.Intn(max-min+1)+min)
+
+	os.Setenv("PROXY_DISCOVERY_URL", "http://localhost:8081/auth/realms/"+testRealm)
+	os.Setenv("PROXY_OPENID_PROVIDER_TIMEOUT", "60s")
+	os.Setenv("PROXY_LISTEN", "0.0.0.0:"+portNum)
+	os.Setenv("PROXY_CLIENT_ID", testClient)
+	os.Setenv("PROXY_CLIENT_SECRET", testClientSecret)
+	os.Setenv("PROXY_UPSTREAM_URL", server.URL)
+	os.Setenv("PROXY_NO_REDIRECTS", "true")
+	os.Setenv("PROXY_SKIP_ACCESS_TOKEN_CLIENT_ID_CHECK", "true")
+	os.Setenv("PROXY_SKIP_ACCESS_TOKEN_ISSUER_CHECK", "true")
+
 	go func() {
-		upstreamHandler := func(w http.ResponseWriter, req *http.Request) {
-			_, _ = io.WriteString(w, `{"message": "test"}`)
-			w.Header().Set("Content-Type", "application/json")
-			w.Header().Set("X-Upstream-Response-Header", "test")
+		app := newOauthProxyApp()
+		os.Args = []string{os.Args[0]}
+		err := app.Run(os.Args)
+
+		if err != nil {
+			log.Fatalf("Error during e2e test %s", err)
+			os.Exit(1)
 		}
-		http.HandleFunc(e2eUpstreamURL, upstreamHandler)
-		_ = http.ListenAndServe(e2eUpstreamListener, nil)
 	}()
-	if !assert.True(t, checkListenOrBail("http://"+path.Join(e2eUpstreamListener, e2eUpstreamURL))) {
-		err := fmt.Errorf("cannot connect to test http listener on: %s", "http://"+path.Join(e2eUpstreamListener, e2eUpstreamURL))
-		t.Logf("%v", err)
-		t.FailNow()
-		return err
-	}
-	return nil
-}
 
-func runTestAuth(t *testing.T) error {
-	go func() {
-		configurationHandler := func(w http.ResponseWriter, req *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			_, _ = io.WriteString(w, `{
-				"issuer": "http://`+e2eOauthListener+`",
-				"subject_types_supported":["public","pairwise"],
-				"id_token_signing_alg_values_supported":["ES384","RS384","HS256","HS512","ES256","RS256","HS384","ES512","RS512"],
-				"userinfo_signing_alg_values_supported":["ES384","RS384","HS256","HS512","ES256","RS256","HS384","ES512","RS512","none"],
-				"authorization_endpoint":"http://`+e2eOauthListener+`/auth/realms/master/protocol/openid-connect/auth",
-				"token_endpoint":"http://`+e2eOauthListener+`/auth/realms/master/protocol/openid-connect/token",
-				"jwks_uri":"http://`+e2eOauthListener+`/auth/realms/master/protocol/openid-connect/certs"
-			}`)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	conf := &clientcredentials.Config{
+		ClientID:     testClient,
+		ClientSecret: testClientSecret,
+		Scopes:       []string{"email", "openid"},
+		TokenURL:     "http://localhost:8081/auth/realms/" + testRealm + "/protocol/openid-connect/token",
+	}
+
+	respToken, err := conf.Token(ctx)
+
+	if err != nil {
+		t.Fatalf("Failed to acquire access token for client")
+	}
+
+	retry := 0
+
+	operation := func() error {
+		var err error
+
+		if retry > 0 {
+			fmt.Printf("Retrying connection to proxy instance %d", retry)
 		}
-		http.HandleFunc(e2eOauthURL, configurationHandler)
-		_ = http.ListenAndServe(e2eOauthListener, nil)
-	}()
-	if !assert.True(t, checkListenOrBail("http://"+path.Join(e2eOauthListener, e2eOauthURL))) {
-		err := fmt.Errorf("cannot connect to test http listener on: %s", "http://"+path.Join(e2eOauthListener, e2eOauthURL))
-		t.Logf("%v", err)
-		t.FailNow()
-		return err
-	}
-	return nil
-}
 
-func TestCorsWithUpstream(t *testing.T) {
-	log.SetOutput(ioutil.Discard)
-	config := newDefaultConfig()
-	config.Listen = e2eProxyListener
-	config.DiscoveryURL = "http://" + e2eOauthListener + e2eOauthURL
-	config.Upstream = "http://" + e2eUpstreamListener
-	config.CorsOrigins = []string{"*"}
-	config.Verbose = false
-	config.DisableAllLogging = true
-	config.Resources = []*Resource{
-		{
-			URL:         e2eUpstreamURL,
-			Methods:     []string{"GET"},
-			WhiteListed: true,
-		},
+		_, err = http.Get("http://localhost:" + portNum)
+
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
 
-	// launch fake upstream resource server
-	_ = runTestUpstream(t)
+	backOff := backoff.NewExponentialBackOff()
+	backOff.MaxElapsedTime = time.Second * 300
+	err = backoff.Retry(operation, backOff)
 
-	// launch fake oauth OIDC server
-	_ = runTestAuth(t)
-
-	// launch louketo-proxy proxy
-	_ = runTestLouketo(t, config)
-
-	// ok now exercise the ensemble with a CORS-enabled request
-	client := http.Client{}
-	u, _ := url.Parse("http://" + e2eProxyListener + e2eUpstreamURL)
-	h := make(http.Header, 1)
-	h.Set("Content-Type", "application/json")
-	h.Add("Origin", "myorigin.com")
-
-	resp, err := client.Do(&http.Request{
-		Method: "GET",
-		URL:    u,
-		Header: h,
-	})
-	assert.NoError(t, err)
-	buf, erb := ioutil.ReadAll(resp.Body)
-	assert.NoError(t, erb)
-	assert.JSONEq(t, `{"message":"test"}`, string(buf)) // check this is our test resource
-	if assert.NotEmpty(t, resp.Header) && assert.Contains(t, resp.Header, "Access-Control-Allow-Origin") {
-		// check the returned upstream response after proxying contains CORS headers
-		assert.Equal(t, []string{"*"}, resp.Header["Access-Control-Allow-Origin"])
+	if err != nil {
+		fmt.Print("Failed to connect to proxy instance, aborting!")
+		os.Exit(1)
 	}
-	defer resp.Body.Close()
+
+	client := resty.New()
+	request := client.SetRedirectPolicy(resty.NoRedirectPolicy()).R()
+	request.SetAuthToken(respToken.AccessToken)
+
+	resp, err := request.Execute("GET", "http://localhost:"+portNum)
+
+	if err != nil {
+		t.Fatalf("Failed to connect to proxy instance, aborting!")
+	}
+
+	status := resp.StatusCode()
+
+	if status != 200 {
+		t.Fatalf("Bad response code %d", status)
+	}
 }

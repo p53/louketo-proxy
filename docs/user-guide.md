@@ -1,20 +1,23 @@
-# Louketo Proxy
+# Gatekeeper
 
-Louketo is a proxy which integrates with OpenID Connect (OIDC) Providers, it supports both access tokens in a browser cookie or bearer tokens.
+Gatekeeper is a proxy which integrates with OpenID Connect (OIDC) Providers, it supports both access tokens in a browser cookie or bearer tokens.
 
-This documentation details how to build and configure Louketo followed by details of how to use each of its features.
+This documentation details how to build and configure Gatekeeper followed by details of how to use each of its features.
 
 For further information, see the included help file which includes a
 full list of commands and switches. View the file by entering the
 following at the command line (modify the location to match where you
-install Louketo Proxy):
+install Gatekeeper Proxy):
 
 ``` bash
-    $ bin/louketo-proxy help
+    $ bin/gatekeeper help
 ```
+
+You can view all settings also in this table [Settings](settings.md)
+
 ## Requirements
-    
-  - Go 1.13 or higher
+
+  - Go 1.16 or higher
   - Make
 
 ## Configuration options
@@ -31,12 +34,19 @@ client-id: <CLIENT_ID>
 client-secret: <CLIENT_SECRET>
 # the interface definition you wish the proxy to listen, all interfaces is specified as ':<port>', unix sockets as unix://<REL_PATH>|</ABS PATH>
 listen: :3000
+# port on which metrics and health endpoints will be available, if not specified it will be on above specified port
+listen-admin: :4000
 # whether to enable refresh tokens
 enable-refresh-tokens: true
 # the location of a certificate you wish the proxy to use for TLS support
 tls-cert:
 # the location of a private key for TLS
 tls-private-key:
+# TLS options related to admin listener
+tls-admin-cert:
+tls-admin-private-key:
+tls-admin-ca-certificate:
+tls-admin-client-certificate:
 # the redirection URL, essentially the site URL, note: /oauth/callback is added at the end
 redirection-url: http://127.0.0.1:3000
 # the encryption key used to encode the session state
@@ -44,7 +54,7 @@ encryption-key: <ENCRYPTION_KEY>
 # the upstream endpoint which we should proxy request
 upstream-url: http://127.0.0.1:80
 # Returns HTTP 401 when no authentication is present, used with forward proxies.
-no-redirects: false 
+no-redirects: false
 # additional scopes to add to the default (openid+email+profile)
 scopes:
 - vpn-user
@@ -118,16 +128,16 @@ resources:
   roles:
   - client:test1
 - uri: /public/*
-# Allow access to the resource above 
+# Allow access to the resource above
   white-listed: true
 - uri: /favicon
-# Allow access to the resource above 
+# Allow access to the resource above
   white-listed: true
 - uri: /css/*
-# Allow access to the resource above 
+# Allow access to the resource above
   white-listed: true
 - uri: /img/*
-# Allow access to the resource above 
+# Allow access to the resource above
   white-listed: true
 # Adds custom headers
 headers:
@@ -139,7 +149,7 @@ Anything defined in a configuration file can also be configured using
 command line options, such as in this example.
 
 ``` bash
-bin/louketo-proxy \
+bin/gatekeeper \
     --discovery-url=https://keycloak.example.com/auth/realms/<REALM_NAME> \
     --client-id=<CLIENT_ID> \
     --client-secret=<SECRET> \
@@ -192,6 +202,15 @@ By default, the access and refresh cookies are session-only and disposed
 of on browser close; you can disable this feature using the
 `--enable-session-cookies` option.
 
+## Cookie Names
+
+There are two parameters which you can use to set up cookie names for access token and refresh token.
+
+```
+--cookie-access-name=myAccessTokenCookie
+--cookie-refresh-name=myRefreshTokenCookie
+```
+
 ## Forward-signing proxy
 
 Forward-signing provides a mechanism for authentication and
@@ -204,25 +223,26 @@ option uses a **contains** comparison on domains. So, if you wanted to
 match all domains under \*.svc.cluster.local you can use:
 `--forwarding-domain=svc.cluster.local`.
 
-At present, the service performs a login using OAuth *client\_credentials*
-grant type, so your IdP service must support direct (username/password)
-logins.
+You can choose between two types of OAuth authentications: *password* grant type (default) or *client\_credentials* grant type.
 
-Example setup:
+Example setup password grant:
 
 You have a collection of micro-services which are permitted to speak to
 one another; you have already set up the credentials, roles, and clients
 in Keycloak, providing granular role controls over issue tokens.
 
 ``` yaml
-- name: louketo-proxy
-  image: quay.io/louketo/louketo-proxy:latest
+- name: gatekeeper
+  image: quay.io/gogatekeeper/gatekeeper:1.4.2
   args:
   - --enable-forwarding=true
   - --forwarding-username=projecta
   - --forwarding-password=some_password
   - --forwarding-domains=projecta.svc.cluster.local
   - --forwarding-domains=projectb.svc.cluster.local
+  - --client-id=xxxxxx
+  - --client-secret=xxxx
+  - --discovery-url=http://keycloak:8080/auth/realms/master
   - --tls-ca-certificate=/etc/secrets/ca.pem
   - --tls-ca-key=/etc/secrets/ca-key.pem
   # Note: if you don't specify any forwarding domains, all domains will be signed; Also the code checks is the
@@ -234,11 +254,40 @@ in Keycloak, providing granular role controls over issue tokens.
 - name: projecta
   image: some_images
 
-# test the forward proxy
-$ curl -k --proxy http://127.0.0.1:3000 https://test.projesta.svc.cluster.local
 ```
 
-On the receiver side, you could set up the Louketo Proxy
+Example setup client credentials grant:
+
+``` yaml
+- name: gatekeeper
+  image: quay.io/gogatekeeper/gatekeeper:1.4.2
+  args:
+  - --enable-forwarding=true
+  - --forwarding-domains=projecta.svc.cluster.local
+  - --forwarding-domains=projectb.svc.cluster.local
+  - --client-id=xxxxxx
+  - --client-secret=xxxx
+  - --discovery-url=http://keycloak:8080/auth/realms/master
+  - --tls-ca-certificate=/etc/secrets/ca.pem
+  - --tls-ca-key=/etc/secrets/ca-key.pem
+  - --forwarding-grant-type=client_credentials
+  # Note: if you don't specify any forwarding domains, all domains will be signed; Also the code checks is the
+  # domain 'contains' the value (it's not a regex) so if you wanted to sign all requests to svc.cluster.local, just use
+  # svc.cluster.local
+  volumeMounts:
+  - name: keycloak-socket
+    mountPoint: /var/run/keycloak
+- name: projecta
+  image: some_images
+
+```    
+Test the forward proxy:
+
+```
+curl -k --proxy http://127.0.0.1:3000 https://test.projesta.svc.cluster.local
+```
+
+On the receiver side, you could set up the Gatekeeper Proxy
 `--no-redirects=true` and permit this to verify and handle admission for
 you. Alternatively, the access token can found as a bearer token in the
 request.
@@ -252,7 +301,7 @@ trust, you’ll need to generate a CA, for example.
 
 ``` bash
 $ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ca.key -out ca.pem
-$ bin/louketo-proxy \
+$ bin/gatekeeper \
   --enable-forwarding \
   --forwarding-username=USERNAME \
   --forwarding-password=PASSWORD \
@@ -300,6 +349,12 @@ you prefer to encrypt the session cookie, use the
 `--enable-encrypted-token` and `--encryption-key` options. Note that the
 access token forwarded in the X-Auth-Token header to upstream is
 unaffected.
+
+## Bearer token passthrough
+
+If your Bearer token is intended for your upstream application and not for gatekeeper
+you can use option ``--skip-authorization-header-identity``. Please be aware that
+token is still required to be in cookies.
 
 ## Upstream headers
 
@@ -448,7 +503,7 @@ token would look like this:
 
 ## Custom pages
 
-By default, Louketo Proxy will immediately redirect you
+By default, Gatekeeper Proxy will immediately redirect you
 for authentication and hand back a 403 for access denied. Most users
 will probably want to present the user with a more friendly sign-in and
 access denied page. You can pass the command line options (or via config
@@ -465,6 +520,16 @@ variable would be accessible from `{{ .title }}`.
 <a href="{{ .redirect }}">Sign-in</a>
 </body>
 </html>
+```
+
+### Custom Error Page for Bad Request
+
+One use case for this is that: inside keycloak server have "required user actions" set to "Terms and Conditions". That means, if it is the first time an user access app X, he will need to accept the T&C or decline. If he accepts the terms, he can login fine to app X. However, if he declines it, he gets an empty error page with "bad request".
+
+You can use built-in template or your custom:
+
+```
+--error-page=templates/error.html.tmpl
 ```
 
 ## White-listed URL’s
@@ -609,6 +674,8 @@ UNIX socket, `--upstream-url unix://path/to/the/file.sock`.
 
   - **/oauth/metrics** is a Prometheus metrics handler
 
+  - **/oauth/discovery** provides endpoint with basic urls gatekeeper provides
+
 ## Metrics
 
 Assuming `--enable-metrics` has been set, a Prometheus endpoint can be
@@ -619,7 +686,7 @@ a counter per HTTP code.
 
 Keep in mind [browser cookie
 limits](http://browsercookielimits.squawky.net/) if you use access or
-refresh tokens in the browser cookie. Louketo Proxy divides
+refresh tokens in the browser cookie. Gatekeeper Proxy divides
 the cookie automatically if your cookie is longer than 4093 bytes. The real
 size of the cookie depends on the content of the issued access token.
 Also, encryption might add additional bytes to the cookie size. If you
@@ -634,8 +701,12 @@ users won’t be able to obtain an access token.
 ## Known Issues
 
 There is a known issue with the Keycloak server 4.6.0.Final in which
-Louketo Proxy is unable to find the *client\_id* in the *aud* claim. This
+Gatekeeper Proxy is unable to find the *client\_id* in the *aud* claim. This
 is due to the fact the *client\_id* is not in the audience anymore. The
 workaround is to add the "Audience" protocol mapper to the client with
 the audience pointed to the *client\_id*. For more information, see
 [KEYCLOAK-8954](https://issues.redhat.com/browse/KEYCLOAK-8954).
+
+you can now use `--skip-access-token-clientid-check` and
+`--skip-access-token-issuer-check` to overcome this limitations, in future they
+will be true by default

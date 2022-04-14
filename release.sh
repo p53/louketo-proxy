@@ -1,5 +1,5 @@
 #!/bin/bash -e
-NAME="louketo-proxy"
+NAME="gatekeeper"
 PLATFORMS="darwin linux windows"
 ARCHITECTURES="amd64"
 GIT_SHA=$(git --no-pager describe --always --dirty)
@@ -31,7 +31,7 @@ release() {
       tar -czvf release/"$NAME-$PLATFORM-$ARCH".tar.gz -C bin/ $NAME$EXT >/dev/null
       sha1sum release/"$NAME-$PLATFORM-$ARCH".tar.gz | cut -d " " -f1 > release/"$NAME-$PLATFORM-$ARCH".tar.gz.sha1
       # Test if tar file is not corrupted
-      if ! tar -tf release/"$NAME-$PLATFORM-$ARCH".tar.gz &>/dev/null;then 
+      if ! tar -tf release/"$NAME-$PLATFORM-$ARCH".tar.gz &>/dev/null;then
         echo "Corrupted tar file"
         exit 1
       fi

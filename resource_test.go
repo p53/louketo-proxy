@@ -1,3 +1,6 @@
+//go:build !e2e
+// +build !e2e
+
 /*
 Copyright 2015 All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +21,7 @@ package main
 import (
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -94,8 +98,9 @@ func TestResourceParseOk(t *testing.T) {
 
 func TestIsValid(t *testing.T) {
 	testCases := []struct {
-		Resource *Resource
-		Ok       bool
+		Resource          *Resource
+		CustomHTTPMethods []string
+		Ok                bool
 	}{
 		{
 			Resource: &Resource{URL: "/test"},
@@ -123,10 +128,24 @@ func TestIsValid(t *testing.T) {
 				Methods: []string{"NO_SUCH_METHOD"},
 			},
 		},
+		{
+			Resource: &Resource{
+				URL:     "/test",
+				Methods: []string{"PROPFIND"},
+			},
+			CustomHTTPMethods: []string{"PROPFIND"},
+			Ok:                true,
+		},
 	}
 
 	for i, c := range testCases {
+		for _, customHTTPMethod := range c.CustomHTTPMethods {
+			chi.RegisterMethod(customHTTPMethod)
+			allHTTPMethods = append(allHTTPMethods, customHTTPMethod)
+		}
+
 		err := c.Resource.valid()
+
 		if err != nil && c.Ok {
 			t.Errorf("case %d should not have failed, error: %s", i, err)
 		}

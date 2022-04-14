@@ -1,3 +1,6 @@
+//go:build !e2e
+// +build !e2e
+
 /*
 Copyright 2017 All rights reserved.
 
@@ -39,7 +42,7 @@ func (f *fakeBoltDBStore) close() {
 }
 
 func newTestBoldDB(t *testing.T) *fakeBoltDBStore {
-	tmpfile, err := ioutil.TempFile("/tmp", "louketo-proxy")
+	tmpfile, err := ioutil.TempFile("/tmp", "gatekeeper")
 	if err != nil {
 		t.Fatalf("unable to create temporary file, error: %s", err)
 	}

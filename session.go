@@ -21,32 +21,44 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/coreos/go-oidc/jose"
 	"go.uber.org/zap"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // getIdentity retrieves the user identity from a request, either from a session cookie or a bearer token
 func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, error) {
 	var isBearer bool
 	// step: check for a bearer token or cookie with jwt token
-	access, isBearer, err := getTokenInRequest(req, r.config.CookieAccessName)
+	access, isBearer, err := getTokenInRequest(
+		req,
+		r.config.CookieAccessName,
+		r.config.SkipAuthorizationHeaderIdentity,
+	)
+
 	if err != nil {
 		return nil, err
 	}
+
 	if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie && !isBearer {
 		if access, err = decodeText(access, r.config.EncryptionKey); err != nil {
 			return nil, ErrDecryption
 		}
 	}
-	token, err := jose.ParseJWT(access)
+
+	rawToken := access
+	token, err := jwt.ParseSigned(access)
+
 	if err != nil {
 		return nil, err
 	}
+
 	user, err := extractIdentity(token)
 	if err != nil {
 		return nil, err
 	}
+
 	user.bearerToken = isBearer
+	user.rawToken = rawToken
 
 	r.log.Debug("found the user identity",
 		zap.String("id", user.id),
@@ -69,14 +81,20 @@ func (r *oauthProxy) getRefreshTokenFromCookie(req *http.Request) (string, error
 }
 
 // getTokenInRequest returns the access token from the http request
-func getTokenInRequest(req *http.Request, name string) (string, bool, error) {
+func getTokenInRequest(req *http.Request, name string, skipAuthorizationHeaderIdentity bool) (string, bool, error) {
 	bearer := true
-	// step: check for a token in the authorization header
-	token, err := getTokenInBearer(req)
-	if err != nil {
-		if err != ErrSessionNotFound {
+	token := ""
+	var err error
+
+	if !skipAuthorizationHeaderIdentity {
+		token, err = getTokenInBearer(req)
+		if err != nil && err != ErrSessionNotFound {
 			return "", false, err
 		}
+	}
+
+	// step: check for a token in the authorization header
+	if err != nil || (err == nil && skipAuthorizationHeaderIdentity) {
 		if token, err = getTokenInCookie(req, name); err != nil {
 			return token, false, err
 		}

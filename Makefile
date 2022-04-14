@@ -1,6 +1,6 @@
-NAME=louketo-proxy
-AUTHOR=louketo
-REGISTRY=docker.io
+NAME=gatekeeper
+AUTHOR=gogatekeeper
+REGISTRY=quay.io
 CONTAINER_TOOL=$(shell command -v podman 2>/dev/null || command -v docker)
 ROOT_DIR=${PWD}
 HARDWARE=$(shell uname -m)
@@ -30,26 +30,27 @@ build: golang
 static: golang
 	@echo "--> Compiling the project statically"
 	@mkdir -p bin
-	CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags "-w ${LFLAGS}" -o bin/${NAME}
+	CGO_ENABLED=0 GOOS=linux go build -a -tags netgo -ldflags "-s -w ${LFLAGS}" -o bin/${NAME}
 
 .PHONY: container-build docker-build
 container-build: docker-build
 docker-build:
 	@echo "--> Compiling the project, inside a temporary container"
+	@mkdir -p bin
 	$(eval IMAGE=$(shell uuidgen))
 	${CONTAINER_TOOL} build --target build-env -t ${IMAGE} .
-	${CONTAINER_TOOL} run --rm ${IMAGE} /bin/cat /louketo-proxy > bin/louketo-proxy
+	${CONTAINER_TOOL} run --rm ${IMAGE} /bin/cat /gatekeeper > bin/gatekeeper
 	${CONTAINER_TOOL} rmi ${IMAGE}
-	chmod +x bin/louketo-proxy
+	chmod +x bin/gatekeeper
 
 .PHONY: container-test docker-test
 container-test: docker-test
 docker-test:
 	@echo "--> Running the container image tests"
 	${CONTAINER_TOOL} run --rm -ti -p 3000:3000 \
-    -v ${ROOT_DIR}/config.yml:/etc/louketo/config.yml:ro \
+    -v ${ROOT_DIR}/config.yml:/etc/gatekeeper/config.yml:ro \
     -v ${ROOT_DIR}/tests:/opt/tests:ro \
-    ${REGISTRY}/${AUTHOR}/${NAME}:${VERSION} --config /etc/louketo/config.yml
+    ${REGISTRY}/${AUTHOR}/${NAME}:${VERSION} --config /etc/gatekeeper/config.yml
 
 .PHONY: container-release docker-release
 container-release: docker-release
@@ -137,12 +138,14 @@ cover:
 spelling:
 	@echo "--> Checking the spelling"
 	@which misspell 2>/dev/null ; if [ $$? -eq 1 ]; then \
+		cd ..; \
 		go get -u github.com/client9/misspell/cmd/misspell; \
+		cd -; \
 	fi
 	@misspell -error *.go
 	@misspell -error *.md
 
-.PHONY: test all changelog
+.PHONY: test all changelog e2e
 test:
 	@echo "--> Running the tests"
 	@go test -v
@@ -151,6 +154,24 @@ test:
 	@$(MAKE) spelling
 	@$(MAKE) vet
 	@$(MAKE) cover
+
+e2e:
+	@echo "--> Running E2E tests"
+	@which k3d 2>/dev/null ; if [ $$? -eq 1 ]; then \
+		wget -q -O - https://raw.githubusercontent.com/rancher/k3d/main/install.sh | TAG=v4.0.0 bash; \
+	fi
+	@which kubectl 2>/dev/null ; if [ $$? -eq 1 ]; then \
+		curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.20.2/bin/linux/amd64/kubectl && \
+		chmod +x ./kubectl && \
+		sudo mv ./kubectl /usr/local/bin/kubectl; \
+	fi
+	@k3d cluster list|grep testcluster; if [ $$? -eq 1 ]; then \
+		k3d cluster create testcluster -p "8081:80@loadbalancer" -p "4010:30010@agent[0]" --agents 2; \
+	fi
+	@k3d cluster start testcluster
+	@k3d kubeconfig merge testcluster --kubeconfig-switch-context
+	@KUBECONFIG=~/.k3d/kubeconfig-testcluster.yaml kubectl apply -f ./e2e/k8s/manifest.yml
+	@go test -v --tags=e2e
 
 all: test
 	echo "--> Performing all tests"

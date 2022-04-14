@@ -20,78 +20,77 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
-	"github.com/coreos/go-oidc/oidc"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // extractIdentity parse the jwt token and extracts the various elements is order to construct
-func extractIdentity(token jose.JWT) (*userContext, error) {
-	claims, err := token.Claims()
+func extractIdentity(token *jwt.JSONWebToken) (*userContext, error) {
+	stdClaims := &jwt.Claims{}
+
+	type RealmRoles struct {
+		Roles []string `json:"roles"`
+	}
+
+	// Extract custom claims
+	type custClaims struct {
+		Email          string                 `json:"email"`
+		PrefName       string                 `json:"preferred_username"`
+		RealmAccess    RealmRoles             `json:"realm_access"`
+		Groups         []string               `json:"groups"`
+		ResourceAccess map[string]interface{} `json:"resource_access"`
+		FamilyName     string                 `json:"family_name"`
+		GivenName      string                 `json:"given_name"`
+		Username       string                 `json:"username"`
+	}
+
+	customClaims := custClaims{}
+
+	err := token.UnsafeClaimsWithoutVerification(stdClaims, &customClaims)
+
 	if err != nil {
 		return nil, err
 	}
-	identity, err := oidc.IdentityFromClaims(claims)
+
+	jsonMap := make(map[string]interface{})
+	err = token.UnsafeClaimsWithoutVerification(&jsonMap)
+
 	if err != nil {
 		return nil, err
 	}
 
 	// @step: ensure we have and can extract the preferred name of the user, if not, we set to the ID
-	preferredName, found, err := claims.StringClaim(claimPreferredName)
-	if err != nil || !found {
-		preferredName = identity.Email
+	preferredName := customClaims.PrefName
+	if preferredName == "" {
+		preferredName = customClaims.Email
 	}
 
-	var audiences []string
-	aud, found, err := claims.StringClaim(claimAudience)
-	if err == nil && found {
-		audiences = append(audiences, aud)
-	} else {
-		aud, found, erc := claims.StringsClaim(claimAudience)
-		if erc != nil || !found {
-			return nil, ErrNoTokenAudience
-		}
-		audiences = aud
-	}
+	audiences := stdClaims.Audience
 
 	// @step: extract the realm roles
-	var roleList []string
-	if realmRoles, found := claims[claimRealmAccess].(map[string]interface{}); found {
-		if roles, found := realmRoles[claimResourceRoles]; found {
-			for _, r := range roles.([]interface{}) {
-				roleList = append(roleList, fmt.Sprintf("%s", r))
-			}
-		}
-	}
+	roleList := make([]string, 0)
+	roleList = append(roleList, customClaims.RealmAccess.Roles...)
 
 	// @step: extract the client roles from the access token
-	if accesses, found := claims[claimResourceAccess].(map[string]interface{}); found {
-		for name, list := range accesses {
-			scopes := list.(map[string]interface{})
-			if roles, found := scopes[claimResourceRoles]; found {
-				for _, r := range roles.([]interface{}) {
-					roleList = append(roleList, fmt.Sprintf("%s:%s", name, r))
-				}
+	for name, list := range customClaims.ResourceAccess {
+		scopes := list.(map[string]interface{})
+
+		if roles, found := scopes[claimResourceRoles]; found {
+			for _, r := range roles.([]interface{}) {
+				roleList = append(roleList, fmt.Sprintf("%s:%s", name, r))
 			}
 		}
-	}
-
-	// @step: extract any group information from the tokens
-	groups, _, err := claims.StringsClaim(claimGroups)
-	if err != nil {
-		return nil, err
 	}
 
 	return &userContext{
 		audiences:     audiences,
-		claims:        claims,
-		email:         identity.Email,
-		expiresAt:     identity.ExpiresAt,
-		groups:        groups,
-		id:            identity.ID,
+		email:         customClaims.Email,
+		expiresAt:     stdClaims.Expiry.Time(),
+		groups:        customClaims.Groups,
+		id:            stdClaims.Subject,
 		name:          preferredName,
 		preferredName: preferredName,
 		roles:         roleList,
-		token:         token,
+		claims:        jsonMap,
 	}, nil
 }
 
@@ -137,5 +136,10 @@ func (r *userContext) isCookie() bool {
 
 // String returns a string representation of the user context
 func (r *userContext) String() string {
-	return fmt.Sprintf("user: %s, expires: %s, roles: %s", r.preferredName, r.expiresAt.String(), strings.Join(r.roles, ","))
+	return fmt.Sprintf(
+		"user: %s, expires: %s, roles: %s",
+		r.preferredName,
+		r.expiresAt.String(),
+		strings.Join(r.roles, ","),
+	)
 }

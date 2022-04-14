@@ -1,3 +1,6 @@
+//go:build !e2e
+// +build !e2e
+
 /*
 Copyright 2015 All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,6 +50,26 @@ func TestDecodeKeyPairs(t *testing.T) {
 			Ok: true,
 		},
 		{
+			List: []string{"a=b==", "b=3"},
+			KeyPairs: map[string]string{
+				"a": "b==",
+				"b": "3",
+			},
+			Ok: true,
+		},
+		{
+			List: []string{"a=", "b=3"},
+			KeyPairs: map[string]string{
+				"a": "",
+				"b": "3",
+			},
+			Ok: true,
+		},
+		{
+			List: []string{"a=b", "==b==3=="},
+			Ok:   false,
+		},
+		{
 			List: []string{"add", "b=3"},
 		},
 	}
@@ -68,22 +91,22 @@ func TestDecodeKeyPairs(t *testing.T) {
 
 func TestGetRequestHostURL(t *testing.T) {
 	cs := []struct {
-		Expected   string
-		HostHeader string
-		Hostname   string
-		TLS        *tls.ConnectionState
+		Expected string
+		Hostname string
+		Headers  map[string]string
+		TLS      *tls.ConnectionState
 	}{
 		{
 			Expected: "http://www.test.com",
-			Hostname: "www.test.com",
+			Headers:  map[string]string{"X-Forwarded-Host": "www.test.com"},
 		},
 		{
 			Expected: "http://",
 		},
 		{
-			Expected:   "http://www.override.com",
-			HostHeader: "www.override.com",
-			Hostname:   "www.test.com",
+			Expected: "http://www.override.com",
+			Headers:  map[string]string{"X-Forwarded-Host": "www.override.com"},
+			Hostname: "www.test.com",
 		},
 		{
 			Expected: "https://www.test.com",
@@ -91,23 +114,36 @@ func TestGetRequestHostURL(t *testing.T) {
 			TLS:      &tls.ConnectionState{},
 		},
 		{
-			Expected:   "https://www.override.com",
-			HostHeader: "www.override.com",
-			Hostname:   "www.test.com",
-			TLS:        &tls.ConnectionState{},
+			Expected: "https://www.override.com",
+			Headers:  map[string]string{"X-Forwarded-Host": "www.override.com"},
+			Hostname: "www.test.com",
+			TLS:      &tls.ConnectionState{},
+		},
+		{
+			Expected: "https://www.override.com",
+			Headers: map[string]string{
+				"X-Forwarded-Host":  "www.override.com",
+				"X-Forwarded-Proto": "https"},
+			Hostname: "www.override.com",
 		},
 	}
-	for i, c := range cs {
+
+	for i := range cs {
 		request := &http.Request{
 			Method: http.MethodGet,
-			Host:   c.Hostname,
-			TLS:    c.TLS,
+			Host:   cs[i].Hostname,
+			TLS:    cs[i].TLS,
 		}
-		if c.HostHeader != "" {
+
+		if cs[i].Headers != nil {
 			request.Header = make(http.Header)
-			request.Header.Set("X-Forwarded-Host", c.HostHeader)
+			for key := range cs[i].Headers {
+				request.Header.Set(key, cs[i].Headers[key])
+			}
 		}
-		assert.Equal(t, c.Expected, getRequestHostURL(request), "case %d, expected: %s, got: %s", i, c.Expected, getRequestHostURL(request))
+
+		url := getRequestHostURL(request)
+		assert.Equal(t, cs[i].Expected, url, "case %d, expected: %s, got: %s", i, cs[i].Expected, url)
 	}
 }
 
@@ -150,12 +186,12 @@ func TestEncryptDataBlock(t *testing.T) {
 		Ok   bool
 	}{
 		{
-			Text: "hello world, my name is Louketo proxy",
+			Text: "hello world, my name is Gatekeeper",
 			Key:  "DtNMS2eO7Fi5vsuLrW55nrRbir2kPfTw",
 			Ok:   true,
 		},
 		{
-			Text: "hello world, my name is Louketo proxy",
+			Text: "hello world, my name is Gatekeeper",
 			Key:  "DtNMS2eO7Fi5vsu",
 		},
 		{
@@ -253,7 +289,7 @@ func TestDecryptDataBlock(t *testing.T) {
 		Ok   bool
 	}{
 		{
-			Text: "hello world, my name is Louketo proxy",
+			Text: "hello world, my name is Gatekeeper",
 			Key:  "DtNMS2eO7Fi5vsuLrW55nrRbir2kPfss",
 			Ok:   true,
 		},

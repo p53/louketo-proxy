@@ -17,13 +17,16 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
-	"github.com/coreos/go-oidc/oidc"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
+	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // proxyMiddleware is responsible for handles reverse proxy request to the upstream endpoint
@@ -42,12 +45,17 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 		}
 
 		// @step: add the proxy forwarding headers
-		req.Header.Add("X-Forwarded-For", realIP(req))
+		req.Header.Set("X-Real-IP", realIP(req))
+		if xff := req.Header.Get(headerXForwardedFor); xff == "" {
+			req.Header.Set("X-Forwarded-For", realIP(req))
+		} else {
+			req.Header.Set("X-Forwarded-For", xff)
+		}
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		req.Header.Set("X-Forwarded-Proto", req.Header.Get("X-Forwarded-Proto"))
 
 		if len(r.config.CorsOrigins) > 0 {
-			// if CORS is enabled by Louketo Proxy, do not propagate CORS requests upstream
+			// if CORS is enabled by Gatekeeper, do not propagate CORS requests upstream
 			req.Header.Del("Origin")
 		}
 		// @step: add any custom headers to the request
@@ -86,24 +94,38 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 }
 
 // forwardProxyHandler is responsible for signing outbound requests
+// nolint:funlen
 func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 	ctx := context.Background()
+
+	if r.config.SkipOpenIDProviderTLSVerify {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		sslcli := &http.Client{Transport: tr}
+		ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
+	}
+
 	conf := r.newOAuth2Config(r.config.RedirectionURL)
+
+	var mu sync.Mutex
 
 	// the loop state
 	var state struct {
 		// the access token
-		token jose.JWT
+		token jwt.JSONWebToken
 		// the refresh token if any
 		refresh string
-		// the identity of the user
-		identity *oidc.Identity
 		// the expiry time of the access token
 		expiration time.Time
 		// whether we need to login
 		login bool
 		// whether we should wait for expiration
 		wait bool
+		// RawToken
+		rawToken string
+		// Subject
+		subject string
 	}
 	state.login = true
 
@@ -114,11 +136,43 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 
 			// step: do we have a access token
 			if state.login {
-				r.log.Info("requesting access token for user",
-					zap.String("username", r.config.ForwardingUsername))
-
 				// step: login into the service
-				resp, err := conf.PasswordCredentialsToken(ctx, r.config.ForwardingUsername, r.config.ForwardingPassword)
+
+				var resp *oauth2.Token
+				var err error
+
+				switch r.config.ForwardingGrantType {
+				case GrantTypeClientCreds:
+					r.log.Info(
+						"requesting access token for client (client_credentials grant) ",
+						zap.String("client_id", r.config.ClientID),
+					)
+
+					conf := &clientcredentials.Config{
+						ClientID:     r.config.ClientID,
+						ClientSecret: r.config.ClientSecret,
+						Scopes:       r.config.Scopes,
+						TokenURL:     r.provider.Endpoint().TokenURL,
+					}
+					resp, err = conf.Token(ctx)
+				case GrantTypeUserCreds:
+					r.log.Info(
+						"requesting access token for user (password grant) ",
+						zap.String("username", r.config.ForwardingUsername),
+					)
+
+					resp, err = conf.PasswordCredentialsToken(
+						ctx,
+						r.config.ForwardingUsername,
+						r.config.ForwardingPassword,
+					)
+				default:
+					r.log.Info(
+						"Chosen grant type is not supported",
+						zap.String("forwarding_grant_type", r.config.ForwardingGrantType),
+					)
+				}
+
 				if err != nil {
 					r.log.Error("failed to login to authentication service", zap.Error(err))
 					// step: back-off and reschedule
@@ -126,8 +180,12 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 					continue
 				}
 
+				mu.Lock()
+				state.rawToken = resp.AccessToken
+				mu.Unlock()
+
 				// step: parse the token
-				token, identity, err := parseToken(resp.AccessToken)
+				token, err := jwt.ParseSigned(resp.AccessToken)
 				if err != nil {
 					r.log.Error("failed to parse the access token", zap.Error(err))
 					// step: we should probably hope and reschedule here
@@ -135,39 +193,83 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 					continue
 				}
 
+				stdClaims := &jwt.Claims{}
+
+				err = token.UnsafeClaimsWithoutVerification(stdClaims)
+
+				if err != nil {
+					r.log.Error("unable to parse access token for claims", zap.Error(err))
+					continue
+				}
+
 				// step: update the loop state
-				state.token = token
-				state.identity = identity
-				state.expiration = identity.ExpiresAt
+				state.token = *token
+				state.expiration = stdClaims.Expiry.Time()
+				state.subject = stdClaims.Subject
 				state.wait = true
 				state.login = false
 				state.refresh = resp.RefreshToken
 
-				r.log.Info("successfully retrieved access token for subject",
-					zap.String("subject", state.identity.ID),
-					zap.String("email", state.identity.Email),
-					zap.String("expires", state.expiration.Format(time.RFC3339)))
+				r.log.Debug(
+					"successfully retrieved access token for subject",
+					zap.String("access token", state.rawToken),
+					zap.String("subject", state.subject),
+					zap.String("expires", state.expiration.Format(time.RFC3339)),
+				)
+
+				r.log.Info(
+					"successfully retrieved access token for subject",
+					zap.String("subject", state.subject),
+					zap.String("expires", state.expiration.Format(time.RFC3339)),
+				)
 			} else {
-				r.log.Info("access token is about to expiry",
-					zap.String("subject", state.identity.ID),
-					zap.String("email", state.identity.Email))
+				r.log.Debug(
+					"access token is about to expiry",
+					zap.String("access token", state.rawToken),
+					zap.String("subject", state.subject),
+				)
+
+				r.log.Info(
+					"access token is about to expiry",
+					zap.String("subject", state.subject),
+				)
 
 				// step: if we a have a refresh token, we need to login again
-				if state.refresh != "" {
-					r.log.Info("attempting to refresh the access token",
-						zap.String("subject", state.identity.ID),
-						zap.String("email", state.identity.Email),
-						zap.String("expires", state.expiration.Format(time.RFC3339)))
+				if state.refresh != "" && r.config.ForwardingGrantType != GrantTypeClientCreds {
+					r.log.Debug(
+						"attempting to refresh the access token",
+						zap.String("access token", state.rawToken),
+						zap.String("refresh token", state.refresh),
+						zap.String("subject", state.subject),
+						zap.String("expires", state.expiration.Format(time.RFC3339)),
+					)
+
+					r.log.Info(
+						"attempting to refresh the access token",
+						zap.String("subject", state.subject),
+						zap.String("expires", state.expiration.Format(time.RFC3339)),
+					)
 
 					// step: attempt to refresh the access
-					token, newRefreshToken, expiration, _, err := getRefreshedToken(conf, state.refresh)
+					token, rawToken, newRefreshToken, expiration, _, err := getRefreshedToken(conf, r.config, state.refresh)
+
+					mu.Lock()
+					state.rawToken = rawToken
+					mu.Unlock()
+
 					if err != nil {
 						state.login = true
 						switch err {
 						case ErrRefreshTokenExpired:
-							r.log.Warn("the refresh token has expired, need to login again",
-								zap.String("subject", state.identity.ID),
-								zap.String("email", state.identity.Email))
+							r.log.Debug(
+								"the refresh token has expired, need to login again",
+								zap.String("refresh token", state.refresh),
+								zap.String("subject", state.subject),
+							)
+							r.log.Warn(
+								"the refresh token has expired, need to login again",
+								zap.String("subject", state.subject),
+							)
 						default:
 							r.log.Error("failed to refresh the access token", zap.Error(err))
 						}
@@ -184,14 +286,24 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 					}
 
 					// step: add some debugging
-					r.log.Info("successfully refreshed the access token",
-						zap.String("subject", state.identity.ID),
-						zap.String("email", state.identity.Email),
-						zap.String("expires", state.expiration.Format(time.RFC3339)))
+					r.log.Debug(
+						"successfully refreshed the access token",
+						zap.String("new access token", state.rawToken),
+						zap.String("refresh token", state.refresh),
+						zap.String("subject", state.subject),
+						zap.String("expires", state.expiration.Format(time.RFC3339)),
+					)
+
+					r.log.Info(
+						"successfully refreshed the access token",
+						zap.String("subject", state.subject),
+						zap.String("expires", state.expiration.Format(time.RFC3339)),
+					)
 				} else {
-					r.log.Info("session does not support refresh token, acquiring new token",
-						zap.String("subject", state.identity.ID),
-						zap.String("email", state.identity.Email))
+					r.log.Info(
+						"session does not support refresh token, acquiring new token",
+						zap.String("subject", state.subject),
+					)
 
 					// we don't have a refresh token, we must perform a login again
 					state.wait = false
@@ -203,9 +315,11 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 			if state.wait {
 				// set the expiration of the access token within a random 85% of actual expiration
 				duration := getWithin(state.expiration, 0.85)
-				r.log.Info("waiting for expiration of access token",
+				r.log.Info(
+					"waiting for expiration of access token",
 					zap.String("token_expiration", state.expiration.Format(time.RFC3339)),
-					zap.String("renewal_duration", duration.String()))
+					zap.String("renewal_duration", duration.String()),
+				)
 
 				<-time.After(duration)
 			}
@@ -217,7 +331,9 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 		req.URL.Host = hostname
 		// is the host being signed?
 		if len(r.config.ForwardingDomains) == 0 || containsSubString(hostname, r.config.ForwardingDomains) {
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.token.Encode()))
+			mu.Lock()
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.rawToken))
+			mu.Unlock()
 			req.Header.Set("X-Forwarded-Agent", prog)
 		}
 	}

@@ -1,3 +1,6 @@
+//go:build !e2e
+// +build !e2e
+
 /*
 Copyright 2015 All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,321 +21,43 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
-	"net"
+	"math/rand"
 	"net/http"
-	"net/url"
-	"strings"
+	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
-	"github.com/coreos/go-oidc/jose"
-	uuid "github.com/gofrs/uuid"
+	"github.com/alicebob/miniredis/v2"
+	resty "github.com/go-resty/resty/v2"
 	"github.com/rs/cors"
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
-	"gopkg.in/resty.v1"
+
+	"gopkg.in/square/go-jose.v2/jwt"
 )
-
-const (
-	testEncryptionKey = "ZSeCYDUxIlhDrmPpa1Ldc7il384esSF2"
-)
-
-type fakeRequest struct {
-	BasicAuth               bool
-	Cookies                 []*http.Cookie
-	Expires                 time.Duration
-	FormValues              map[string]string
-	Groups                  []string
-	HasCookieToken          bool
-	HasLogin                bool
-	HasToken                bool
-	Headers                 map[string]string
-	Method                  string
-	NotSigned               bool
-	OnResponse              func(int, *resty.Request, *resty.Response)
-	Password                string
-	ProxyProtocol           string
-	ProxyRequest            bool
-	RawToken                string
-	Redirects               bool
-	Roles                   []string
-	TokenClaims             jose.Claims
-	URI                     string
-	URL                     string
-	Username                string
-	ExpectedCode            int
-	ExpectedContent         string
-	ExpectedContentContains string
-	ExpectedCookies         map[string]string
-	ExpectedHeaders         map[string]string
-	ExpectedLocation        string
-	ExpectedNoProxyHeaders  []string
-	ExpectedProxy           bool
-	ExpectedProxyHeaders    map[string]string
-
-	// advanced test cases
-	ExpectedCookiesValidator map[string]func(string) bool
-}
-
-type fakeProxy struct {
-	config  *Config
-	idp     *fakeAuthServer
-	proxy   *oauthProxy
-	cookies map[string]*http.Cookie
-}
-
-func newFakeProxy(c *Config) *fakeProxy {
-	log.SetOutput(ioutil.Discard)
-	if c == nil {
-		c = newFakeKeycloakConfig()
-	}
-	auth := newFakeAuthServer()
-	c.DiscoveryURL = auth.getLocation()
-	c.RevocationEndpoint = auth.getRevocationURL()
-	c.Verbose = true
-	proxy, err := newProxy(c)
-	if err != nil {
-		panic("failed to create fake proxy service, error: " + err.Error())
-	}
-	proxy.log = zap.NewNop()
-	proxy.upstream = &fakeUpstreamService{}
-	if err = proxy.Run(); err != nil {
-		panic("failed to create the proxy service, error: " + err.Error())
-	}
-	c.RedirectionURL = fmt.Sprintf("http://%s", proxy.listener.Addr().String())
-	// step: we need to update the client configs
-	if proxy.client, proxy.idp, proxy.idpClient, err = proxy.newOpenIDClient(); err != nil {
-		panic("failed to recreate the openid client, error: " + err.Error())
-	}
-
-	return &fakeProxy{c, auth, proxy, make(map[string]*http.Cookie)}
-}
-
-func (f *fakeProxy) getServiceURL() string {
-	return fmt.Sprintf("http://%s", f.proxy.listener.Addr().String())
-}
-
-// RunTests performs a series of requests against a fake proxy service
-func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
-	defer func() {
-		f.idp.Close()
-		f.proxy.server.Close()
-	}()
-
-	for i := range requests {
-		c := requests[i]
-		var upstream fakeUpstreamResponse
-
-		f.config.NoRedirects = !c.Redirects
-		// we need to set any defaults
-		if c.Method == "" {
-			c.Method = http.MethodGet
-		}
-		// create a http client
-		client := resty.New()
-		request := client.SetRedirectPolicy(resty.NoRedirectPolicy()).R()
-
-		if c.ProxyProtocol != "" {
-			client.SetTransport(&http.Transport{
-				Dial: func(network, addr string) (net.Conn, error) {
-					conn, err := net.Dial("tcp", addr)
-					if err != nil {
-						return nil, err
-					}
-					header := fmt.Sprintf("PROXY TCP4 %s 10.0.0.1 1000 2000\r\n", c.ProxyProtocol)
-					_, _ = conn.Write([]byte(header))
-
-					return conn, nil
-				},
-			})
-		}
-
-		// are we performing a oauth login beforehand
-		if c.HasLogin {
-			if err := f.performUserLogin(c.URI); err != nil {
-				t.Errorf("case %d, unable to login to oauth server, error: %s", i, err)
-				return
-			}
-		}
-		if len(f.cookies) > 0 {
-			for _, k := range f.cookies {
-				client.SetCookie(k)
-			}
-		}
-		if c.ExpectedProxy {
-			request.SetResult(&upstream)
-		}
-		if c.ProxyRequest {
-			client.SetProxy(f.getServiceURL())
-		}
-		if c.BasicAuth {
-			request.SetBasicAuth(c.Username, c.Password)
-		}
-		if c.RawToken != "" {
-			setRequestAuthentication(f.config, client, request, &c, c.RawToken)
-		}
-		if len(c.Cookies) > 0 {
-			client.SetCookies(c.Cookies)
-		}
-		if len(c.Headers) > 0 {
-			request.SetHeaders(c.Headers)
-		}
-		if c.FormValues != nil {
-			request.SetFormData(c.FormValues)
-		}
-		if c.HasToken {
-			token := newTestToken(f.idp.getLocation())
-			if c.TokenClaims != nil && len(c.TokenClaims) > 0 {
-				token.merge(c.TokenClaims)
-			}
-			if len(c.Roles) > 0 {
-				token.addRealmRoles(c.Roles)
-			}
-			if len(c.Groups) > 0 {
-				token.addGroups(c.Groups)
-			}
-			if c.Expires > 0 || c.Expires < 0 {
-				token.setExpiration(time.Now().Add(c.Expires))
-			}
-			if c.NotSigned {
-				authToken := token.getToken()
-				setRequestAuthentication(f.config, client, request, &c, authToken.Encode())
-			} else {
-				signed, _ := f.idp.signToken(token.claims)
-				setRequestAuthentication(f.config, client, request, &c, signed.Encode())
-			}
-		}
-
-		// step: execute the request
-		var resp *resty.Response
-		var err error
-		switch c.URL {
-		case "":
-			resp, err = request.Execute(c.Method, f.getServiceURL()+c.URI)
-		default:
-			resp, err = request.Execute(c.Method, c.URL)
-		}
-		if err != nil {
-			if !strings.Contains(err.Error(), "auto redirect is disabled") {
-				assert.NoError(t, err, "case %d, unable to make request, error: %s", i, err)
-				continue
-			}
-		}
-		status := resp.StatusCode()
-		if c.ExpectedCode != 0 {
-			assert.Equal(t, c.ExpectedCode, status, "case %d, expected status code: %d, got: %d", i, c.ExpectedCode, status)
-		}
-		if c.ExpectedLocation != "" {
-			l, _ := url.Parse(resp.Header().Get("Location"))
-			assert.True(t, strings.Contains(l.String(), c.ExpectedLocation), "expected location to contain %s", l.String())
-			if l.Query().Get("state") != "" {
-				state, err := uuid.FromString(l.Query().Get("state"))
-				if err != nil {
-					assert.Fail(t, "expected state parameter with valid UUID, got: %s with error %s", state.String(), err)
-				}
-			}
-		}
-		if len(c.ExpectedHeaders) > 0 {
-			for k, v := range c.ExpectedHeaders {
-				e := resp.Header().Get(k)
-				assert.Equal(t, v, e, "case %d, expected header %s=%s, got: %s", i, k, v, e)
-			}
-		}
-		if c.ExpectedProxy {
-			assert.NotEmpty(t, resp.Header().Get(testProxyAccepted), "case %d, did not proxy request", i)
-		} else {
-			assert.Empty(t, resp.Header().Get(testProxyAccepted), "case %d, should NOT proxy request", i)
-		}
-		if c.ExpectedProxyHeaders != nil && len(c.ExpectedProxyHeaders) > 0 {
-			for k, v := range c.ExpectedProxyHeaders {
-				headers := upstream.Headers
-				switch v {
-				case "":
-					assert.NotEmpty(t, headers.Get(k), "case %d, expected the proxy header: %s to exist", i, k)
-				default:
-					assert.Equal(t, v, headers.Get(k), "case %d, expected proxy header %s=%s, got: %s", i, k, v, headers.Get(k))
-				}
-			}
-		}
-		if len(c.ExpectedNoProxyHeaders) > 0 {
-			for _, k := range c.ExpectedNoProxyHeaders {
-				assert.Empty(t, upstream.Headers.Get(k), "case %d, header: %s was not expected to exist", i, k)
-			}
-		}
-
-		if c.ExpectedContent != "" {
-			e := string(resp.Body())
-			assert.Equal(t, c.ExpectedContent, e, "case %d, expected content: %s, got: %s", i, c.ExpectedContent, e)
-		}
-		if c.ExpectedContentContains != "" {
-			e := string(resp.Body())
-			assert.Contains(t, e, c.ExpectedContentContains, "case %d, expected content: %s, got: %s", i, c.ExpectedContentContains, e)
-		}
-		if len(c.ExpectedCookies) > 0 {
-			for k, v := range c.ExpectedCookies {
-				cookie := findCookie(k, resp.Cookies())
-				if !assert.NotNil(t, cookie, "case %d, expected cookie %s not found", i, k) {
-					continue
-				}
-				if v != "" {
-					assert.Equal(t, cookie.Value, v, "case %d, expected cookie value: %s, got: %s", i, v, cookie.Value)
-				}
-			}
-			for k, v := range c.ExpectedCookiesValidator {
-				cookie := findCookie(k, resp.Cookies())
-				if !assert.NotNil(t, cookie, "case %d, expected cookie %s not found", i, k) {
-					continue
-				}
-				if v != nil {
-					assert.True(t, v(cookie.Value), "case %d, invalid cookie value: %s", i, cookie.Value)
-				}
-			}
-		}
-		if c.OnResponse != nil {
-			c.OnResponse(i, request, resp)
-		}
-	}
-}
-
-func (f *fakeProxy) performUserLogin(uri string) error {
-	resp, err := makeTestCodeFlowLogin(f.getServiceURL() + uri)
-	if err != nil {
-		return err
-	}
-	for _, c := range resp.Cookies() {
-		if c.Name == f.config.CookieAccessName || c.Name == f.config.CookieRefreshName {
-			f.cookies[c.Name] = &http.Cookie{
-				Name:   c.Name,
-				Path:   "/",
-				Domain: "127.0.0.1",
-				Value:  c.Value,
-			}
-		}
-	}
-	defer resp.Body.Close()
-
-	return nil
-}
-
-func setRequestAuthentication(cfg *Config, client *resty.Client, request *resty.Request, c *fakeRequest, token string) {
-	switch c.HasCookieToken {
-	case true:
-		client.SetCookie(&http.Cookie{
-			Name:  cfg.CookieAccessName,
-			Path:  "/",
-			Value: token,
-		})
-	default:
-		request.SetAuthToken(token)
-	}
-}
 
 func TestMetricsMiddleware(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.EnableMetrics = true
 	cfg.LocalhostMetrics = true
+	cfg.EnableRefreshTokens = true
+	cfg.EnableEncryptedToken = true
+	cfg.EncryptionKey = testEncryptionKey
 	requests := []fakeRequest{
+		{
+			URI:           fakeAuthAllURL,
+			HasLogin:      true,
+			Redirects:     true,
+			OnResponse:    delay,
+			ExpectedProxy: true,
+			ExpectedCode:  http.StatusOK,
+		},
+		{
+			URI:           fakeAuthAllURL,
+			Redirects:     false,
+			ExpectedProxy: true,
+			ExpectedCode:  http.StatusOK,
+		},
 		{
 			URI: cfg.WithOAuthURI(metricsURL),
 			Headers: map[string]string{
@@ -346,8 +71,35 @@ func TestMetricsMiddleware(t *testing.T) {
 			ExpectedCode:            http.StatusOK,
 			ExpectedContentContains: "proxy_request_status_total",
 		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"issued\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"exchange\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"login\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"logout\"",
+		},
+		{
+			URI:                     cfg.WithOAuthURI(metricsURL),
+			ExpectedCode:            http.StatusOK,
+			ExpectedContentContains: "action=\"renew\"",
+		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	p := newFakeProxy(cfg, &fakeAuthConfig{})
+	p.idp.setTokenExpiration(1000 * time.Millisecond)
+	p.RunTests(t, requests)
 }
 
 func TestOauthRequests(t *testing.T) {
@@ -369,7 +121,189 @@ func TestOauthRequests(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
+}
+
+func TestAdminListener(t *testing.T) {
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestAdminOnSameListener",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+				},
+				{
+					URI:          "/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			Name: "TestAdminOnDifferentListener",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+				c.ListenAdmin = "127.0.0.1:12300"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:          "/oauth/health",
+					Redirects:    true,
+					ExpectedCode: http.StatusNotFound,
+				},
+				{
+					URI:          "/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusNotFound,
+				},
+				{
+					URL:                     "http://127.0.0.1:12300/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+				},
+				{
+					URL:          "http://127.0.0.1:12300/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+				},
+			},
+		},
+		{
+			Name: "TestAdminOnDifferentListenerWithHTTPS",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+				c.ListenAdmin = "127.0.0.1:12301"
+				c.ListenAdminScheme = secureScheme
+				c.TLSAdminCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSAdminPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSAdminCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     "https://127.0.0.1:12301/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+					RequestCA:               fakeCA,
+				},
+				{
+					URL:          "https://127.0.0.1:12301/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+					RequestCA:    fakeCA,
+				},
+			},
+		},
+		{
+			Name: "TestAdminOnDifferentListenerWithHTTPSandCommonCreds",
+			ProxySettings: func(c *Config) {
+				c.EnableMetrics = true
+				c.ListenAdmin = "127.0.0.1:12302"
+				c.ListenAdminScheme = secureScheme
+				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     "https://127.0.0.1:12302/oauth/health",
+					Redirects:               true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "OK",
+					RequestCA:               fakeCA,
+				},
+				{
+					URL:          "https://127.0.0.1:12302/oauth/metrics",
+					Redirects:    true,
+					ExpectedCode: http.StatusOK,
+					RequestCA:    fakeCA,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		c := newFakeKeycloakConfig()
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+
+				certFile := ""
+				privFile := ""
+				caFile := ""
+
+				if c.TLSAdminCertificate != "" {
+					certFile = c.TLSAdminCertificate
+				}
+
+				if c.TLSCertificate != "" {
+					certFile = c.TLSCertificate
+				}
+
+				if c.TLSAdminPrivateKey != "" {
+					privFile = c.TLSAdminPrivateKey
+				}
+
+				if c.TLSPrivateKey != "" {
+					privFile = c.TLSPrivateKey
+				}
+
+				if c.TLSAdminCaCertificate != "" {
+					caFile = c.TLSAdminCaCertificate
+				}
+
+				if c.TLSCaCertificate != "" {
+					caFile = c.TLSCaCertificate
+				}
+
+				if certFile != "" {
+					fakeCertByte := []byte(fakeCert)
+					err := ioutil.WriteFile(certFile, fakeCertByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing certificate %s", err)
+					}
+					defer os.Remove(certFile)
+				}
+
+				if privFile != "" {
+					fakeKeyByte := []byte(fakePrivateKey)
+					err := ioutil.WriteFile(privFile, fakeKeyByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing privateKey %s", err)
+					}
+					defer os.Remove(privFile)
+				}
+
+				if caFile != "" {
+					fakeCAByte := []byte(fakeCA)
+					err := ioutil.WriteFile(caFile, fakeCAByte, 0644)
+
+					if err != nil {
+						t.Fatalf("Problem writing cacertificate %s", err)
+					}
+					defer os.Remove(caFile)
+				}
+
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }
 
 func TestOauthRequestsWithBaseURI(t *testing.T) {
@@ -407,7 +341,7 @@ func TestOauthRequestsWithBaseURI(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestMethodExclusions(t *testing.T) {
@@ -431,7 +365,7 @@ func TestMethodExclusions(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestPreserveURLEncoding(t *testing.T) {
@@ -525,7 +459,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 		},
 	}
 
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestStrangeRoutingError(t *testing.T) {
@@ -599,7 +533,7 @@ func TestStrangeRoutingError(t *testing.T) {
 		},
 	}
 
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestNoProxyingRequests(t *testing.T) {
@@ -632,7 +566,7 @@ func TestNoProxyingRequests(t *testing.T) {
 			ExpectedCode: http.StatusSeeOther,
 		},
 	}
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 const testAdminURI = "/admin/test"
@@ -702,7 +636,7 @@ func TestStrangeAdminRequests(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestWhiteListedRequests(t *testing.T) {
@@ -748,7 +682,7 @@ func TestWhiteListedRequests(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestRequireAnyRoles(t *testing.T) {
@@ -780,7 +714,7 @@ func TestRequireAnyRoles(t *testing.T) {
 			ExpectedCode: http.StatusForbidden,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestGroupPermissionsMiddleware(t *testing.T) {
@@ -892,7 +826,7 @@ func TestGroupPermissionsMiddleware(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestRolePermissionsMiddleware(t *testing.T) {
@@ -995,7 +929,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			HasToken:     true,
 			NotSigned:    true,
 			Roles:        []string{fakeTestRole},
-			ExpectedCode: http.StatusForbidden,
+			ExpectedCode: http.StatusUnauthorized,
 		},
 		{ // check with correct token, signed
 			URI:          "/admin/page",
@@ -1113,7 +1047,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			ExpectedProxy: true,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestCrossSiteHandler(t *testing.T) {
@@ -1178,107 +1112,285 @@ func TestCrossSiteHandler(t *testing.T) {
 		cfg.CorsMethods = c.Cors.AllowedMethods
 		cfg.CorsOrigins = c.Cors.AllowedOrigins
 
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
-func TestCheckRefreshTokens(t *testing.T) {
+func TestRefreshToken(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.EnableRefreshTokens = true
-	cfg.EncryptionKey = testEncryptionKey
-	fn := func(no int, req *resty.Request, resp *resty.Response) {
-		if no == 0 {
-			<-time.After(1000 * time.Millisecond)
-		}
-	}
-	p := newFakeProxy(cfg)
-	p.idp.setTokenExpiration(1000 * time.Millisecond)
 
-	requests := []fakeRequest{
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
 		{
-			URI:           fakeAuthAllURL,
-			HasLogin:      true,
-			Redirects:     true,
-			OnResponse:    fn,
-			ExpectedProxy: true,
-			ExpectedCode:  http.StatusOK,
+			Name: "TestRefreshTokenEncryption",
+			ProxySettings: func(c *Config) {
+				c.EnableRefreshTokens = true
+				c.EnableEncryptedToken = true
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EncryptionKey = testEncryptionKey
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                           fakeAuthAllURL,
+					HasLogin:                      true,
+					Redirects:                     true,
+					OnResponse:                    delay,
+					ExpectedProxy:                 true,
+					ExpectedCode:                  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
+				},
+				{
+					URI:                      fakeAuthAllURL,
+					Redirects:                false,
+					ExpectedProxy:            true,
+					ExpectedCode:             http.StatusOK,
+					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
+				},
+			},
 		},
 		{
-			URI:             fakeAuthAllURL,
-			Redirects:       false,
-			ExpectedProxy:   true,
-			ExpectedCode:    http.StatusOK,
-			ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
+			Name: "TestRefreshTokenExpiration",
+			ProxySettings: func(c *Config) {
+				c.EnableRefreshTokens = true
+				c.EnableEncryptedToken = true
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EncryptionKey = testEncryptionKey
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                           fakeAuthAllURL,
+					HasLogin:                      true,
+					Redirects:                     true,
+					OnResponse:                    doubleDelay,
+					ExpectedProxy:                 true,
+					ExpectedCode:                  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
+				},
+				{
+					URI:           fakeAuthAllURL,
+					Redirects:     false,
+					ExpectedProxy: false,
+					ExpectedCode:  http.StatusUnauthorized,
+				},
+			},
 		},
 	}
-	p.RunTests(t, requests)
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		cfgCopy := *cfg
+		c := &cfgCopy
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 1000 * time.Millisecond})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }
 
-func TestCheckEncryptedCookie(t *testing.T) {
+func delay(no int, req *resty.Request, resp *resty.Response) {
+	if no == 0 {
+		<-time.After(1000 * time.Millisecond)
+	}
+}
+
+func doubleDelay(no int, req *resty.Request, resp *resty.Response) {
+	if no == 0 {
+		<-time.After(2000 * time.Millisecond)
+	}
+}
+
+func checkAccessTokenEncryption(t *testing.T, cfg *Config, value string) bool {
+	rawToken, err := decodeText(value, cfg.EncryptionKey)
+
+	if err != nil {
+		return false
+	}
+
+	token, err := jwt.ParseSigned(rawToken)
+
+	if err != nil {
+		return false
+	}
+
+	user, err := extractIdentity(token)
+
+	if err != nil {
+		return false
+	}
+
+	return assert.Contains(t, user.claims, "aud") && assert.Contains(t, user.claims, "email")
+}
+
+func checkRefreshTokenEncryption(t *testing.T, cfg *Config, value string) bool {
+	rawToken, err := decodeText(value, cfg.EncryptionKey)
+
+	if err != nil {
+		return false
+	}
+
+	_, err = jwt.ParseSigned(rawToken)
+
+	return err == nil
+}
+
+func TestAccessTokenEncryption(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.EnableRefreshTokens = true
-	cfg.EnableEncryptedToken = true
-	cfg.Verbose = true
-	cfg.EnableLogging = true
-	cfg.EncryptionKey = testEncryptionKey
-	testEncryptedToken(t, cfg)
-}
+	redisServer, err := miniredis.Run()
 
-func TestCheckForcedEncryptedCookie(t *testing.T) {
-	cfg := newFakeKeycloakConfig()
-	cfg.EnableRefreshTokens = true
-	cfg.EnableEncryptedToken = false
-	cfg.ForceEncryptedCookie = true
-	cfg.Verbose = true
-	cfg.EnableLogging = true
-	cfg.EncryptionKey = testEncryptionKey
-	testEncryptedToken(t, cfg)
-}
-
-func testEncryptedToken(t *testing.T, cfg *Config) {
-	fn := func(no int, req *resty.Request, resp *resty.Response) {
-		if no == 0 {
-			<-time.After(1000 * time.Millisecond)
-		}
+	if err != nil {
+		t.Fatalf("Starting redis failed %s", err)
 	}
-	val := func(value string) bool {
-		// check the cookie value is an encrypted token
-		accessToken, err := decodeText(value, cfg.EncryptionKey)
-		if err != nil {
-			return false
-		}
-		jwt, err := jose.ParseJWT(accessToken)
-		if err != nil {
-			return false
-		}
-		claims, err := jwt.Claims()
-		if err != nil {
-			return false
-		}
-		return assert.Contains(t, claims, "aud") && assert.Contains(t, claims, "email")
-	}
-	p := newFakeProxy(cfg)
-	p.idp.setTokenExpiration(1000 * time.Millisecond)
 
-	requests := []fakeRequest{
+	defer redisServer.Close()
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
 		{
-			URI:           fakeAuthAllURL,
-			HasLogin:      true,
-			Redirects:     true,
-			OnResponse:    fn,
-			ExpectedProxy: true,
-			ExpectedCode:  http.StatusOK,
+			Name: "TestEnableEncryptedTokenWithBoltDB",
+			ProxySettings: func(c *Config) {
+				c.EnableRefreshTokens = true
+				c.EnableEncryptedToken = true
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EncryptionKey = testEncryptionKey
+				c.StoreURL = "boltdb:////tmp/test.boltdb"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                           fakeAuthAllURL,
+					HasLogin:                      true,
+					Redirects:                     true,
+					OnResponse:                    delay,
+					ExpectedProxy:                 true,
+					ExpectedCode:                  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+				{
+					URI:                      fakeAuthAllURL,
+					Redirects:                false,
+					ExpectedProxy:            true,
+					ExpectedCode:             http.StatusOK,
+					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+			},
 		},
 		{
-			URI:                      fakeAuthAllURL,
-			Redirects:                false,
-			ExpectedProxy:            true,
-			ExpectedCode:             http.StatusOK,
-			ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
-			ExpectedCookiesValidator: map[string]func(string) bool{cfg.CookieAccessName: val},
+			Name: "TestEnableEncryptedTokenWithRedis",
+			ProxySettings: func(c *Config) {
+				c.EnableRefreshTokens = true
+				c.EnableEncryptedToken = true
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EncryptionKey = testEncryptionKey
+				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                           fakeAuthAllURL,
+					HasLogin:                      true,
+					Redirects:                     true,
+					OnResponse:                    delay,
+					ExpectedProxy:                 true,
+					ExpectedCode:                  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+				{
+					URI:                      fakeAuthAllURL,
+					Redirects:                false,
+					ExpectedProxy:            true,
+					ExpectedCode:             http.StatusOK,
+					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+			},
+		},
+		{
+			Name: "TestEnableEncryptedToken",
+			ProxySettings: func(c *Config) {
+				c.EnableRefreshTokens = true
+				c.EnableEncryptedToken = true
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EncryptionKey = testEncryptionKey
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                           fakeAuthAllURL,
+					HasLogin:                      true,
+					Redirects:                     true,
+					OnResponse:                    delay,
+					ExpectedProxy:                 true,
+					ExpectedCode:                  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+				{
+					URI:                      fakeAuthAllURL,
+					Redirects:                false,
+					ExpectedProxy:            true,
+					ExpectedCode:             http.StatusOK,
+					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+			},
+		},
+		{
+			Name: "ForceEncryptedCookie",
+			ProxySettings: func(c *Config) {
+				c.EnableRefreshTokens = true
+				c.EnableEncryptedToken = false
+				c.ForceEncryptedCookie = true
+				c.Verbose = true
+				c.EnableLogging = true
+				c.EncryptionKey = testEncryptionKey
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                           fakeAuthAllURL,
+					HasLogin:                      true,
+					Redirects:                     true,
+					OnResponse:                    delay,
+					ExpectedProxy:                 true,
+					ExpectedCode:                  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+				{
+					URI:                      fakeAuthAllURL,
+					Redirects:                false,
+					ExpectedProxy:            true,
+					ExpectedCode:             http.StatusOK,
+					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+				},
+			},
 		},
 	}
-	p.RunTests(t, requests)
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		cfgCopy := *cfg
+		c := &cfgCopy
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 1000 * time.Millisecond})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
 }
 
 func TestCustomHeadersHandler(t *testing.T) {
@@ -1291,7 +1403,7 @@ func TestCustomHeadersHandler(t *testing.T) {
 			Request: fakeRequest{
 				URI:      fakeAuthAllURL,
 				HasToken: true,
-				TokenClaims: jose.Claims{
+				TokenClaims: map[string]interface{}{
 					"sub":                "test-subject",
 					"username":           "rohith",
 					"preferred_username": "rohith",
@@ -1312,7 +1424,7 @@ func TestCustomHeadersHandler(t *testing.T) {
 			Request: fakeRequest{
 				URI:      fakeAuthAllURL,
 				HasToken: true,
-				TokenClaims: jose.Claims{
+				TokenClaims: map[string]interface{}{
 					"email":              "gambol99@gmail.com",
 					"name":               "Rohith Jayawardene",
 					"family_name":        "Jayawardene",
@@ -1332,7 +1444,7 @@ func TestCustomHeadersHandler(t *testing.T) {
 	for _, c := range requests {
 		cfg := newFakeKeycloakConfig()
 		cfg.AddClaims = c.Match
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
@@ -1401,7 +1513,7 @@ func TestAdmissionHandlerRoles(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 // check to see if custom headers are hitting the upstream
@@ -1455,7 +1567,7 @@ func TestCustomHeaders(t *testing.T) {
 		cfg := newFakeKeycloakConfig()
 		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
 		cfg.Headers = c.Headers
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
@@ -1466,7 +1578,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 	}{
 		// jose.StringClaim test
 		{
-			Matches: map[string]string{"cal": "test"},
+			Matches: map[string]string{"item": "test"},
 			Request: fakeRequest{
 				URI:          testAdminURI,
 				HasToken:     true,
@@ -1486,7 +1598,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:           testAdminURI,
 				HasToken:      true,
-				TokenClaims:   jose.Claims{"item": "tes"},
+				TokenClaims:   map[string]interface{}{"item": "tes"},
 				ExpectedProxy: true,
 				ExpectedCode:  http.StatusOK,
 			},
@@ -1496,7 +1608,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:          testAdminURI,
 				HasToken:     true,
-				TokenClaims:  jose.Claims{"item": "test"},
+				TokenClaims:  map[string]interface{}{"item": "test"},
 				ExpectedCode: http.StatusForbidden,
 			},
 		},
@@ -1505,7 +1617,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:          testAdminURI,
 				HasToken:     true,
-				TokenClaims:  jose.Claims{"item": "test"},
+				TokenClaims:  map[string]interface{}{"item": "test"},
 				ExpectedCode: http.StatusForbidden,
 			},
 		},
@@ -1514,7 +1626,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:      testAdminURI,
 				HasToken: true,
-				TokenClaims: jose.Claims{
+				TokenClaims: map[string]interface{}{
 					"item":  "tester",
 					"found": "something",
 				},
@@ -1527,7 +1639,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:           testAdminURI,
 				HasToken:      true,
-				TokenClaims:   jose.Claims{"item": "test"},
+				TokenClaims:   map[string]interface{}{"item": "test"},
 				ExpectedProxy: true,
 				ExpectedCode:  http.StatusOK,
 			},
@@ -1537,28 +1649,28 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:           testAdminURI,
 				HasToken:      true,
-				TokenClaims:   jose.Claims{"item": "test"},
+				TokenClaims:   map[string]interface{}{"item": "test"},
 				ExpectedProxy: true,
 				ExpectedCode:  http.StatusOK,
 			},
 		},
 		// jose.StringsClaim test
 		{
-			Matches: map[string]string{"item": "^t.*t"},
+			Matches: map[string]string{"item1": "^t.*t"},
 			Request: fakeRequest{
 				URI:           testAdminURI,
 				HasToken:      true,
-				TokenClaims:   jose.Claims{"item": []string{"nonMatchingClaim", "test", "anotherNonMatching"}},
+				TokenClaims:   map[string]interface{}{"item1": []string{"nonMatchingClaim", "test", "anotherNonMatching"}},
 				ExpectedProxy: true,
 				ExpectedCode:  http.StatusOK,
 			},
 		},
 		{
-			Matches: map[string]string{"item": "^t.*t"},
+			Matches: map[string]string{"item1": "^t.*t"},
 			Request: fakeRequest{
 				URI:           testAdminURI,
 				HasToken:      true,
-				TokenClaims:   jose.Claims{"item": []string{"1test", "2test", "3test"}},
+				TokenClaims:   map[string]interface{}{"item1": []string{"1test", "2test", "3test"}},
 				ExpectedProxy: false,
 				ExpectedCode:  http.StatusForbidden,
 			},
@@ -1568,7 +1680,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:           testAdminURI,
 				HasToken:      true,
-				TokenClaims:   jose.Claims{"item": []string{}},
+				TokenClaims:   map[string]interface{}{"item1": []string{}},
 				ExpectedProxy: false,
 				ExpectedCode:  http.StatusForbidden,
 			},
@@ -1581,7 +1693,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 			Request: fakeRequest{
 				URI:      testAdminURI,
 				HasToken: true,
-				TokenClaims: jose.Claims{
+				TokenClaims: map[string]interface{}{
 					"item1": []string{"randomItem", "test"},
 					"item2": []string{"randomItem", "anotherItem"},
 					"item3": []string{"randomItem2", "anotherItem3"},
@@ -1595,69 +1707,127 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 		cfg := newFakeKeycloakConfig()
 		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
 		cfg.MatchClaims = c.Matches
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
 }
 
 func TestGzipCompression(t *testing.T) {
+	cfg := newFakeKeycloakConfig()
+	s := httptest.NewServer(&fakeUpstreamService{})
+
 	requests := []struct {
-		EnableCompression bool
-		Request           fakeRequest
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
 	}{
 		{
-			EnableCompression: true,
-			Request: fakeRequest{
-				URI:           "/gambol99.htm",
-				ExpectedProxy: true,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
-				},
-				ExpectedHeaders: map[string]string{
-					"Content-Encoding": "gzip",
+			Name: "TestCompressionWithCustomURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = true
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/gambol99.htm",
+					ExpectedProxy: true,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedHeaders: map[string]string{
+						"Content-Encoding": "gzip",
+					},
 				},
 			},
 		},
 		{
-			EnableCompression: true,
-			Request: fakeRequest{
-				URI:           testAdminURI,
-				ExpectedProxy: false,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
-				},
-				ExpectedHeaders: map[string]string{
-					"Content-Encoding": "gzip",
+			Name: "TestCompressionWithAdminURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = true
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           testAdminURI,
+					ExpectedProxy: false,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedHeaders: map[string]string{
+						"Content-Encoding": "gzip",
+					},
 				},
 			},
 		},
 		{
-			EnableCompression: false,
-			Request: fakeRequest{
-				URI:           "/gambol99.htm",
-				ExpectedProxy: true,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
+			Name: "TestCompressionWithLogging",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = true
+				c.EnableLogging = true
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     s.URL + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "/test",
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedHeaders: map[string]string{
+						"Content-Encoding": "gzip",
+					},
 				},
-				ExpectedNoProxyHeaders: []string{"Content-Encoding"},
 			},
 		},
 		{
-			EnableCompression: false,
-			Request: fakeRequest{
-				URI:           testAdminURI,
-				ExpectedProxy: false,
-				Headers: map[string]string{
-					"Accept-Encoding": "gzip, deflate, br",
+			Name: "TestWithoutCompressionCustomURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = false
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/gambol99.htm",
+					ExpectedProxy: true,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedNoProxyHeaders: []string{"Content-Encoding"},
 				},
-				ExpectedNoProxyHeaders: []string{"Content-Encoding"},
+			},
+		},
+		{
+			Name: "TestWithoutCompressionWithAdminURI",
+			ProxySettings: func(c *Config) {
+				c.EnableCompression = false
+				c.EnableLogging = false
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           testAdminURI,
+					ExpectedProxy: false,
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+					},
+					ExpectedNoProxyHeaders: []string{"Content-Encoding"},
+				},
 			},
 		},
 	}
 
-	for _, c := range requests {
-		cfg := newFakeKeycloakConfig()
-		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
-		cfg.EnableCompression = c.EnableCompression
-		newFakeProxy(cfg).RunTests(t, []fakeRequest{c.Request})
+	for _, testCase := range requests {
+		testCase := testCase
+		c := cfg
+		c.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
+
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
 	}
 }

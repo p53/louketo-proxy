@@ -1,3 +1,6 @@
+//go:build !e2e
+// +build !e2e
+
 /*
 Copyright 2015 All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +30,7 @@ func TestRedirectToAuthorizationUnauthorized(t *testing.T) {
 	requests := []fakeRequest{
 		{URI: "/admin", ExpectedCode: http.StatusUnauthorized},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestRedirectToAuthorization(t *testing.T) {
@@ -39,7 +42,7 @@ func TestRedirectToAuthorization(t *testing.T) {
 			ExpectedCode:     http.StatusSeeOther,
 		},
 	}
-	newFakeProxy(nil).RunTests(t, requests)
+	newFakeProxy(nil, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestRedirectToAuthorizationWith303Enabled(t *testing.T) {
@@ -53,7 +56,7 @@ func TestRedirectToAuthorizationWith303Enabled(t *testing.T) {
 			ExpectedCode:     http.StatusSeeOther,
 		},
 	}
-	newFakeProxy(cfg).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestRedirectToAuthorizationSkipToken(t *testing.T) {
@@ -62,7 +65,7 @@ func TestRedirectToAuthorizationSkipToken(t *testing.T) {
 	}
 	c := newFakeKeycloakConfig()
 	c.SkipTokenVerification = true
-	newFakeProxy(c).RunTests(t, requests)
+	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func assertAlmostEquals(t *testing.T, expected time.Duration, actual time.Duration) {
@@ -74,24 +77,24 @@ func assertAlmostEquals(t *testing.T, expected time.Duration, actual time.Durati
 }
 
 func TestGetAccessCookieExpiration_NoExp(t *testing.T) {
-	token := newTestToken("foo").getToken()
-	refreshToken := token.Encode()
+	token, err := newTestToken("foo").getToken()
+	assert.NoError(t, err)
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
-	proxy := newFakeProxy(c).proxy
-	duration := proxy.getAccessCookieExpiration(refreshToken)
+	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
+	duration := proxy.getAccessCookieExpiration(token)
 	assertAlmostEquals(t, c.AccessTokenDuration, duration)
 }
 
 func TestGetAccessCookieExpiration_ZeroExp(t *testing.T) {
 	ft := newTestToken("foo")
 	ft.setExpiration(time.Unix(0, 0))
-	token := ft.getToken()
-	refreshToken := token.Encode()
+	token, err := ft.getToken()
+	assert.NoError(t, err)
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
-	proxy := newFakeProxy(c).proxy
-	duration := proxy.getAccessCookieExpiration(refreshToken)
+	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
+	duration := proxy.getAccessCookieExpiration(token)
 	assert.True(t, duration > 0, "duration should be positive")
 	assertAlmostEquals(t, c.AccessTokenDuration, duration)
 }
@@ -99,25 +102,23 @@ func TestGetAccessCookieExpiration_ZeroExp(t *testing.T) {
 func TestGetAccessCookieExpiration_PastExp(t *testing.T) {
 	ft := newTestToken("foo")
 	ft.setExpiration(time.Now().AddDate(-1, 0, 0))
-	token := ft.getToken()
-	refreshToken := token.Encode()
+	token, err := ft.getToken()
+	assert.NoError(t, err)
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
-	proxy := newFakeProxy(c).proxy
-	duration := proxy.getAccessCookieExpiration(refreshToken)
+	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
+	duration := proxy.getAccessCookieExpiration(token)
 	assertAlmostEquals(t, c.AccessTokenDuration, duration)
 }
 
 func TestGetAccessCookieExpiration_ValidExp(t *testing.T) {
 	ft := newTestToken("foo")
-	token := ft.getToken()
-	refreshToken := token.Encode()
+	token, err := ft.getToken()
+	assert.NoError(t, err)
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
-	proxy := newFakeProxy(c).proxy
-	duration := proxy.getAccessCookieExpiration(refreshToken)
-	val, ok, _ := ft.claims.TimeClaim("exp")
-	assert.True(t, ok)
-	expectedDuration := time.Until(val)
+	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
+	duration := proxy.getAccessCookieExpiration(token)
+	expectedDuration := time.Until(time.Unix(ft.claims.Exp, 0))
 	assertAlmostEquals(t, expectedDuration, duration)
 }

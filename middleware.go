@@ -30,8 +30,8 @@ import (
 	uuid "github.com/gofrs/uuid"
 
 	"github.com/PuerkitoBio/purell"
-	"github.com/coreos/go-oidc/jose"
-	"github.com/go-chi/chi/middleware"
+	oidc3 "github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/unrolled/secure"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -52,15 +52,37 @@ var gzPool = sync.Pool{
 type gzipResponseWriter struct {
 	io.Writer
 	http.ResponseWriter
+	bytes int
+	code  int
+	tee   io.Writer
 }
 
 func (w *gzipResponseWriter) WriteHeader(status int) {
 	w.Header().Del("Content-Length")
 	w.ResponseWriter.WriteHeader(status)
+	w.code = status
 }
 
 func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	return w.Writer.Write(b)
+	n, err := w.Writer.Write(b)
+	w.bytes += n
+	return n, err
+}
+
+func (w *gzipResponseWriter) BytesWritten() int {
+	return w.bytes
+}
+
+func (w *gzipResponseWriter) Status() int {
+	return w.code
+}
+
+func (w *gzipResponseWriter) Tee(writ io.Writer) {
+	w.tee = writ
+}
+
+func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }
 
 // gzipMiddleware is responsible for compressing a response
@@ -124,9 +146,11 @@ func (r *oauthProxy) requestIDMiddleware(header string) func(http.Handler) http.
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if v := req.Header.Get(header); v == "" {
 				uuid, err := uuid.NewV1()
+
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 				}
+
 				req.Header.Set(header, uuid.String())
 			}
 
@@ -141,7 +165,9 @@ func (r *oauthProxy) loggingMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		resp := w.(middleware.WrapResponseWriter)
 		next.ServeHTTP(resp, req)
+
 		addr := req.RemoteAddr
+
 		if req.URL.Path == req.URL.RawPath || req.URL.RawPath == "" {
 			r.log.Info("client request",
 				zap.Duration("latency", time.Since(start)),
@@ -164,17 +190,25 @@ func (r *oauthProxy) loggingMiddleware(next http.Handler) http.Handler {
 }
 
 // authenticationMiddleware is responsible for verifying the access token
+// nolint:funlen
 func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			clientIP := req.RemoteAddr
+
 			// grab the user identity from the request
 			user, err := r.getIdentity(req)
+
 			if err != nil {
-				r.log.Error("no session found in request, redirecting for authorization", zap.Error(err))
+				r.log.Error(
+					"no session found in request, redirecting for authorization",
+					zap.Error(err),
+				)
+
 				next.ServeHTTP(w, req.WithContext(r.redirectToAuthorization(w, req)))
 				return
 			}
+
 			// create the request scope
 			scope := req.Context().Value(contextScopeName).(*RequestScope)
 			scope.Identity = user
@@ -182,25 +216,44 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 
 			// step: skip if we are running skip-token-verification
 			if r.config.SkipTokenVerification {
-				r.log.Warn("skip token verification enabled, skipping verification - TESTING ONLY")
+				r.log.Warn(
+					"skip token verification enabled, " +
+						"skipping verification - TESTING ONLY",
+				)
+
 				if user.isExpired() {
-					r.log.Error("the session has expired and verification switch off",
+					r.log.Error(
+						"the session has expired and verification switch off",
 						zap.String("client_ip", clientIP),
 						zap.String("username", user.name),
-						zap.String("expired_on", user.expiresAt.String()))
+						zap.String("sub", user.id),
+						zap.String("expired_on", user.expiresAt.String()),
+					)
 
 					next.ServeHTTP(w, req.WithContext(r.redirectToAuthorization(w, req)))
 					return
 				}
 			} else { //nolint:gocritic
-				if err := verifyToken(r.client, user.token); err != nil {
+				verifier := r.provider.Verifier(
+					&oidc3.Config{
+						ClientID:          r.config.ClientID,
+						SkipClientIDCheck: r.config.SkipAccessTokenClientIDCheck,
+						SkipIssuerCheck:   r.config.SkipAccessTokenIssuerCheck,
+					},
+				)
+
+				_, err := verifier.Verify(context.Background(), user.rawToken)
+
+				if err != nil {
 					// step: if the error post verification is anything other than a token
 					// expired error we immediately throw an access forbidden - as there is
 					// something messed up in the token
-					if err != ErrAccessTokenExpired {
-						r.log.Error("access token failed verification",
+					if !strings.Contains(err.Error(), "token is expired") {
+						r.log.Error(
+							"access token failed verification",
 							zap.String("client_ip", clientIP),
-							zap.Error(err))
+							zap.Error(err),
+						)
 
 						next.ServeHTTP(w, req.WithContext(r.accessForbidden(w, req)))
 						return
@@ -208,26 +261,35 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 
 					// step: check if we are refreshing the access tokens and if not re-auth
 					if !r.config.EnableRefreshTokens {
-						r.log.Error("session expired and access token refreshing is disabled",
+						r.log.Error(
+							"session expired and access token refreshing is disabled",
 							zap.String("client_ip", clientIP),
 							zap.String("email", user.name),
-							zap.String("expired_on", user.expiresAt.String()))
+							zap.String("sub", user.id),
+							zap.String("expired_on", user.expiresAt.String()),
+						)
 
 						next.ServeHTTP(w, req.WithContext(r.redirectToAuthorization(w, req)))
 						return
 					}
 
-					r.log.Info("accces token for user has expired, attemping to refresh the token",
+					r.log.Info(
+						"accces token for user has expired, attemping to refresh the token",
 						zap.String("client_ip", clientIP),
-						zap.String("email", user.email))
+						zap.String("email", user.email),
+						zap.String("sub", user.id),
+					)
 
 					// step: check if the user has refresh token
 					refresh, _, err := r.retrieveRefreshToken(req.WithContext(ctx), user)
 					if err != nil {
-						r.log.Error("unable to find a refresh token for user",
+						r.log.Error(
+							"unable to find a refresh token for user",
 							zap.String("client_ip", clientIP),
 							zap.String("email", user.email),
-							zap.Error(err))
+							zap.String("sub", user.id),
+							zap.Error(err),
+						)
 
 						next.ServeHTTP(w, req.WithContext(r.redirectToAuthorization(w, req)))
 						return
@@ -242,22 +304,55 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 					// exp: expiration of the access token
 					// expiresIn: expiration of the ID token
 					conf := r.newOAuth2Config(r.config.RedirectionURL)
-					token, newRefreshToken, accessExpiresAt, refreshExpiresIn, err := getRefreshedToken(conf, refresh)
+
+					r.log.Debug(
+						"Issuing refresh token request",
+						zap.String("current access token", user.rawToken),
+						zap.String("refresh token", refresh),
+						zap.String("email", user.email),
+						zap.String("sub", user.id),
+					)
+
+					_, newRawAccToken, newRefreshToken, accessExpiresAt, refreshExpiresIn, err := getRefreshedToken(conf, r.config, refresh)
+
 					if err != nil {
 						switch err {
 						case ErrRefreshTokenExpired:
-							r.log.Warn("refresh token has expired, cannot retrieve access token",
+							r.log.Warn(
+								"refresh token has expired, cannot retrieve access token",
 								zap.String("client_ip", clientIP),
-								zap.String("email", user.email))
+								zap.String("email", user.email),
+								zap.String("sub", user.id),
+							)
 
 							r.clearAllCookies(req.WithContext(ctx), w)
 						default:
-							r.log.Error("failed to refresh the access token", zap.Error(err))
+							r.log.Debug(
+								"failed to refresh the access token",
+								zap.Error(err),
+								zap.String("access token", user.rawToken),
+								zap.String("email", user.email),
+								zap.String("sub", user.id),
+							)
+							r.log.Error(
+								"failed to refresh the access token",
+								zap.Error(err),
+								zap.String("email", user.email),
+								zap.String("sub", user.id),
+							)
 						}
-						next.ServeHTTP(w, req.WithContext(r.redirectToAuthorization(w, req)))
 
+						next.ServeHTTP(w, req.WithContext(r.redirectToAuthorization(w, req)))
 						return
 					}
+
+					r.log.Debug(
+						"info about tokens after refreshing",
+						zap.String("new access token", newRawAccToken),
+						zap.String("new refresh token", newRefreshToken),
+						zap.String("email", user.email),
+						zap.String("sub", user.id),
+					)
 
 					accessExpiresIn := time.Until(accessExpiresAt)
 
@@ -265,57 +360,81 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 					if newRefreshToken != "" {
 						refresh = newRefreshToken
 					}
+
 					if refreshExpiresIn == 0 {
 						// refresh token expiry claims not available: try to parse refresh token
 						refreshExpiresIn = r.getAccessCookieExpiration(refresh)
 					}
 
-					r.log.Info("injecting the refreshed access token cookie",
+					r.log.Info(
+						"injecting the refreshed access token cookie",
 						zap.String("client_ip", clientIP),
 						zap.String("cookie_name", r.config.CookieAccessName),
 						zap.String("email", user.email),
+						zap.String("sub", user.id),
 						zap.Duration("refresh_expires_in", refreshExpiresIn),
-						zap.Duration("expires_in", accessExpiresIn))
+						zap.Duration("expires_in", accessExpiresIn),
+					)
 
-					accessToken := token.Encode()
+					accessToken := newRawAccToken
+
 					if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie {
 						if accessToken, err = encodeText(accessToken, r.config.EncryptionKey); err != nil {
-							r.log.Error("unable to encode the access token", zap.Error(err))
+							r.log.Error(
+								"unable to encode the access token", zap.Error(err),
+								zap.String("email", user.email),
+								zap.String("sub", user.id),
+							)
+
 							w.WriteHeader(http.StatusInternalServerError)
 							return
 						}
 					}
+
 					// step: inject the refreshed access token
 					r.dropAccessTokenCookie(req.WithContext(ctx), w, accessToken, accessExpiresIn)
 
 					// step: inject the renewed refresh token
 					if newRefreshToken != "" {
-						r.log.Debug("renew refresh cookie with new refresh token",
-							zap.Duration("refresh_expires_in", refreshExpiresIn))
+						r.log.Debug(
+							"renew refresh cookie with new refresh token",
+							zap.Duration("refresh_expires_in", refreshExpiresIn),
+							zap.String("email", user.email),
+							zap.String("sub", user.id),
+						)
+
 						encryptedRefreshToken, err := encodeText(newRefreshToken, r.config.EncryptionKey)
+
 						if err != nil {
-							r.log.Error("failed to encrypt the refresh token", zap.Error(err))
+							r.log.Error(
+								"failed to encrypt the refresh token",
+								zap.Error(err),
+								zap.String("email", user.email),
+								zap.String("sub", user.id),
+							)
+
 							w.WriteHeader(http.StatusInternalServerError)
 							return
 						}
 
 						if r.useStore() {
-							go func(old, new jose.JWT, encrypted string) {
+							go func(old, new string, encrypted string) {
 								if err := r.DeleteRefreshToken(old); err != nil {
 									r.log.Error("failed to remove old token", zap.Error(err))
 								}
+
 								if err := r.StoreRefreshToken(new, encrypted, refreshExpiresIn); err != nil {
 									r.log.Error("failed to store refresh token", zap.Error(err))
 									return
 								}
-							}(user.token, token, encryptedRefreshToken)
+							}(user.rawToken, newRawAccToken, encryptedRefreshToken)
 						} else {
 							r.dropRefreshTokenCookie(req.WithContext(ctx), w, encryptedRefreshToken, refreshExpiresIn)
 						}
 					}
 
 					// update the with the new access token and inject into the context
-					user.token = token
+					user.rawToken = newRawAccToken
 					ctx = context.WithValue(req.Context(), contextScopeName, scope)
 				}
 			}
@@ -339,54 +458,73 @@ func (r *oauthProxy) checkClaim(user *userContext, claimName string, match *rege
 		return false
 	}
 
-	// Check string claim.
-	valueStr, foundStr, errStr := user.claims.StringClaim(claimName)
-	// We have found string claim, so let's check whether it matches.
-	if foundStr {
-		if match.MatchString(valueStr) {
-			return true
-		}
-		r.log.Warn("claim requirement does not match claim in token", append(errFields,
-			zap.String("issued", valueStr),
-			zap.String("required", match.String()),
-		)...)
+	switch user.claims[claimName].(type) {
+	case []interface{}:
+		for _, v := range user.claims[claimName].([]interface{}) {
+			value, ok := v.(string)
 
-		return false
-	}
+			if !ok {
+				r.log.Warn(
+					"Problem while asserting claim",
+					append(
+						errFields,
+						zap.String(
+							"issued",
+							fmt.Sprintf("%v", user.claims[claimName]),
+						),
+						zap.String("required", match.String()),
+					)...,
+				)
 
-	// Check strings claim.
-	valueStrs, foundStrs, errStrs := user.claims.StringsClaim(claimName)
-	// We have found strings claim, so let's check whether it matches.
-	if foundStrs {
-		for _, value := range valueStrs {
+				return false
+			}
+
 			if match.MatchString(value) {
 				return true
 			}
 		}
-		r.log.Warn("claim requirement does not match any element claim group in token", append(errFields,
-			zap.String("issued", fmt.Sprintf("%v", valueStrs)),
-			zap.String("required", match.String()),
-		)...)
+		r.log.Warn(
+			"claim requirement does not match any element claim group in token",
+			append(
+				errFields,
+				zap.String(
+					"issued",
+					fmt.Sprintf("%v", user.claims[claimName]),
+				),
+				zap.String("required", match.String()),
+			)...,
+		)
 
 		return false
-	}
+	case string:
+		if match.MatchString(user.claims[claimName].(string)) {
+			return true
+		}
 
-	// If this fails, the claim is probably float or int.
-	if errStr != nil && errStrs != nil {
-		r.log.Error("unable to extract the claim from token (tried string and strings)", append(errFields,
-			zap.Error(errStr),
-			zap.Error(errStrs),
-		)...)
+		r.log.Warn(
+			"claim requirement does not match claim in token",
+			append(
+				errFields,
+				zap.String("issued", user.claims[claimName].(string)),
+				zap.String("required", match.String()),
+			)...,
+		)
+
 		return false
+	default:
+		r.log.Error(
+			"unable to extract the claim from token not string or array of strings",
+		)
 	}
 
 	r.log.Warn("unexpected error", errFields...)
 	return false
 }
 
-// admissionMiddleware is responsible checking the access token against the protected resource
+// admissionMiddleware is responsible for checking the access token against the protected resource
 func (r *oauthProxy) admissionMiddleware(resource *Resource) func(http.Handler) http.Handler {
 	claimMatches := make(map[string]*regexp.Regexp)
+
 	for k, v := range r.config.MatchClaims {
 		claimMatches[k] = regexp.MustCompile(v)
 	}
@@ -395,10 +533,12 @@ func (r *oauthProxy) admissionMiddleware(resource *Resource) func(http.Handler) 
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			// we don't need to continue is a decision has been made
 			scope := req.Context().Value(contextScopeName).(*RequestScope)
+
 			if scope.AccessDenied {
 				next.ServeHTTP(w, req)
 				return
 			}
+
 			user := scope.Identity
 
 			// @step: we need to check the roles
@@ -458,7 +598,7 @@ func (r *oauthProxy) responseHeaderMiddleware(headers map[string]string) func(ht
 	}
 }
 
-// identityHeadersMiddleware is responsible for add the authentication headers for the upstream
+// identityHeadersMiddleware is responsible for adding the authentication headers to upstream
 func (r *oauthProxy) identityHeadersMiddleware(custom []string) func(http.Handler) http.Handler {
 	customClaims := make(map[string]string)
 
@@ -480,6 +620,7 @@ func (r *oauthProxy) identityHeadersMiddleware(custom []string) func(http.Handle
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			scope := req.Context().Value(contextScopeName).(*RequestScope)
+
 			if scope.Identity != nil {
 				user := scope.Identity
 				req.Header.Set("X-Auth-Audience", strings.Join(user.audiences, ","))
@@ -493,11 +634,11 @@ func (r *oauthProxy) identityHeadersMiddleware(custom []string) func(http.Handle
 
 				// should we add the token header?
 				if r.config.EnableTokenHeader {
-					req.Header.Set("X-Auth-Token", user.token.Encode())
+					req.Header.Set("X-Auth-Token", user.rawToken)
 				}
 				// add the authorization header if requested
 				if r.config.EnableAuthorizationHeader {
-					req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", user.token.Encode()))
+					req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", user.rawToken))
 				}
 				// are we filtering out the cookies
 				if !r.config.EnableAuthorizationCookies {
@@ -519,6 +660,7 @@ func (r *oauthProxy) identityHeadersMiddleware(custom []string) func(http.Handle
 // securityMiddleware performs numerous security checks on the request
 func (r *oauthProxy) securityMiddleware(next http.Handler) http.Handler {
 	r.log.Info("enabling the security filter middleware")
+
 	secure := secure.New(secure.Options{
 		AllowedHosts:          r.config.Hostnames,
 		BrowserXssFilter:      r.config.EnableBrowserXSSFilter,
@@ -540,16 +682,33 @@ func (r *oauthProxy) securityMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// methodCheck middleware
+func (r *oauthProxy) methodCheckMiddleware(next http.Handler) http.Handler {
+	r.log.Info("enabling the method check middleware")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !isValidHTTPMethod(req.Method) {
+			r.log.Warn("method not implemented ", zap.String("method", req.Method))
+			w.WriteHeader(http.StatusNotImplemented)
+			return
+		}
+
+		next.ServeHTTP(w, req)
+	})
+}
+
 // proxyDenyMiddleware just block everything
 func proxyDenyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		sc := req.Context().Value(contextScopeName)
+
 		var scope *RequestScope
 		if sc == nil {
 			scope = &RequestScope{}
 		} else {
 			scope = sc.(*RequestScope)
 		}
+
 		scope.AccessDenied = true
 		// update the request context
 		ctx := context.WithValue(req.Context(), contextScopeName, scope)

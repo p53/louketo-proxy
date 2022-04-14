@@ -1,3 +1,6 @@
+//go:build !e2e
+// +build !e2e
+
 /*
 Copyright 2015 All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,53 +27,126 @@ import (
 )
 
 func TestGetIndentity(t *testing.T) {
-	p, idp, _ := newTestProxyService(nil)
-	token := newTestToken(idp.getLocation()).getToken()
-	encoded := token.Encode()
-
 	testCases := []struct {
-		Request *http.Request
-		Ok      bool
+		Request       func(token string) *http.Request
+		Ok            bool
+		ProxySettings func(c *Config)
 	}{
 		{
-			Request: &http.Request{
-				Header: http.Header{
-					"Authorization": []string{fmt.Sprintf("Bearer %s", encoded)},
-				},
+			Request: func(token string) *http.Request {
+				return &http.Request{
+					Header: http.Header{
+						"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
+					},
+				}
 			},
 			Ok: true,
-		},
-		{
-			Request: &http.Request{
-				Header: http.Header{
-					"Authorization": []string{"Basic QWxhZGRpbjpPcGVuU2VzYW1l"},
-				},
+			ProxySettings: func(c *Config) {
+				c.SkipAuthorizationHeaderIdentity = false
 			},
 		},
 		{
-			Request: &http.Request{
-				Header: http.Header{
-					"Authorization": []string{fmt.Sprintf("Test %s", encoded)},
-				},
+			Request: func(token string) *http.Request {
+				return &http.Request{
+					Header: http.Header{
+						"Authorization": []string{"Basic QWxhZGRpbjpPcGVuU2VzYW1l"},
+					},
+				}
+			},
+			Ok: false,
+			ProxySettings: func(c *Config) {
+				c.SkipAuthorizationHeaderIdentity = false
 			},
 		},
 		{
-			Request: &http.Request{
-				Header: http.Header{},
+			Request: func(token string) *http.Request {
+				return &http.Request{
+					Header: http.Header{
+						"Authorization": []string{fmt.Sprintf("Test %s", token)},
+					},
+				}
+			},
+			Ok: false,
+			ProxySettings: func(c *Config) {
+				c.SkipAuthorizationHeaderIdentity = false
+			},
+		},
+		{
+			Request: func(token string) *http.Request {
+				return &http.Request{
+					Header: http.Header{},
+				}
+			},
+			Ok: false,
+			ProxySettings: func(c *Config) {
+				c.SkipAuthorizationHeaderIdentity = false
+			},
+		},
+		{
+			Request: func(token string) *http.Request {
+				return &http.Request{
+					Header: http.Header{},
+				}
+			},
+			Ok: false,
+			ProxySettings: func(c *Config) {
+				c.SkipAuthorizationHeaderIdentity = true
+			},
+		},
+		{
+			Request: func(token string) *http.Request {
+				return &http.Request{
+					Header: http.Header{
+						"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
+					},
+				}
+			},
+			Ok: false,
+			ProxySettings: func(c *Config) {
+				c.SkipAuthorizationHeaderIdentity = true
+			},
+		},
+		{
+			Request: func(token string) *http.Request {
+				return &http.Request{
+					Header: http.Header{
+						"Authorization": []string{"Basic QWxhZGRpbjpPcGVuU2VzYW1l"},
+					},
+				}
+			},
+			Ok: false,
+			ProxySettings: func(c *Config) {
+				c.SkipAuthorizationHeaderIdentity = true
 			},
 		},
 	}
 
-	for i, c := range testCases {
-		user, err := p.getIdentity(c.Request)
-		if err != nil && c.Ok {
+	for i, testCase := range testCases {
+		c := newFakeKeycloakConfig()
+		testCase := testCase
+		testCase.ProxySettings(c)
+
+		p, idp, _ := newTestProxyService(c)
+		token, err := newTestToken(idp.getLocation()).getToken()
+		assert.NoError(t, err)
+
+		user, err := p.getIdentity(testCase.Request(token))
+
+		if err != nil && testCase.Ok {
 			t.Errorf("test case %d should not have errored", i)
 			continue
 		}
-		if err != nil && !c.Ok {
+
+		if err == nil && !testCase.Ok {
+			t.Errorf("test case %d should not have errored", i)
 			continue
 		}
-		if user.token.Encode() != encoded {
+
+		if err != nil && !testCase.Ok {
+			continue
+		}
+
+		if user.rawToken != token {
 			t.Errorf("test case %d the tokens are not the same", i)
 		}
 	}
@@ -78,36 +154,61 @@ func TestGetIndentity(t *testing.T) {
 
 func TestGetTokenInRequest(t *testing.T) {
 	defaultName := newDefaultConfig().CookieAccessName
-	token := newTestToken("test").getToken()
+	token, err := newTestToken("test").getToken()
+	assert.NoError(t, err)
 	cs := []struct {
-		Token      string
-		AuthScheme string
-		Error      error
+		Token                           string
+		AuthScheme                      string
+		Error                           error
+		SkipAuthorizationHeaderIdentity bool
 	}{
 		{
-			Token:      "",
-			AuthScheme: "",
-			Error:      ErrSessionNotFound,
+			Token:                           "",
+			AuthScheme:                      "",
+			Error:                           ErrSessionNotFound,
+			SkipAuthorizationHeaderIdentity: false,
 		},
 		{
-			Token:      token.Encode(),
-			AuthScheme: "",
-			Error:      nil,
+			Token:                           token,
+			AuthScheme:                      "",
+			Error:                           nil,
+			SkipAuthorizationHeaderIdentity: false,
 		},
 		{
-			Token:      token.Encode(),
-			AuthScheme: "Bearer",
-			Error:      nil,
+			Token:                           token,
+			AuthScheme:                      "Bearer",
+			Error:                           nil,
+			SkipAuthorizationHeaderIdentity: false,
 		},
 		{
-			Token:      "QWxhZGRpbjpPcGVuU2VzYW1l",
-			AuthScheme: "Basic",
-			Error:      ErrSessionNotFound,
+			Token:                           "",
+			AuthScheme:                      "",
+			Error:                           ErrSessionNotFound,
+			SkipAuthorizationHeaderIdentity: true,
 		},
 		{
-			Token:      token.Encode(),
-			AuthScheme: "Test",
-			Error:      ErrSessionNotFound,
+			Token:                           token,
+			AuthScheme:                      "Bearer",
+			Error:                           ErrSessionNotFound,
+			SkipAuthorizationHeaderIdentity: true,
+		},
+		{
+			Token:                           token,
+			AuthScheme:                      "",
+			Error:                           nil,
+			SkipAuthorizationHeaderIdentity: true,
+		},
+		{
+			Token:                           "QWxhZGRpbjpPcGVuU2VzYW1l",
+			AuthScheme:                      "Basic",
+			Error:                           ErrSessionNotFound,
+			SkipAuthorizationHeaderIdentity: false,
+		},
+		{
+			Token:                           token,
+			AuthScheme:                      "Test",
+			Error:                           ErrSessionNotFound,
+			SkipAuthorizationHeaderIdentity: false,
 		},
 	}
 	for i, x := range cs {
@@ -124,12 +225,12 @@ func TestGetTokenInRequest(t *testing.T) {
 				})
 			}
 		}
-		access, bearer, err := getTokenInRequest(req, defaultName)
+		access, bearer, err := getTokenInRequest(req, defaultName, x.SkipAuthorizationHeaderIdentity)
 		switch x.Error {
 		case nil:
 			assert.NoError(t, err, "case %d should not have thrown an error", i)
 			assert.Equal(t, x.AuthScheme == "Bearer", bearer)
-			assert.Equal(t, token.Encode(), access)
+			assert.Equal(t, token, access)
 		default:
 			assert.Equal(t, x.Error, err, "case %d, expected error: %s", i, x.Error)
 		}

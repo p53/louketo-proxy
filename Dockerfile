@@ -1,41 +1,47 @@
+ARG HOMEDIR=/opt/gatekeeper
+
 #
-# Builder image
+# Builder
 #
 
-FROM golang:1.14.4 AS build-env
+FROM golang:1.17.6 AS build-env
 ARG SOURCE=*
+ARG HOMEDIR
 
 ADD $SOURCE /src/
 WORKDIR /src/
 
-# Unpack any tars, then try to execute a Makefile, but if the SOURCE url is
-# just a tar of binaries, then there probably won't be one. Using multiple RUN
-# commands to ensure any errors are caught.
-RUN find . -name '*.tar.gz' -type f | xargs -rn1 tar -xzf
-RUN if [ -f Makefile ]; then make; fi
-RUN cp "$(find . -name 'louketo-proxy' -type f -print -quit)" /louketo-proxy
+RUN make static
+
+WORKDIR ${HOMEDIR}
+
+RUN cp /src/bin/gatekeeper .
+COPY templates ./templates
+
+RUN echo "gatekeeper:x:1000:gatekeeper" >> /etc/group && \
+    echo "gatekeeper:x:1000:1000:gatekeeper user:${HOMEDIR}:/sbin/nologin" >> /etc/passwd && \
+    chown -R gatekeeper:gatekeeper ${HOMEDIR} && \
+    chmod -R g+rw ${HOMEDIR} && \
+    chmod +x gatekeeper
 
 #
 # Actual image
 #
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.2
+FROM scratch
+ARG HOMEDIR
 
-LABEL Name=louketo-proxy \
-      Release=https://github.com/louketo/louketo-proxy \
-      Url=https://github.com/louketo/louketo-proxy \
-      Help=https://github.com/louketo/louketo-proxy/issues
+LABEL Name=gatekeeper \
+      Release=https://github.com/gogatekeeper/gatekeeper \
+      Url=https://github.com/gogatekeeper/gatekeeper \
+      Help=https://github.com/gogatekeeper/gatekeeper/issues
 
-WORKDIR "/opt/louketo"
+COPY --chown=1000:1000 --from=build-env ${HOMEDIR} ${HOMEDIR}
+COPY --from=build-env /etc/passwd /etc/passwd
+COPY --from=build-env /etc/group /etc/group
+COPY --from=build-env /usr/share/ca-certificates /usr/share/ca-certificates
+COPY --from=build-env /etc/ssl/certs /etc/ssl/certs
 
-RUN echo "louketo:x:1000:louketo" >> /etc/group && \
-    echo "louketo:x:1000:1000:louketo user:/opt/louketo:/sbin/nologin" >> /etc/passwd && \
-    chown -R louketo:louketo /opt/louketo && \
-    chmod -R g+rw /opt/louketo
-
-COPY templates ./templates
-COPY --from=build-env /louketo-proxy ./
-RUN chmod +x louketo-proxy
-
+WORKDIR ${HOMEDIR}
 USER 1000
-ENTRYPOINT [ "/opt/louketo/louketo-proxy" ]
+ENTRYPOINT [ "/opt/gatekeeper/gatekeeper" ]
