@@ -1045,6 +1045,7 @@ func (r *oauthProxy) Render(w io.Writer, name string, data interface{}) error {
 func (r *oauthProxy) getPAT(done chan bool) {
 	retry := 0
 	r.pat = &PAT{}
+	initialized := false
 
 	for {
 		if retry > 0 {
@@ -1088,7 +1089,10 @@ func (r *oauthProxy) getPAT(done chan bool) {
 		r.pat.Token = token
 		r.pat.m.Unlock()
 
-		done <- true
+		if !initialized {
+			done <- true
+			initialized = true
+		}
 
 		retry = 0
 		time.Sleep(r.config.PatRefreshInterval)
