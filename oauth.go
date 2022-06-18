@@ -33,6 +33,7 @@ const (
 	GrantTypeUserCreds    = "password"
 	GrantTypeRefreshToken = "refresh_token"
 	GrantTypeClientCreds  = "client_credentials"
+	GrantTypeUmaTicket    = "urn:ietf:params:oauth:grant-type:uma-ticket"
 )
 
 // newOAuth2Config returns a oauth2 config

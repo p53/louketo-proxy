@@ -164,6 +164,15 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 			return r.revokeProxy(w, req)
 		}
 
+		if len(resources) == 0 {
+			r.log.Info(
+				"no resources for path",
+				zap.String("path", req.URL.Path),
+			)
+			w.WriteHeader(http.StatusUnauthorized)
+			return r.revokeProxy(w, req)
+		}
+
 		resourceID := resources[0].ID
 		resourceScopes := make([]string, 0)
 

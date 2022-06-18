@@ -199,6 +199,9 @@ func TestForwardingProxy(t *testing.T) {
 				c.ForwardingUsername = validUsername
 				c.ForwardingPassword = validPassword
 				c.ForwardingGrantType = GrantTypeUserCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
+				c.OpenIDProviderTimeout = 30 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -218,6 +221,8 @@ func TestForwardingProxy(t *testing.T) {
 				c.ForwardingUsername = validUsername
 				c.ForwardingPassword = validPassword
 				c.ForwardingGrantType = GrantTypeUserCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -245,6 +250,8 @@ func TestForwardingProxy(t *testing.T) {
 				c.ClientID = validUsername
 				c.ClientSecret = validPassword
 				c.ForwardingGrantType = GrantTypeClientCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -264,6 +271,8 @@ func TestForwardingProxy(t *testing.T) {
 				c.ClientID = validUsername
 				c.ClientSecret = validPassword
 				c.ForwardingGrantType = GrantTypeClientCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -291,6 +300,7 @@ func TestForwardingProxy(t *testing.T) {
 			testCase.Name,
 			func(t *testing.T) {
 				c := newFakeKeycloakConfig()
+				c.Upstream = s.URL
 				testCase.ProxySettings(c)
 				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 900 * time.Millisecond})
 				<-time.After(time.Duration(100) * time.Millisecond)
@@ -300,9 +310,160 @@ func TestForwardingProxy(t *testing.T) {
 	}
 }
 
+func TestUmaForwardingProxy(t *testing.T) {
+	fakeUpstream := httptest.NewServer(&fakeUpstreamService{})
+	upstreamConfig := newFakeKeycloakConfig()
+	upstreamConfig.EnableUma = true
+	upstreamConfig.EnableDefaultDeny = true
+	upstreamConfig.ClientID = validUsername
+	upstreamConfig.ClientSecret = validPassword
+	upstreamConfig.PatRetryCount = 5
+	upstreamConfig.PatRetryInterval = 2 * time.Second
+	upstreamConfig.Upstream = fakeUpstream.URL
+	// in newFakeProxy we are creating fakeauth server so, we will
+	// have two different fakeauth servers for upstream and forwarding,
+	// so we need to skip issuer check, but responses will be same
+	// so it is ok for this testing
+	upstreamConfig.SkipAccessTokenIssuerCheck = true
+
+	upstreamProxy := newFakeProxy(
+		upstreamConfig,
+		&fakeAuthConfig{},
+	)
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestFailureOnDisabledUmaOnForwardingProxy",
+			ProxySettings: func(c *Config) {
+				c.EnableForwarding = true
+				c.ForwardingDomains = []string{}
+				c.ForwardingUsername = validUsername
+				c.ForwardingPassword = validPassword
+				c.ForwardingGrantType = GrantTypeUserCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
+				c.OpenIDProviderTimeout = 30 * time.Second
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:           upstreamProxy.getServiceURL() + "/test",
+					ProxyRequest:  true,
+					ExpectedProxy: false,
+					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+		{
+			Name: "TestPasswordGrant",
+			ProxySettings: func(c *Config) {
+				c.EnableForwarding = true
+				c.EnableUma = true
+				c.ForwardingDomains = []string{}
+				c.ForwardingUsername = validUsername
+				c.ForwardingPassword = validPassword
+				c.ForwardingGrantType = GrantTypeUserCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
+				c.OpenIDProviderTimeout = 30 * time.Second
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     upstreamProxy.getServiceURL() + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gambol",
+				},
+			},
+		},
+		{
+			Name: "TestPasswordGrantWithRefreshing",
+			ProxySettings: func(c *Config) {
+				c.EnableForwarding = true
+				c.EnableUma = true
+				c.ForwardingDomains = []string{}
+				c.ForwardingUsername = validUsername
+				c.ForwardingPassword = validPassword
+				c.ForwardingGrantType = GrantTypeUserCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     upstreamProxy.getServiceURL() + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					OnResponse:              delay,
+					ExpectedContentContains: "gambol",
+				},
+				{
+					URL:                     upstreamProxy.getServiceURL() + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gambol",
+				},
+			},
+		},
+		{
+			Name: "TestClientCredentialsGrant",
+			ProxySettings: func(c *Config) {
+				c.EnableForwarding = true
+				c.EnableUma = true
+				c.ForwardingDomains = []string{}
+				c.ClientID = validUsername
+				c.ClientSecret = validPassword
+				c.ForwardingGrantType = GrantTypeClientCreds
+				c.PatRetryCount = 5
+				c.PatRetryInterval = 2 * time.Second
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URL:                     upstreamProxy.getServiceURL() + "/test",
+					ProxyRequest:            true,
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gambol",
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				forwardingConfig := newFakeKeycloakConfig()
+				forwardingConfig.Upstream = upstreamProxy.getServiceURL()
+
+				testCase.ProxySettings(forwardingConfig)
+				forwardingProxy := newFakeProxy(
+					forwardingConfig,
+					&fakeAuthConfig{},
+				)
+
+				// <-time.After(time.Duration(100) * time.Millisecond)
+				forwardingProxy.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
+}
+
 func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.EnableForwarding = true
+	cfg.PatRetryCount = 5
+	cfg.PatRetryInterval = 2 * time.Second
+	cfg.OpenIDProviderTimeout = 30 * time.Second
 	cfg.ForwardingDomains = []string{}
 	cfg.ForwardingUsername = validUsername
 	cfg.ForwardingPassword = validPassword

@@ -17,16 +17,11 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net/http"
-	"sync"
-	"time"
 
+	"github.com/Nerzal/gocloak/v11"
 	"go.uber.org/zap"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
 // proxyMiddleware is responsible for handles reverse proxy request to the upstream endpoint
@@ -96,244 +91,120 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 // forwardProxyHandler is responsible for signing outbound requests
 // nolint:funlen
 func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
-	ctx := context.Background()
-
-	if r.config.SkipOpenIDProviderTLSVerify {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		sslcli := &http.Client{Transport: tr}
-		ctx = context.WithValue(ctx, oauth2.HTTPClient, sslcli)
-	}
-
-	conf := r.newOAuth2Config(r.config.RedirectionURL)
-
-	var mu sync.Mutex
-
-	// the loop state
-	var state struct {
-		// the access token
-		token jwt.JSONWebToken
-		// the refresh token if any
-		refresh string
-		// the expiry time of the access token
-		expiration time.Time
-		// whether we need to login
-		login bool
-		// whether we should wait for expiration
-		wait bool
-		// RawToken
-		rawToken string
-		// Subject
-		subject string
-	}
-	state.login = true
-
-	// create a routine to refresh the access tokens or login on expiration
-	go func() {
-		for {
-			state.wait = false
-
-			// step: do we have a access token
-			if state.login {
-				// step: login into the service
-
-				var resp *oauth2.Token
-				var err error
-
-				switch r.config.ForwardingGrantType {
-				case GrantTypeClientCreds:
-					r.log.Info(
-						"requesting access token for client (client_credentials grant) ",
-						zap.String("client_id", r.config.ClientID),
-					)
-
-					conf := &clientcredentials.Config{
-						ClientID:     r.config.ClientID,
-						ClientSecret: r.config.ClientSecret,
-						Scopes:       r.config.Scopes,
-						TokenURL:     r.provider.Endpoint().TokenURL,
-					}
-					resp, err = conf.Token(ctx)
-				case GrantTypeUserCreds:
-					r.log.Info(
-						"requesting access token for user (password grant) ",
-						zap.String("username", r.config.ForwardingUsername),
-					)
-
-					resp, err = conf.PasswordCredentialsToken(
-						ctx,
-						r.config.ForwardingUsername,
-						r.config.ForwardingPassword,
-					)
-				default:
-					r.log.Info(
-						"Chosen grant type is not supported",
-						zap.String("forwarding_grant_type", r.config.ForwardingGrantType),
-					)
-				}
-
-				if err != nil {
-					r.log.Error("failed to login to authentication service", zap.Error(err))
-					// step: back-off and reschedule
-					<-time.After(time.Duration(5) * time.Second)
-					continue
-				}
-
-				mu.Lock()
-				state.rawToken = resp.AccessToken
-				mu.Unlock()
-
-				// step: parse the token
-				token, err := jwt.ParseSigned(resp.AccessToken)
-				if err != nil {
-					r.log.Error("failed to parse the access token", zap.Error(err))
-					// step: we should probably hope and reschedule here
-					<-time.After(time.Duration(5) * time.Second)
-					continue
-				}
-
-				stdClaims := &jwt.Claims{}
-
-				err = token.UnsafeClaimsWithoutVerification(stdClaims)
-
-				if err != nil {
-					r.log.Error("unable to parse access token for claims", zap.Error(err))
-					continue
-				}
-
-				// step: update the loop state
-				state.token = *token
-				state.expiration = stdClaims.Expiry.Time()
-				state.subject = stdClaims.Subject
-				state.wait = true
-				state.login = false
-				state.refresh = resp.RefreshToken
-
-				r.log.Debug(
-					"successfully retrieved access token for subject",
-					zap.String("access token", state.rawToken),
-					zap.String("subject", state.subject),
-					zap.String("expires", state.expiration.Format(time.RFC3339)),
-				)
-
-				r.log.Info(
-					"successfully retrieved access token for subject",
-					zap.String("subject", state.subject),
-					zap.String("expires", state.expiration.Format(time.RFC3339)),
-				)
-			} else {
-				r.log.Debug(
-					"access token is about to expiry",
-					zap.String("access token", state.rawToken),
-					zap.String("subject", state.subject),
-				)
-
-				r.log.Info(
-					"access token is about to expiry",
-					zap.String("subject", state.subject),
-				)
-
-				// step: if we a have a refresh token, we need to login again
-				if state.refresh != "" && r.config.ForwardingGrantType != GrantTypeClientCreds {
-					r.log.Debug(
-						"attempting to refresh the access token",
-						zap.String("access token", state.rawToken),
-						zap.String("refresh token", state.refresh),
-						zap.String("subject", state.subject),
-						zap.String("expires", state.expiration.Format(time.RFC3339)),
-					)
-
-					r.log.Info(
-						"attempting to refresh the access token",
-						zap.String("subject", state.subject),
-						zap.String("expires", state.expiration.Format(time.RFC3339)),
-					)
-
-					// step: attempt to refresh the access
-					token, rawToken, newRefreshToken, expiration, _, err := getRefreshedToken(conf, r.config, state.refresh)
-
-					mu.Lock()
-					state.rawToken = rawToken
-					mu.Unlock()
-
-					if err != nil {
-						state.login = true
-						switch err {
-						case ErrRefreshTokenExpired:
-							r.log.Debug(
-								"the refresh token has expired, need to login again",
-								zap.String("refresh token", state.refresh),
-								zap.String("subject", state.subject),
-							)
-							r.log.Warn(
-								"the refresh token has expired, need to login again",
-								zap.String("subject", state.subject),
-							)
-						default:
-							r.log.Error("failed to refresh the access token", zap.Error(err))
-						}
-						continue
-					}
-
-					// step: update the state
-					state.token = token
-					state.expiration = expiration
-					state.wait = true
-					state.login = false
-					if newRefreshToken != "" {
-						state.refresh = newRefreshToken
-					}
-
-					// step: add some debugging
-					r.log.Debug(
-						"successfully refreshed the access token",
-						zap.String("new access token", state.rawToken),
-						zap.String("refresh token", state.refresh),
-						zap.String("subject", state.subject),
-						zap.String("expires", state.expiration.Format(time.RFC3339)),
-					)
-
-					r.log.Info(
-						"successfully refreshed the access token",
-						zap.String("subject", state.subject),
-						zap.String("expires", state.expiration.Format(time.RFC3339)),
-					)
-				} else {
-					r.log.Info(
-						"session does not support refresh token, acquiring new token",
-						zap.String("subject", state.subject),
-					)
-
-					// we don't have a refresh token, we must perform a login again
-					state.wait = false
-					state.login = true
-				}
-			}
-
-			// wait for an expiration to come close
-			if state.wait {
-				// set the expiration of the access token within a random 85% of actual expiration
-				duration := getWithin(state.expiration, 0.85)
-				r.log.Info(
-					"waiting for expiration of access token",
-					zap.String("token_expiration", state.expiration.Format(time.RFC3339)),
-					zap.String("renewal_duration", duration.String()),
-				)
-
-				<-time.After(duration)
-			}
-		}
-	}()
-
 	return func(req *http.Request, resp *http.Response) {
+		var token string
+
+		if r.config.EnableUma {
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				r.config.OpenIDProviderTimeout,
+			)
+
+			defer cancel()
+
+			matchingURI := true
+
+			resourceParam := gocloak.GetResourceParams{
+				URI:         &req.URL.Path,
+				MatchingURI: &matchingURI,
+			}
+
+			r.pat.m.Lock()
+			pat := r.pat.Token.AccessToken
+			r.pat.m.Unlock()
+
+			resources, err := r.idpClient.GetResourcesClient(
+				ctx,
+				pat,
+				r.config.Realm,
+				resourceParam,
+			)
+
+			if err != nil {
+				r.log.Error(
+					"problem getting resources for path",
+					zap.String("path", req.URL.Path),
+					zap.Error(err),
+				)
+				return
+			}
+
+			if len(resources) == 0 {
+				r.log.Info(
+					"no resources for path",
+					zap.String("path", req.URL.Path),
+				)
+				return
+			}
+
+			resourceID := resources[0].ID
+			resourceScopes := make([]string, 0)
+
+			if len(*resources[0].ResourceScopes) == 0 {
+				r.log.Error(
+					"missing scopes for resource in IDP provider",
+					zap.String("resourceID", *resourceID),
+				)
+				return
+			}
+
+			for _, scope := range *resources[0].ResourceScopes {
+				resourceScopes = append(resourceScopes, *scope.Name)
+			}
+
+			permissions := []gocloak.CreatePermissionTicketParams{
+				{
+					ResourceID:     resourceID,
+					ResourceScopes: &resourceScopes,
+				},
+			}
+
+			permTicket, err := r.idpClient.CreatePermissionTicket(
+				ctx,
+				pat,
+				r.config.Realm,
+				permissions,
+			)
+
+			if err != nil {
+				r.log.Error(
+					"problem getting permission ticket for resourceId",
+					zap.String("resourceID", *resourceID),
+					zap.Error(err),
+				)
+				return
+			}
+
+			grantType := GrantTypeUmaTicket
+
+			rptOptions := gocloak.RequestingPartyTokenOptions{
+				GrantType: &grantType,
+				Ticket:    permTicket.Ticket,
+			}
+
+			rpt, err := r.idpClient.GetRequestingPartyToken(ctx, pat, r.config.Realm, rptOptions)
+
+			if err != nil {
+				r.log.Error(
+					"problem getting RPT for resource (hint: do you have permissions assigned to resource?)",
+					zap.String("resourceID", *resourceID),
+					zap.Error(err),
+				)
+				return
+			}
+
+			token = rpt.AccessToken
+		} else {
+			r.pat.m.Lock()
+			token = r.pat.Token.AccessToken
+			r.pat.m.Unlock()
+		}
+
 		hostname := req.Host
 		req.URL.Host = hostname
 		// is the host being signed?
 		if len(r.config.ForwardingDomains) == 0 || containsSubString(hostname, r.config.ForwardingDomains) {
-			mu.Lock()
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", state.rawToken))
-			mu.Unlock()
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 			req.Header.Set("X-Forwarded-Agent", prog)
 		}
 	}

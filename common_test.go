@@ -112,15 +112,6 @@ var defTestTokenClaims = DefaultTestTokenClaims{
 	Item1: []string{"default"},
 	Item2: []string{"default"},
 	Item3: []string{"default"},
-	Authorization: Permissions{
-		Permissions: []Permission{
-			{
-				Scopes:       []string{"test"},
-				ResourceID:   "6ef1b62e-0fd4-47f2-81fc-eead97a01c22",
-				ResourceName: "test-resource",
-			},
-		},
-	},
 }
 
 const (
@@ -192,7 +183,7 @@ func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	}
 
 	c.DiscoveryURL = auth.getLocation()
-	c.Verbose = true
+	// c.Verbose = true
 	c.DisableAllLogging = true
 	err := c.update()
 
@@ -207,7 +198,11 @@ func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	}
 
 	// proxy.log = zap.NewNop()
-	proxy.upstream = &fakeUpstreamService{}
+
+	if c.Upstream == "" {
+		proxy.upstream = &fakeUpstreamService{}
+	}
+
 	if err = proxy.Run(); err != nil {
 		panic("failed to create the proxy service, error: " + err.Error())
 	}
@@ -983,11 +978,12 @@ func (t *fakeToken) addClientRoles(client string, roles []string) {
 }
 
 type fakeAuthServer struct {
-	location      *url.URL
-	proxyLocation string
-	key           jose2.JSONWebKey
-	server        *httptest.Server
-	expiration    time.Duration
+	location                  *url.URL
+	proxyLocation             string
+	key                       jose2.JSONWebKey
+	server                    *httptest.Server
+	expiration                time.Duration
+	resourceSetHandlerFailure bool
 }
 
 const fakePrivateKey = `
@@ -1081,9 +1077,10 @@ type fakeOidcDiscoveryResponse struct {
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 type fakeAuthConfig struct {
-	EnableTLS   bool
-	EnableProxy bool
-	Expiration  time.Duration
+	EnableTLS                 bool
+	EnableProxy               bool
+	Expiration                time.Duration
+	ResourceSetHandlerFailure bool
 }
 
 // newFakeAuthServer simulates a oauth service
@@ -1142,6 +1139,8 @@ func newFakeAuthServer(config *fakeAuthConfig) *fakeAuthServer {
 		panic("unable to create fake oauth service, error: " + err.Error())
 	}
 	service.location = location
+	service.resourceSetHandlerFailure = config.ResourceSetHandlerFailure
+
 	service.expiration = time.Duration(1) * time.Hour
 
 	if config.Expiration.Seconds() > 0 {
@@ -1266,6 +1265,18 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 	refreshToken := newTestToken(r.getLocation())
 	refreshToken.setExpiration(refreshExpires)
 
+	if req.FormValue("grant_type") == GrantTypeUmaTicket {
+		token.claims.Authorization = Permissions{
+			Permissions: []Permission{
+				{
+					Scopes:       []string{"test"},
+					ResourceID:   "6ef1b62e-0fd4-47f2-81fc-eead97a01c22",
+					ResourceName: "some",
+				},
+			},
+		}
+	}
+
 	// sign the token with the private key
 	jwtAccess, err := token.getToken()
 	if err != nil {
@@ -1384,6 +1395,13 @@ func (r *fakeAuthServer) tokenHandler(w http.ResponseWriter, req *http.Request) 
 			RefreshToken: jwtRefresh,
 			ExpiresIn:    float64(expires.Second()),
 		})
+	case GrantTypeUmaTicket:
+		renderJSON(http.StatusOK, w, req, tokenResponse{
+			IDToken:      jwtAccess,
+			AccessToken:  jwtAccess,
+			RefreshToken: jwtRefresh,
+			ExpiresIn:    float64(expires.Second()),
+		})
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 	}
@@ -1395,6 +1413,10 @@ func (r *fakeAuthServer) ResourcesHandler(w http.ResponseWriter, req *http.Reque
 }
 
 func (r *fakeAuthServer) ResourceHandler(w http.ResponseWriter, req *http.Request) {
+	if r.resourceSetHandlerFailure {
+		renderJSON(http.StatusNotFound, w, req, []string{})
+	}
+
 	type Resource struct {
 		Name               string              `json:"name"`
 		Type               string              `json:"type"`

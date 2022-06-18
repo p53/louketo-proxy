@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/square/go-jose.v2/jwt"
 
 	"golang.org/x/crypto/acme/autocert"
 
@@ -141,9 +142,9 @@ func newProxy(config *Config) (*oauthProxy, error) {
 
 	svc.log.Info("successfully retrieved openid configuration from the discovery")
 
-	if config.EnableUma {
+	if config.EnableUma || config.EnableForwarding {
 		patDone := make(chan bool)
-		go svc.getPAT(patDone, *config)
+		go svc.getPAT(patDone)
 		<-patDone
 	}
 
@@ -1042,17 +1043,22 @@ func (r *oauthProxy) Render(w io.Writer, name string, data interface{}) error {
 	return r.templates.ExecuteTemplate(w, name, data)
 }
 
-func (r *oauthProxy) getPAT(done chan bool, config Config) {
+func (r *oauthProxy) getPAT(done chan bool) {
 	retry := 0
 	r.pat = &PAT{}
 	initialized := false
+	config := *r.config
 	clientID := config.ClientID
 	clientSecret := config.ClientSecret
 	realm := config.Realm
 	timeout := config.OpenIDProviderTimeout
 	patRetryCount := config.PatRetryCount
 	patRetryInterval := config.PatRetryInterval
-	patRefreshInterval := config.PatRefreshInterval
+	grantType := GrantTypeClientCreds
+
+	if config.EnableForwarding && config.ForwardingGrantType == GrantTypeUserCreds {
+		grantType = GrantTypeUserCreds
+	}
 
 	for {
 		if retry > 0 {
@@ -1067,12 +1073,33 @@ func (r *oauthProxy) getPAT(done chan bool, config Config) {
 			timeout,
 		)
 
-		token, err := r.idpClient.LoginClient(
-			ctx,
-			clientID,
-			clientSecret,
-			realm,
-		)
+		var token *gocloak.JWT
+		var err error
+
+		switch grantType {
+		case GrantTypeClientCreds:
+			token, err = r.idpClient.LoginClient(
+				ctx,
+				clientID,
+				clientSecret,
+				realm,
+			)
+		case GrantTypeUserCreds:
+			token, err = r.idpClient.Login(
+				ctx,
+				clientID,
+				clientSecret,
+				realm,
+				config.ForwardingUsername,
+				config.ForwardingPassword,
+			)
+		default:
+			r.log.Error(
+				"Chosen grant type is not supported",
+				zap.String("grant_type", grantType),
+			)
+			os.Exit(11)
+		}
 
 		if err != nil {
 			retry++
@@ -1087,7 +1114,7 @@ func (r *oauthProxy) getPAT(done chan bool, config Config) {
 				os.Exit(10)
 			}
 
-			time.Sleep(patRetryInterval)
+			<-time.After(patRetryInterval)
 			continue
 		}
 
@@ -1101,7 +1128,36 @@ func (r *oauthProxy) getPAT(done chan bool, config Config) {
 
 		initialized = true
 
+		parsedToken, err := jwt.ParseSigned(token.AccessToken)
+
+		if err != nil {
+			retry++
+			r.log.Error("failed to parse the access token", zap.Error(err))
+			<-time.After(patRetryInterval)
+			continue
+		}
+
+		stdClaims := &jwt.Claims{}
+
+		err = parsedToken.UnsafeClaimsWithoutVerification(stdClaims)
+
+		if err != nil {
+			retry++
+			r.log.Error("unable to parse access token for claims", zap.Error(err))
+			<-time.After(patRetryInterval)
+			continue
+		}
+
 		retry = 0
-		time.Sleep(patRefreshInterval)
+		expiration := stdClaims.Expiry.Time()
+
+		refreshIn := getWithin(expiration, 0.85)
+
+		r.log.Info(
+			"waiting for expiration of access token",
+			zap.Float64("refresh_in", refreshIn.Seconds()),
+		)
+
+		<-time.After(refreshIn)
 	}
 }

@@ -1848,7 +1848,6 @@ func TestEnableUma(t *testing.T) {
 				c.ClientID = validUsername
 				c.ClientSecret = validPassword
 				c.PatRetryCount = 5
-				c.PatRefreshInterval = 33 * time.Second
 				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
@@ -1875,7 +1874,6 @@ func TestEnableUma(t *testing.T) {
 				c.ClientID = validUsername
 				c.ClientSecret = validPassword
 				c.PatRetryCount = 5
-				c.PatRefreshInterval = 33 * time.Second
 				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
@@ -1904,7 +1902,6 @@ func TestEnableUma(t *testing.T) {
 				c.ClientID = validUsername
 				c.ClientSecret = validPassword
 				c.PatRetryCount = 5
-				c.PatRefreshInterval = 33 * time.Second
 				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
@@ -1941,7 +1938,6 @@ func TestEnableUma(t *testing.T) {
 				c.ClientID = validUsername
 				c.ClientSecret = validPassword
 				c.PatRetryCount = 5
-				c.PatRefreshInterval = 33 * time.Second
 				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
@@ -1978,7 +1974,6 @@ func TestEnableUma(t *testing.T) {
 				c.ClientID = validUsername
 				c.ClientSecret = validPassword
 				c.PatRetryCount = 5
-				c.PatRefreshInterval = 33 * time.Second
 				c.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{

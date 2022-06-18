@@ -78,7 +78,6 @@ func newDefaultConfig() *Config {
 		ForwardingGrantType:           GrantTypeUserCreds,
 		PatRetryCount:                 5,
 		PatRetryInterval:              10 * time.Second,
-		PatRefreshInterval:            33 * time.Second,
 	}
 }
 
