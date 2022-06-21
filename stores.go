@@ -37,8 +37,6 @@ func createStorage(location string) (storage, error) {
 	switch u.Scheme {
 	case "redis":
 		store, err = newRedisStore(u)
-	case "boltdb":
-		store, err = newBoltDBStore(u)
 	default:
 		return nil, fmt.Errorf("unsupport store: %s", u.Scheme)
 	}

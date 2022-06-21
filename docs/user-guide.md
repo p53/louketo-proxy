@@ -584,10 +584,6 @@ kc-state).** or a store **(still requires encryption key)**.
 
 At present the only store options supported are
 [Redis](https://github.com/antirez/redis) and
-[Boltdb](https://github.com/boltdb/bolt).
-
-To enable a local BoltDB store use `--store-url boltdb:///PATH` or using
-a relative path `boltdb://PATH`.
 
 To enable a local Redis store use `redis://[USER:PASSWORD@]HOST:PORT`.
 In both cases, the refresh token is encrypted before being placed into
