@@ -252,7 +252,7 @@ type Config struct {
 	// EnableCompression enables gzip compression for response
 	EnableCompression bool `json:"enable-compression" yaml:"enable-compression" usage:"enable gzip compression for response" env:"ENABLE_COMPRESSION"`
 
-	EnableUma        bool          `json:"enable-uma" yaml:"enable-uma" usage:"enable uma authorization" env:"ENABLE_UMA"`
+	EnableUma        bool          `json:"enable-uma" yaml:"enable-uma" usage:"enable uma authorization, please don't use it in production, we would like to receive feedback" env:"ENABLE_UMA"`
 	PatRetryCount    int           `json:"pat-retry-count" yaml:"pat-retry-count" usage:"number of retries to get PAT" env:"PAT_RETRY_COUNT"`
 	PatRetryInterval time.Duration `json:"pat-retry-interval" yaml:"pat-retry-interval" usage:"interval between retries to get PAT" env:"PAT_RETRY_INTERVAL"`
 

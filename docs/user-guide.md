@@ -674,8 +674,9 @@ UNIX socket, `--upstream-url unix://path/to/the/file.sock`.
 
 ## Authorization
 
-In version 1.5.0 we are introducing authorization `--enable-uma`. Right now we use authorization
-options provided by Keycloak which are specified in UMA (user managed access specification).
+In version 1.5.0 we are introducing authorization `--enable-uma`. 
+As it is new feature please don't use it in production, we would like first to receive feedback/testing by community. 
+Right now we use authorization options provided by Keycloak which are specified in UMA (user managed access specification).
 To use this feature you need to enable authorization for client in keycloak and have
 **for each resource associated at least one scope and of course proper permissions set**.
 
