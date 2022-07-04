@@ -672,6 +672,51 @@ UNIX socket, `--upstream-url unix://path/to/the/file.sock`.
 
   - **/oauth/discovery** provides endpoint with basic urls gatekeeper provides
 
+## Authorization
+
+In version 1.5.0 we are introducing authorization `--enable-uma`. Right now we use authorization
+options provided by Keycloak which are specified in UMA (user managed access specification).
+To use this feature you need to enable authorization for client in keycloak and have
+**for each resource associated at least one scope and of course proper permissions set**.
+
+To access endpoint protected by gatekeeper with authorization enabled you have to get RPT token.
+You can do that by performing following steps:
+
+1. Request token as you would do normally (e.g. in our case using password grant), we will store it in TOKEN variable:
+
+    ```
+    curl -X POST -d "username=test&password=test&client_id=test&client_secret=test&gran_type=password" http://examplekeycloak.com/auth/example/admin/protocol/openid-connect/token
+    ```
+
+2. accessing endpoint protected by gatekeeper which will return 401 with this response and UMA ticket, we will store it in TICKET variable:
+
+    accessing protected endpoint
+
+    ```
+    curl http://example.com/protectedendpoint
+    ```
+
+    will return
+
+    ```
+    WWW-Authenticate: realm="example", as_uri="http://examplekeycloak.com", ticket="eseiose.slidsds....."
+    ```
+
+3. Value in WWW-Authenticate header is UMA ticket. We will use this ticket (in case of keycloak it is also jwt token),
+along with our token to get RPT token, we will store it in RPT variable.
+
+    ```
+    curl -X POST -d "ticket=$TICKET" -H "Authorization: Bearer $TOKEN" http://examplekeycloak.com/auth/example/admin/protocol/openid-connect/token
+    ```
+
+    This will return RPT token which we can use to access endpoint protected by gatekeeper authorization.
+
+4. access protected endpoint
+
+    ```
+    curl -H "Authorization: Bearer $RPT" http://example.com/protectedendpoint
+    ```
+
 ## Metrics
 
 Assuming `--enable-metrics` has been set, a Prometheus endpoint can be
@@ -704,5 +749,4 @@ the audience pointed to the *client\_id*. For more information, see
 [KEYCLOAK-8954](https://issues.redhat.com/browse/KEYCLOAK-8954).
 
 you can now use `--skip-access-token-clientid-check` and
-`--skip-access-token-issuer-check` to overcome this limitations, in future they
-will be true by default
+`--skip-access-token-issuer-check` to overcome this limitations.

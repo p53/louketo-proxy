@@ -52,6 +52,7 @@
 |    --content-security-policy value         | specify the content security policy | | PROXY_CONTENT_SECURITY_POLICY
 |    --localhost-metrics                     | enforces the metrics page can only been requested from 127.0.0.1 | false | PROXY_LOCALHOST_METRICS
 |    --enable-compression                    | enable gzip compression for response | false | PROXY_ENABLE_COMPRESSION
+|    --enable-uma                            | enable UMA authorization             | false | PROXY_ENABLE_UMA
 |    --access-token-duration value           | fallback cookie duration for the access token when using refresh tokens | 720h0m0s | PROXY_ACCESS_TOKEN_DURATION
 |    --cookie-domain value                   | domain the access cookie is available to, defaults host header | | PROXY_COOKIE_DOMAIN
 |    --cookie-access-name value              | name of the cookie use to hold the access token | kc-access | PROXY_COOKIE_ACCESS_NAME
