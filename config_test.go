@@ -1808,6 +1808,7 @@ func TestEnableUmaValid(t *testing.T) {
 				EnableUma:    true,
 				ClientID:     "test",
 				ClientSecret: "test",
+				NoRedirects:  true,
 			},
 			Valid: true,
 		},
