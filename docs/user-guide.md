@@ -177,8 +177,10 @@ role is present the permission is granted.
 
 `--enable-default-deny` - option blocks all requests without valid token on all basic HTTP methods,
 (DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT, TRACE). **WARNING:** There are no additional requirements on
-the token, it isn't checked for some claims or roles, groups etc..., so if you would like to block all requests,
-even with valid token you should use direct resource specification e.g. as example in whitelisting section.
+the token, it isn't checked for some claims or roles, groups etc...
+
+`--enable-default-deny-strict` (recommended) - option blocks all requests (including valid token) unless
+specific path with requirements specified in resources
 
 ## OpenID Provider Communication
 
