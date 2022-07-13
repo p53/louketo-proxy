@@ -1145,11 +1145,11 @@ func TestRefreshToken(t *testing.T) {
 					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
 				},
 				{
-					URI:                      fakeAuthAllURL,
-					Redirects:                false,
-					ExpectedProxy:            true,
-					ExpectedCode:             http.StatusOK,
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
+					URI:           fakeAuthAllURL,
+					Redirects:     false,
+					HasLogin:      false,
+					ExpectedProxy: true,
+					ExpectedCode:  http.StatusOK,
 				},
 			},
 		},
@@ -1164,10 +1164,12 @@ func TestRefreshToken(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:                           fakeAuthAllURL,
-					HasLogin:                      true,
-					Redirects:                     true,
-					OnResponse:                    doubleDelay,
+					URI:       fakeAuthAllURL,
+					HasLogin:  true,
+					Redirects: true,
+					OnResponse: func(int, *resty.Request, *resty.Response) {
+						<-time.After(time.Duration(int64(3200)) * time.Millisecond)
+					},
 					ExpectedProxy:                 true,
 					ExpectedCode:                  http.StatusOK,
 					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
@@ -1175,6 +1177,7 @@ func TestRefreshToken(t *testing.T) {
 				{
 					URI:           fakeAuthAllURL,
 					Redirects:     false,
+					HasLogin:      false,
 					ExpectedProxy: false,
 					ExpectedCode:  http.StatusUnauthorized,
 				},
@@ -1190,7 +1193,7 @@ func TestRefreshToken(t *testing.T) {
 			testCase.Name,
 			func(t *testing.T) {
 				testCase.ProxySettings(c)
-				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 1000 * time.Millisecond})
+				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 1500 * time.Millisecond})
 				p.RunTests(t, testCase.ExecutionSettings)
 			},
 		)
@@ -1200,12 +1203,6 @@ func TestRefreshToken(t *testing.T) {
 func delay(no int, req *resty.Request, resp *resty.Response) {
 	if no == 0 {
 		<-time.After(1000 * time.Millisecond)
-	}
-}
-
-func doubleDelay(no int, req *resty.Request, resp *resty.Response) {
-	if no == 0 {
-		<-time.After(2000 * time.Millisecond)
 	}
 }
 
