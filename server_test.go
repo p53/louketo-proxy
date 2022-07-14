@@ -1191,9 +1191,9 @@ func TestTLS(t *testing.T) {
 			Name: "TestProxyTLS",
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 				c.Listen = testProxyAddr
 			},
 			ExecutionSettings: []fakeRequest{
@@ -1208,9 +1208,9 @@ func TestTLS(t *testing.T) {
 			Name: "TestProxyTLSMatch",
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 				c.Listen = testProxyAddr
 				c.TLSMinVersion = "tlsv1.0"
 			},
@@ -1227,9 +1227,9 @@ func TestTLS(t *testing.T) {
 			Name: "TestProxyTLSDiffer",
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 				c.Listen = testProxyAddr
 				c.TLSMinVersion = "tlsv1.2"
 			},
@@ -1246,9 +1246,9 @@ func TestTLS(t *testing.T) {
 			Name: "TestProxyTLSMinNotFullfilled",
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 				c.Listen = testProxyAddr
 				c.TLSMinVersion = "tlsv1.3"
 			},

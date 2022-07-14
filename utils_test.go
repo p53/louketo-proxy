@@ -464,7 +464,7 @@ func TestFileExists(t *testing.T) {
 	if fileExists("no_such_file_exsit_32323232") {
 		t.Error("we should have received false")
 	}
-	tmpfile, err := ioutil.TempFile("/tmp", fmt.Sprintf("test_file_%d", os.Getpid()))
+	tmpfile, err := ioutil.TempFile(os.TempDir()+"", fmt.Sprintf("test_file_%d", os.Getpid()))
 	if err != nil {
 		t.Fatalf("failed to create the temporary file, %s", err)
 	}

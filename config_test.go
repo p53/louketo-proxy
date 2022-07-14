@@ -487,8 +487,8 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "ValidPrivateAndCertificate",
 			Config: &Config{
-				TLSCertificate: fmt.Sprintf("/tmp/gateconfig_crt_%d", rand.Intn(10000)),
-				TLSPrivateKey:  fmt.Sprintf("/tmp/gateconfig_priv_%d", rand.Intn(10000)),
+				TLSCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_crt_%d", rand.Intn(10000)),
+				TLSPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                      true,
 			TLSCertificateExists:       true,
@@ -499,8 +499,8 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingPrivateFile",
 			Config: &Config{
-				TLSCertificate: fmt.Sprintf("/tmp/gateconfig_crt_%d", rand.Intn(10000)),
-				TLSPrivateKey:  fmt.Sprintf("/tmp/gateconfig_priv_%d", rand.Intn(10000)),
+				TLSCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_crt_%d", rand.Intn(10000)),
+				TLSPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                      false,
 			TLSCertificateExists:       true,
@@ -511,7 +511,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingPrivate",
 			Config: &Config{
-				TLSCertificate: fmt.Sprintf("/tmp/gateconfig_crt_%d", rand.Intn(10000)),
+				TLSCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_crt_%d", rand.Intn(10000)),
 				TLSPrivateKey:  "",
 			},
 			Valid:                      false,
@@ -523,8 +523,8 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingCertificateFile",
 			Config: &Config{
-				TLSCertificate: fmt.Sprintf("/tmp/gateconfig_crt_%d", rand.Intn(10000)),
-				TLSPrivateKey:  fmt.Sprintf("/tmp/gateconfig_priv_%d", rand.Intn(10000)),
+				TLSCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_crt_%d", rand.Intn(10000)),
+				TLSPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                      false,
 			TLSCertificateExists:       false,
@@ -536,7 +536,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 			Name: "InValidMissingCertificate",
 			Config: &Config{
 				TLSCertificate: "",
-				TLSPrivateKey:  fmt.Sprintf("/tmp/gateconfig_priv_%d", rand.Intn(10000)),
+				TLSPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                      false,
 			TLSCertificateExists:       false,
@@ -547,8 +547,8 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingPrivateAndCertificateFile",
 			Config: &Config{
-				TLSCertificate: fmt.Sprintf("/tmp/gateconfig_crt_%d", rand.Intn(10000)),
-				TLSPrivateKey:  fmt.Sprintf("/tmp/gateconfig_priv_%d", rand.Intn(10000)),
+				TLSCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_crt_%d", rand.Intn(10000)),
+				TLSPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                      false,
 			TLSCertificateExists:       false,
@@ -559,7 +559,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "ValidCaCertificate",
 			Config: &Config{
-				TLSCaCertificate: fmt.Sprintf("/tmp/gateconfig_ca_%d", rand.Intn(10000)),
+				TLSCaCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_ca_%d", rand.Intn(10000)),
 			},
 			Valid:                      true,
 			TLSCertificateExists:       false,
@@ -570,7 +570,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingCaCertificateFile",
 			Config: &Config{
-				TLSCaCertificate: fmt.Sprintf("/tmp/gateconfig_ca_%d", rand.Intn(10000)),
+				TLSCaCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_ca_%d", rand.Intn(10000)),
 			},
 			Valid:                      false,
 			TLSCertificateExists:       false,
@@ -581,7 +581,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "ValidClientCertificate",
 			Config: &Config{
-				TLSClientCertificate: fmt.Sprintf("/tmp/gateconfig_client_%d", rand.Intn(10000)),
+				TLSClientCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_client_%d", rand.Intn(10000)),
 			},
 			Valid:                      true,
 			TLSCertificateExists:       false,
@@ -592,7 +592,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 		{
 			Name: "InvalidValidMissingClientCertificate",
 			Config: &Config{
-				TLSClientCertificate: fmt.Sprintf("/tmp/gateconfig_client_%d", rand.Intn(10000)),
+				TLSClientCertificate: fmt.Sprintf(os.TempDir()+"/gateconfig_client_%d", rand.Intn(10000)),
 			},
 			Valid:                      false,
 			TLSCertificateExists:       false,
@@ -692,8 +692,8 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "ValidPrivateAndCertificate",
 			Config: &Config{
-				TLSAdminCertificate: fmt.Sprintf("/tmp/gateadminconfig_crt_%d", rand.Intn(10000)),
-				TLSAdminPrivateKey:  fmt.Sprintf("/tmp/gateadminconfig_priv_%d", rand.Intn(10000)),
+				TLSAdminCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_crt_%d", rand.Intn(10000)),
+				TLSAdminPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateadminconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                           true,
 			TLSAdminCertificateExists:       true,
@@ -704,8 +704,8 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingPrivateFile",
 			Config: &Config{
-				TLSAdminCertificate: fmt.Sprintf("/tmp/gateadminconfig_crt_%d", rand.Intn(10000)),
-				TLSAdminPrivateKey:  fmt.Sprintf("/tmp/gateadminconfig_priv_%d", rand.Intn(10000)),
+				TLSAdminCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_crt_%d", rand.Intn(10000)),
+				TLSAdminPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateadminconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                           false,
 			TLSAdminCertificateExists:       true,
@@ -716,7 +716,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingPrivate",
 			Config: &Config{
-				TLSAdminCertificate: fmt.Sprintf("/tmp/gateadminconfig_crt_%d", rand.Intn(10000)),
+				TLSAdminCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_crt_%d", rand.Intn(10000)),
 				TLSAdminPrivateKey:  "",
 			},
 			Valid:                           false,
@@ -728,8 +728,8 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingCertificateFile",
 			Config: &Config{
-				TLSAdminCertificate: fmt.Sprintf("/tmp/gateadminconfig_crt_%d", rand.Intn(10000)),
-				TLSAdminPrivateKey:  fmt.Sprintf("/tmp/gateadminconfig_priv_%d", rand.Intn(10000)),
+				TLSAdminCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_crt_%d", rand.Intn(10000)),
+				TLSAdminPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateadminconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                           false,
 			TLSAdminCertificateExists:       false,
@@ -741,7 +741,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 			Name: "InValidMissingCertificate",
 			Config: &Config{
 				TLSAdminCertificate: "",
-				TLSAdminPrivateKey:  fmt.Sprintf("/tmp/gateadminconfig_priv_%d", rand.Intn(10000)),
+				TLSAdminPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateadminconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                           false,
 			TLSAdminCertificateExists:       false,
@@ -752,8 +752,8 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingPrivateAndCertificateFile",
 			Config: &Config{
-				TLSAdminCertificate: fmt.Sprintf("/tmp/gateadminconfig_crt_%d", rand.Intn(10000)),
-				TLSAdminPrivateKey:  fmt.Sprintf("/tmp/gateadminconfig_priv_%d", rand.Intn(10000)),
+				TLSAdminCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_crt_%d", rand.Intn(10000)),
+				TLSAdminPrivateKey:  fmt.Sprintf(os.TempDir()+"/gateadminconfig_priv_%d", rand.Intn(10000)),
 			},
 			Valid:                           false,
 			TLSAdminCertificateExists:       false,
@@ -764,7 +764,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "ValidCaCertificate",
 			Config: &Config{
-				TLSAdminCaCertificate: fmt.Sprintf("/tmp/gateadminconfig_ca_%d", rand.Intn(10000)),
+				TLSAdminCaCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_ca_%d", rand.Intn(10000)),
 			},
 			Valid:                           true,
 			TLSAdminCertificateExists:       false,
@@ -775,7 +775,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "InValidMissingCaCertificateFile",
 			Config: &Config{
-				TLSAdminCaCertificate: fmt.Sprintf("/tmp/gateadminconfig_ca_%d", rand.Intn(10000)),
+				TLSAdminCaCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_ca_%d", rand.Intn(10000)),
 			},
 			Valid:                           false,
 			TLSAdminCertificateExists:       false,
@@ -786,7 +786,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "ValidClientCertificate",
 			Config: &Config{
-				TLSAdminClientCertificate: fmt.Sprintf("/tmp/gateadminconfig_client_%d", rand.Intn(10000)),
+				TLSAdminClientCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_client_%d", rand.Intn(10000)),
 			},
 			Valid:                           true,
 			TLSAdminCertificateExists:       false,
@@ -797,7 +797,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 		{
 			Name: "InvalidValidMissingClientCertificate",
 			Config: &Config{
-				TLSAdminClientCertificate: fmt.Sprintf("/tmp/gateadminconfig_client_%d", rand.Intn(10000)),
+				TLSAdminClientCertificate: fmt.Sprintf(os.TempDir()+"/gateadminconfig_client_%d", rand.Intn(10000)),
 			},
 			Valid:                           false,
 			TLSAdminCertificateExists:       false,

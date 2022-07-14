@@ -178,9 +178,9 @@ func TestAdminListener(t *testing.T) {
 				c.EnableMetrics = true
 				c.ListenAdmin = "127.0.0.1:12301"
 				c.ListenAdminScheme = secureScheme
-				c.TLSAdminCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSAdminPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSAdminCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.TLSAdminCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSAdminPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSAdminCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -204,9 +204,9 @@ func TestAdminListener(t *testing.T) {
 				c.EnableMetrics = true
 				c.ListenAdmin = "127.0.0.1:12302"
 				c.ListenAdminScheme = secureScheme
-				c.TLSCertificate = fmt.Sprintf("/tmp/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf("/tmp/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf("/tmp/gateadmin_ca_%d", rand.Intn(10000))
+				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 			},
 			ExecutionSettings: []fakeRequest{
 				{
