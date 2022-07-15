@@ -16,15 +16,11 @@ limitations under the License.
 package main
 
 import (
-	"compress/gzip"
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	uuid "github.com/gofrs/uuid"
@@ -43,69 +39,6 @@ const (
 	// normalizeFlags is the options to purell
 	normalizeFlags purell.NormalizationFlags = purell.FlagRemoveDotSegments | purell.FlagRemoveDuplicateSlashes
 )
-
-var gzPool = sync.Pool{
-	New: func() interface{} {
-		w := gzip.NewWriter(ioutil.Discard)
-		return w
-	},
-}
-
-type gzipResponseWriter struct {
-	io.Writer
-	http.ResponseWriter
-	bytes int
-	code  int
-	tee   io.Writer
-}
-
-func (w *gzipResponseWriter) WriteHeader(status int) {
-	w.Header().Del("Content-Length")
-	w.ResponseWriter.WriteHeader(status)
-	w.code = status
-}
-
-func (w *gzipResponseWriter) Write(b []byte) (int, error) {
-	n, err := w.Writer.Write(b)
-	w.bytes += n
-	return n, err
-}
-
-func (w *gzipResponseWriter) BytesWritten() int {
-	return w.bytes
-}
-
-func (w *gzipResponseWriter) Status() int {
-	return w.code
-}
-
-func (w *gzipResponseWriter) Tee(writ io.Writer) {
-	w.tee = writ
-}
-
-func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
-	return w.ResponseWriter
-}
-
-// gzipMiddleware is responsible for compressing a response
-func gzipMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
-		if !strings.Contains(req.Header.Get("Accept-Encoding"), "gzip") {
-			next.ServeHTTP(wrt, req)
-			return
-		}
-
-		wrt.Header().Set("Content-Encoding", "gzip")
-
-		gz := gzPool.Get().(*gzip.Writer)
-		defer gzPool.Put(gz)
-
-		gz.Reset(wrt)
-		defer gz.Close()
-
-		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: wrt, Writer: gz}, req)
-	})
-}
 
 // entrypointMiddleware is custom filtering for incoming requests
 func entrypointMiddleware(next http.Handler) http.Handler {

@@ -226,12 +226,12 @@ func (r *oauthProxy) useDefaultStack(engine chi.Router) {
 		engine.Use(r.requestIDMiddleware(r.config.RequestIDHeader))
 	}
 
+	if r.config.EnableCompression {
+		engine.Use(middleware.Compress(5))
+	}
+
 	// @step: enable the entrypoint middleware
 	engine.Use(entrypointMiddleware)
-
-	if r.config.EnableCompression {
-		engine.Use(gzipMiddleware)
-	}
 
 	if r.config.EnableLogging {
 		engine.Use(r.loggingMiddleware)

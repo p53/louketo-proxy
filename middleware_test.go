@@ -1719,9 +1719,7 @@ func TestGzipCompression(t *testing.T) {
 					Headers: map[string]string{
 						"Accept-Encoding": "gzip, deflate, br",
 					},
-					ExpectedHeaders: map[string]string{
-						"Content-Encoding": "gzip",
-					},
+					ExpectedNoProxyHeaders: []string{"Content-Encoding"},
 				},
 			},
 		},
