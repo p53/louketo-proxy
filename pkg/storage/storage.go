@@ -26,17 +26,17 @@ func CreateStorage(location string) (Storage, error) {
 	var store Storage
 	var err error
 
-	u, err := url.Parse(location)
+	uri, err := url.Parse(location)
 
 	if err != nil {
 		return nil, err
 	}
 
-	switch u.Scheme {
+	switch uri.Scheme {
 	case "redis":
-		store, err = newRedisStore(u)
+		store, err = newRedisStore(uri)
 	default:
-		return nil, fmt.Errorf("unsupport store: %s", u.Scheme)
+		return nil, fmt.Errorf("unsupport store: %s", uri.Scheme)
 	}
 
 	return store, err

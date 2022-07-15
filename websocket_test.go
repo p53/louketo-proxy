@@ -51,15 +51,15 @@ func TestWebSocket(t *testing.T) {
 
 	proxyWsURL.Scheme = "ws"
 
-	ws, err := websocket.Dial(proxyWsURL.String()+"/auth_all/white_listed/ws", "", "http://localhost/")
+	wsock, err := websocket.Dial(proxyWsURL.String()+"/auth_all/white_listed/ws", "", "http://localhost/")
 	require.NoError(t, err)
 
 	request := []byte("hello, world!")
-	err = websocket.Message.Send(ws, request)
+	err = websocket.Message.Send(wsock, request)
 	require.NoError(t, err)
 
 	var responseData = make([]byte, 1024)
-	err = websocket.Message.Receive(ws, &responseData)
+	err = websocket.Message.Receive(wsock, &responseData)
 	require.NoError(t, err)
 
 	responseJSON := fakeUpstreamResponse{}

@@ -590,7 +590,7 @@ func (r *Config) updateDiscoveryURI() error {
 		"/.well-known/openid-configuration",
 	)
 
-	u, err := url.ParseRequestURI(r.DiscoveryURL)
+	uri, err := url.ParseRequestURI(r.DiscoveryURL)
 
 	if err != nil {
 		return fmt.Errorf(
@@ -599,7 +599,7 @@ func (r *Config) updateDiscoveryURI() error {
 		)
 	}
 
-	r.DiscoveryURI = u
+	r.DiscoveryURI = uri
 
 	return nil
 }

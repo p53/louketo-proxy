@@ -26,7 +26,7 @@ import (
 )
 
 func TestDecodeResourceBad(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Option string
 	}{
 		{Option: "unknown=bad"},
@@ -36,15 +36,15 @@ func TestDecodeResourceBad(t *testing.T) {
 		{Option: "uri=/|white-listed=ERROR"},
 		{Option: "uri=/|require-any-role=BAD"},
 	}
-	for i, c := range cs {
-		if _, err := newResource().parse(c.Option); err == nil {
+	for i, testCase := range testCases {
+		if _, err := newResource().parse(testCase.Option); err == nil {
 			t.Errorf("case %d should have errored", i)
 		}
 	}
 }
 
 func TestResourceParseOk(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Option   string
 		Resource *Resource
 	}{
@@ -89,10 +89,10 @@ func TestResourceParseOk(t *testing.T) {
 			Resource: &Resource{URL: "/*", Methods: allHTTPMethods, RequireAnyRole: true},
 		},
 	}
-	for i, x := range cs {
-		r, err := newResource().parse(x.Option)
+	for i, testCase := range testCases {
+		r, err := newResource().parse(testCase.Option)
 		assert.NoError(t, err, "case %d should not have errored with: %s", i, err)
-		assert.Equal(t, r, x.Resource, "case %d, expected: %#v, got: %#v", i, x.Resource, r)
+		assert.Equal(t, r, testCase.Resource, "case %d, expected: %#v, got: %#v", i, testCase.Resource, r)
 	}
 }
 
@@ -138,16 +138,16 @@ func TestIsValid(t *testing.T) {
 		},
 	}
 
-	for i, c := range testCases {
-		for _, customHTTPMethod := range c.CustomHTTPMethods {
+	for idx, testCase := range testCases {
+		for _, customHTTPMethod := range testCase.CustomHTTPMethods {
 			chi.RegisterMethod(customHTTPMethod)
 			allHTTPMethods = append(allHTTPMethods, customHTTPMethod)
 		}
 
-		err := c.Resource.valid()
+		err := testCase.Resource.valid()
 
-		if err != nil && c.Ok {
-			t.Errorf("case %d should not have failed, error: %s", i, err)
+		if err != nil && testCase.Ok {
+			t.Errorf("case %d should not have failed, error: %s", idx, err)
 		}
 	}
 }

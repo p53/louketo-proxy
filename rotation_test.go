@@ -32,15 +32,15 @@ const (
 )
 
 func newTestCertificateRotator(t *testing.T) *certificationRotation {
-	c, err := newCertificateRotator(testCertificateFile, testPrivateKeyFile, zap.NewNop())
-	assert.NotNil(t, c)
-	assert.Equal(t, testCertificateFile, c.certificateFile)
-	assert.Equal(t, testPrivateKeyFile, c.privateKeyFile)
+	rotation, err := newCertificateRotator(testCertificateFile, testPrivateKeyFile, zap.NewNop())
+	assert.NotNil(t, rotation)
+	assert.Equal(t, testCertificateFile, rotation.certificateFile)
+	assert.Equal(t, testPrivateKeyFile, rotation.privateKeyFile)
 	if !assert.NoError(t, err) {
 		t.Fatalf("unable to create the certificate rotator, error: %s", err)
 	}
 
-	return c
+	return rotation
 }
 
 func TestNewCeritifacteRotator(t *testing.T) {

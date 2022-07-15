@@ -611,22 +611,22 @@ func TestIsTLSFilesValid(t *testing.T) {
 				clientCertFile := ""
 				privFile := ""
 				caFile := ""
-				c := testCase.Config
+				cfg := testCase.Config
 
-				if c.TLSCertificate != "" {
-					certFile = c.TLSCertificate
+				if cfg.TLSCertificate != "" {
+					certFile = cfg.TLSCertificate
 				}
 
-				if c.TLSClientCertificate != "" {
-					clientCertFile = c.TLSClientCertificate
+				if cfg.TLSClientCertificate != "" {
+					clientCertFile = cfg.TLSClientCertificate
 				}
 
-				if c.TLSPrivateKey != "" {
-					privFile = c.TLSPrivateKey
+				if cfg.TLSPrivateKey != "" {
+					privFile = cfg.TLSPrivateKey
 				}
 
-				if c.TLSCaCertificate != "" {
-					caFile = c.TLSCaCertificate
+				if cfg.TLSCaCertificate != "" {
+					caFile = cfg.TLSCaCertificate
 				}
 
 				if certFile != "" && testCase.TLSCertificateExists {
@@ -816,22 +816,22 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 				clientCertFile := ""
 				privFile := ""
 				caFile := ""
-				c := testCase.Config
+				cfg := testCase.Config
 
-				if c.TLSAdminCertificate != "" {
-					certFile = c.TLSAdminCertificate
+				if cfg.TLSAdminCertificate != "" {
+					certFile = cfg.TLSAdminCertificate
 				}
 
-				if c.TLSAdminClientCertificate != "" {
-					clientCertFile = c.TLSAdminClientCertificate
+				if cfg.TLSAdminClientCertificate != "" {
+					clientCertFile = cfg.TLSAdminClientCertificate
 				}
 
-				if c.TLSAdminPrivateKey != "" {
-					privFile = c.TLSAdminPrivateKey
+				if cfg.TLSAdminPrivateKey != "" {
+					privFile = cfg.TLSAdminPrivateKey
 				}
 
-				if c.TLSAdminCaCertificate != "" {
-					caFile = c.TLSAdminCaCertificate
+				if cfg.TLSAdminCaCertificate != "" {
+					caFile = cfg.TLSAdminCaCertificate
 				}
 
 				if certFile != "" && testCase.TLSAdminCertificateExists {

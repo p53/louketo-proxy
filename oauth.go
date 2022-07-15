@@ -61,7 +61,7 @@ func (r *oauthProxy) newOAuth2Config(redirectionURL string) *oauth2.Config {
 // NOTE: we may be able to extract the specific (non-standard) claim refresh_expires_in and refresh_expires
 // from response.RawBody.
 // When not available, keycloak provides us with the same (for now) expiry value for ID token.
-func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, t string) (jwt.JSONWebToken, string, string, time.Time, time.Duration, error) {
+func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, oldRefreshToken string) (jwt.JSONWebToken, string, string, time.Time, time.Duration, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		proxyConfig.OpenIDProviderTimeout,
@@ -80,7 +80,7 @@ func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, t string) (jwt.
 
 	start := time.Now()
 
-	tkn, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: t}).Token()
+	tkn, err := conf.TokenSource(ctx, &oauth2.Token{RefreshToken: oldRefreshToken}).Token()
 
 	if err != nil {
 		if strings.Contains(err.Error(), "invalid_grant") {

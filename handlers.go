@@ -48,7 +48,7 @@ type DiscoveryResponse struct {
 }
 
 // getRedirectionURL returns the redirectionURL for the oauth flow
-func (r *oauthProxy) getRedirectionURL(w http.ResponseWriter, req *http.Request) string {
+func (r *oauthProxy) getRedirectionURL(wrt http.ResponseWriter, req *http.Request) string {
 	var redirect string
 
 	switch r.config.RedirectionURL {
@@ -72,7 +72,7 @@ func (r *oauthProxy) getRedirectionURL(w http.ResponseWriter, req *http.Request)
 
 	if state != nil && req.URL.Query().Get("state") != state.Value {
 		r.log.Error("state parameter mismatch")
-		w.WriteHeader(http.StatusForbidden)
+		wrt.WriteHeader(http.StatusForbidden)
 		return ""
 	}
 
@@ -80,13 +80,13 @@ func (r *oauthProxy) getRedirectionURL(w http.ResponseWriter, req *http.Request)
 }
 
 // oauthAuthorizationHandler is responsible for performing the redirection to oauth provider
-func (r *oauthProxy) oauthAuthorizationHandler(w http.ResponseWriter, req *http.Request) {
+func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *http.Request) {
 	if r.config.SkipTokenVerification {
-		w.WriteHeader(http.StatusNotAcceptable)
+		wrt.WriteHeader(http.StatusNotAcceptable)
 		return
 	}
 
-	conf := r.newOAuth2Config(r.getRedirectionURL(w, req))
+	conf := r.newOAuth2Config(r.getRedirectionURL(wrt, req))
 	// step: set the access type of the session
 	accessType := oauth2.AccessTypeOnline
 
@@ -108,16 +108,16 @@ func (r *oauthProxy) oauthAuthorizationHandler(w http.ResponseWriter, req *http.
 		model := make(map[string]string)
 		model["redirect"] = authURL
 
-		w.WriteHeader(http.StatusOK)
+		wrt.WriteHeader(http.StatusOK)
 		_ = r.Render(
-			w,
+			wrt,
 			path.Base(r.config.SignInPage),
 			mergeMaps(model, r.config.Tags),
 		)
 		return
 	}
 
-	r.redirectToURL(authURL, w, req, http.StatusSeeOther)
+	r.redirectToURL(authURL, wrt, req, http.StatusSeeOther)
 }
 
 // oauthCallbackHandler is responsible for handling the response from oauth service
@@ -448,17 +448,17 @@ func (r *oauthProxy) loginHandler(w http.ResponseWriter, req *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		idToken, ok := token.Extra("id_token").(string)
+		idToken, assertOk := token.Extra("id_token").(string)
 
-		if !ok {
+		if !assertOk {
 			return "",
 				http.StatusInternalServerError,
 				fmt.Errorf("token response does not contain an id_token")
 		}
 
-		expiresIn, ok := token.Extra("expires_in").(float64)
+		expiresIn, assertOk := token.Extra("expires_in").(float64)
 
-		if !ok {
+		if !assertOk {
 			return "",
 				http.StatusInternalServerError,
 				fmt.Errorf("token response does not contain expires_in")
@@ -774,35 +774,35 @@ func (r *oauthProxy) logoutHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // expirationHandler checks if the token has expired
-func (r *oauthProxy) expirationHandler(w http.ResponseWriter, req *http.Request) {
+func (r *oauthProxy) expirationHandler(wrt http.ResponseWriter, req *http.Request) {
 	user, err := r.getIdentity(req)
 
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		wrt.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	if user.isExpired() {
-		w.WriteHeader(http.StatusUnauthorized)
+		wrt.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	wrt.WriteHeader(http.StatusOK)
 }
 
 // tokenHandler display access token to screen
-func (r *oauthProxy) tokenHandler(w http.ResponseWriter, req *http.Request) {
+func (r *oauthProxy) tokenHandler(wrt http.ResponseWriter, req *http.Request) {
 	user, err := r.getIdentity(req)
 
 	if err != nil {
-		r.accessError(w, req)
+		r.accessError(wrt, req)
 		return
 	}
 
 	token, err := jwt.ParseSigned(user.rawToken)
 
 	if err != nil {
-		r.accessError(w, req)
+		r.accessError(wrt, req)
 		return
 	}
 
@@ -810,20 +810,20 @@ func (r *oauthProxy) tokenHandler(w http.ResponseWriter, req *http.Request) {
 	err = token.UnsafeClaimsWithoutVerification(&jsonMap)
 
 	if err != nil {
-		r.accessError(w, req)
+		r.accessError(wrt, req)
 		return
 	}
 
 	result, err := json.Marshal(jsonMap)
 
 	if err != nil {
-		r.accessError(w, req)
+		r.accessError(wrt, req)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	wrt.Header().Set("Content-Type", "application/json")
 
-	_, _ = w.Write(result)
+	_, _ = wrt.Write(result)
 }
 
 // healthHandler is a health check handler for the service
@@ -871,14 +871,14 @@ func (r *oauthProxy) debugHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 // proxyMetricsHandler forwards the request into the prometheus handler
-func (r *oauthProxy) proxyMetricsHandler(w http.ResponseWriter, req *http.Request) {
+func (r *oauthProxy) proxyMetricsHandler(wrt http.ResponseWriter, req *http.Request) {
 	if r.config.LocalhostMetrics {
 		if !net.ParseIP(realIP(req)).IsLoopback() {
-			r.accessForbidden(w, req)
+			r.accessForbidden(wrt, req)
 			return
 		}
 	}
-	r.metricsHandler.ServeHTTP(w, req)
+	r.metricsHandler.ServeHTTP(wrt, req)
 }
 
 // retrieveRefreshToken retrieves the refresh token from store or cookie
@@ -905,7 +905,7 @@ func methodNotAllowHandlder(w http.ResponseWriter, req *http.Request) {
 }
 
 // discoveryHandler provides endpoint info
-func (r *oauthProxy) discoveryHandler(w http.ResponseWriter, req *http.Request) {
+func (r *oauthProxy) discoveryHandler(wrt http.ResponseWriter, req *http.Request) {
 	resp := &DiscoveryResponse{
 		ExpiredURL: r.config.WithOAuthURI(strings.TrimPrefix(expiredURL, "/")),
 		LogoutURL:  r.config.WithOAuthURI(strings.TrimPrefix(logoutURL, "/")),
@@ -921,13 +921,13 @@ func (r *oauthProxy) discoveryHandler(w http.ResponseWriter, req *http.Request) 
 			zap.String("error", err.Error()),
 		)
 
-		w.WriteHeader(http.StatusInternalServerError)
+		wrt.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(respBody)
+	wrt.Header().Set("Content-Type", "application/json")
+	wrt.WriteHeader(http.StatusOK)
+	_, err = wrt.Write(respBody)
 
 	if err != nil {
 		r.log.Error(

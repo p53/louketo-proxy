@@ -109,11 +109,11 @@ func TestCookieDomain(t *testing.T) {
 }
 
 func TestDropCookie(t *testing.T) {
-	p, _, _ := newTestProxyService(nil)
+	proxy, _, _ := newTestProxyService(nil)
 
 	req := newFakeHTTPRequest("GET", "/admin")
 	resp := httptest.NewRecorder()
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/",
@@ -121,8 +121,8 @@ func TestDropCookie(t *testing.T) {
 
 	req = newFakeHTTPRequest("GET", "/admin")
 	resp = httptest.NewRecorder()
-	p.config.SecureCookie = false
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.config.SecureCookie = false
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/",
@@ -130,15 +130,15 @@ func TestDropCookie(t *testing.T) {
 
 	req = newFakeHTTPRequest("GET", "/admin")
 	resp = httptest.NewRecorder()
-	p.config.SecureCookie = true
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.config.SecureCookie = true
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 	assert.NotEqual(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/; HttpOnly; Secure",
 		"we have not set the cookie, headers: %v", resp.Header())
 
-	p.config.CookieDomain = "test.com"
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
-	p.config.SecureCookie = false
+	proxy.config.CookieDomain = "test.com"
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.config.SecureCookie = false
 	assert.NotEqual(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/; Domain=test.com;",
 		"we have not set the cookie, headers: %v", resp.Header())
@@ -170,11 +170,11 @@ func TestSessionOnlyCookie(t *testing.T) {
 }
 
 func TestSameSiteCookie(t *testing.T) {
-	p, _, _ := newTestProxyService(nil)
+	proxy, _, _ := newTestProxyService(nil)
 
 	req := newFakeHTTPRequest("GET", "/admin")
 	resp := httptest.NewRecorder()
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/",
@@ -182,8 +182,8 @@ func TestSameSiteCookie(t *testing.T) {
 
 	req = newFakeHTTPRequest("GET", "/admin")
 	resp = httptest.NewRecorder()
-	p.config.SameSiteCookie = SameSiteStrict
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.config.SameSiteCookie = SameSiteStrict
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/; SameSite=Strict",
@@ -191,8 +191,8 @@ func TestSameSiteCookie(t *testing.T) {
 
 	req = newFakeHTTPRequest("GET", "/admin")
 	resp = httptest.NewRecorder()
-	p.config.SameSiteCookie = SameSiteLax
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.config.SameSiteCookie = SameSiteLax
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/; SameSite=Lax",
@@ -200,8 +200,8 @@ func TestSameSiteCookie(t *testing.T) {
 
 	req = newFakeHTTPRequest("GET", "/admin")
 	resp = httptest.NewRecorder()
-	p.config.SameSiteCookie = SameSiteNone
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.config.SameSiteCookie = SameSiteNone
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/",
@@ -209,11 +209,11 @@ func TestSameSiteCookie(t *testing.T) {
 }
 
 func TestHTTPOnlyCookie(t *testing.T) {
-	p, _, _ := newTestProxyService(nil)
+	proxy, _, _ := newTestProxyService(nil)
 
 	req := newFakeHTTPRequest("GET", "/admin")
 	resp := httptest.NewRecorder()
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/",
@@ -221,8 +221,8 @@ func TestHTTPOnlyCookie(t *testing.T) {
 
 	req = newFakeHTTPRequest("GET", "/admin")
 	resp = httptest.NewRecorder()
-	p.config.HTTPOnlyCookie = true
-	p.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
+	proxy.config.HTTPOnlyCookie = true
+	proxy.dropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
 		"test-cookie=test-value; Path=/; HttpOnly",
@@ -230,11 +230,11 @@ func TestHTTPOnlyCookie(t *testing.T) {
 }
 
 func TestClearAccessTokenCookie(t *testing.T) {
-	p, _, _ := newTestProxyService(nil)
+	proxy, _, _ := newTestProxyService(nil)
 
 	req := newFakeHTTPRequest("GET", "/admin")
 	resp := httptest.NewRecorder()
-	p.clearAccessTokenCookie(req, resp)
+	proxy.clearAccessTokenCookie(req, resp)
 	assert.Contains(t, resp.Header().Get("Set-Cookie"),
 		accessCookie+"=; Path=/; Expires=",
 		"we have not cleared the, headers: %v", resp.Header())
@@ -261,27 +261,27 @@ func TestClearAllCookies(t *testing.T) {
 }
 
 func TestGetMaxCookieChunkLength(t *testing.T) {
-	p, _, _ := newTestProxyService(nil)
+	proxy, _, _ := newTestProxyService(nil)
 	req := newFakeHTTPRequest("GET", "/admin")
 
-	p.config.HTTPOnlyCookie = true
-	p.config.EnableSessionCookies = true
-	p.config.SecureCookie = true
-	p.config.SameSiteCookie = "Strict"
-	p.config.CookieDomain = "1234567890"
-	assert.Equal(t, p.getMaxCookieChunkLength(req, "1234567890"), 4017,
+	proxy.config.HTTPOnlyCookie = true
+	proxy.config.EnableSessionCookies = true
+	proxy.config.SecureCookie = true
+	proxy.config.SameSiteCookie = "Strict"
+	proxy.config.CookieDomain = "1234567890"
+	assert.Equal(t, proxy.getMaxCookieChunkLength(req, "1234567890"), 4017,
 		"cookie chunk calculation is not correct")
 
-	p.config.SameSiteCookie = "Lax"
-	assert.Equal(t, p.getMaxCookieChunkLength(req, "1234567890"), 4020,
+	proxy.config.SameSiteCookie = "Lax"
+	assert.Equal(t, proxy.getMaxCookieChunkLength(req, "1234567890"), 4020,
 		"cookie chunk calculation is not correct")
 
-	p.config.HTTPOnlyCookie = false
-	p.config.EnableSessionCookies = false
-	p.config.SecureCookie = false
-	p.config.SameSiteCookie = "None"
-	p.config.CookieDomain = ""
-	assert.Equal(t, p.getMaxCookieChunkLength(req, ""), 4021,
+	proxy.config.HTTPOnlyCookie = false
+	proxy.config.EnableSessionCookies = false
+	proxy.config.SecureCookie = false
+	proxy.config.SameSiteCookie = "None"
+	proxy.config.CookieDomain = ""
+	assert.Equal(t, proxy.getMaxCookieChunkLength(req, ""), 4021,
 		"cookie chunk calculation is not correct")
 }
 

@@ -36,19 +36,19 @@ func filterCookies(req *http.Request, filter []string) error {
 	// @step: empty the current cookies
 	req.Header.Set("Cookie", "")
 	// @step: iterate the cookies and filter out anything we
-	for _, x := range cookies {
+	for _, cookie := range cookies {
 		var found bool
 		// @step: does this cookie match our filter?
 		for _, n := range filter {
-			if strings.HasPrefix(x.Name, n) {
-				req.AddCookie(&http.Cookie{Name: x.Name, Value: "censored"})
+			if strings.HasPrefix(cookie.Name, n) {
+				req.AddCookie(&http.Cookie{Name: cookie.Name, Value: "censored"})
 				found = true
 				break
 			}
 		}
 
 		if !found {
-			req.AddCookie(x)
+			req.AddCookie(cookie)
 		}
 	}
 
@@ -58,13 +58,13 @@ func filterCookies(req *http.Request, filter []string) error {
 // revokeProxy is responsible to stopping the middleware from proxying the request
 func (r *oauthProxy) revokeProxy(w http.ResponseWriter, req *http.Request) context.Context {
 	var scope *RequestScope
-	sc := req.Context().Value(contextScopeName)
+	ctxVal := req.Context().Value(contextScopeName)
 
-	switch sc {
+	switch ctxVal {
 	case nil:
 		scope = &RequestScope{AccessDenied: true}
 	default:
-		scope = sc.(*RequestScope)
+		scope = ctxVal.(*RequestScope)
 	}
 
 	scope.AccessDenied = true
@@ -73,13 +73,13 @@ func (r *oauthProxy) revokeProxy(w http.ResponseWriter, req *http.Request) conte
 }
 
 // accessForbidden redirects the user to the forbidden page
-func (r *oauthProxy) accessForbidden(w http.ResponseWriter, req *http.Request) context.Context {
-	w.WriteHeader(http.StatusForbidden)
+func (r *oauthProxy) accessForbidden(wrt http.ResponseWriter, req *http.Request) context.Context {
+	wrt.WriteHeader(http.StatusForbidden)
 	// are we using a custom http template for 403?
 	if r.config.hasCustomForbiddenPage() {
 		name := path.Base(r.config.ForbiddenPage)
 
-		if err := r.Render(w, name, r.config.Tags); err != nil {
+		if err := r.Render(wrt, name, r.config.Tags); err != nil {
 			r.log.Error(
 				"failed to render the template",
 				zap.Error(err),
@@ -88,17 +88,17 @@ func (r *oauthProxy) accessForbidden(w http.ResponseWriter, req *http.Request) c
 		}
 	}
 
-	return r.revokeProxy(w, req)
+	return r.revokeProxy(wrt, req)
 }
 
 // accessError redirects the user to the error page
-func (r *oauthProxy) accessError(w http.ResponseWriter, req *http.Request) context.Context {
-	w.WriteHeader(http.StatusBadRequest)
+func (r *oauthProxy) accessError(wrt http.ResponseWriter, req *http.Request) context.Context {
+	wrt.WriteHeader(http.StatusBadRequest)
 	// are we using a custom http template for 400?
 	if r.config.hasCustomErrorPage() {
 		name := path.Base(r.config.ErrorPage)
 
-		if err := r.Render(w, name, r.config.Tags); err != nil {
+		if err := r.Render(wrt, name, r.config.Tags); err != nil {
 			r.log.Error(
 				"failed to render the template",
 				zap.Error(err),
@@ -107,25 +107,25 @@ func (r *oauthProxy) accessError(w http.ResponseWriter, req *http.Request) conte
 		}
 	}
 
-	return r.revokeProxy(w, req)
+	return r.revokeProxy(wrt, req)
 }
 
 // redirectToURL redirects the user and aborts the context
-func (r *oauthProxy) redirectToURL(url string, w http.ResponseWriter, req *http.Request, statusCode int) context.Context {
-	w.Header().Add(
+func (r *oauthProxy) redirectToURL(url string, wrt http.ResponseWriter, req *http.Request, statusCode int) context.Context {
+	wrt.Header().Add(
 		"Cache-Control",
 		"no-cache, no-store, must-revalidate, max-age=0",
 	)
 
-	http.Redirect(w, req, url, statusCode)
-	return r.revokeProxy(w, req)
+	http.Redirect(wrt, req, url, statusCode)
+	return r.revokeProxy(wrt, req)
 }
 
 // redirectToAuthorization redirects the user to authorization handler
-func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Request) context.Context {
+func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.Request) context.Context {
 	if r.config.NoRedirects && !r.config.EnableUma {
-		w.WriteHeader(http.StatusUnauthorized)
-		return r.revokeProxy(w, req)
+		wrt.WriteHeader(http.StatusUnauthorized)
+		return r.revokeProxy(wrt, req)
 	}
 
 	if r.config.EnableUma {
@@ -160,8 +160,8 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 				zap.String("path", req.URL.Path),
 				zap.Error(err),
 			)
-			w.WriteHeader(http.StatusUnauthorized)
-			return r.revokeProxy(w, req)
+			wrt.WriteHeader(http.StatusUnauthorized)
+			return r.revokeProxy(wrt, req)
 		}
 
 		if len(resources) == 0 {
@@ -169,8 +169,8 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 				"no resources for path",
 				zap.String("path", req.URL.Path),
 			)
-			w.WriteHeader(http.StatusUnauthorized)
-			return r.revokeProxy(w, req)
+			wrt.WriteHeader(http.StatusUnauthorized)
+			return r.revokeProxy(wrt, req)
 		}
 
 		resourceID := resources[0].ID
@@ -181,8 +181,8 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 				"missingg scopes for resource in IDP provider",
 				zap.String("resourceID", *resourceID),
 			)
-			w.WriteHeader(http.StatusUnauthorized)
-			return r.revokeProxy(w, req)
+			wrt.WriteHeader(http.StatusUnauthorized)
+			return r.revokeProxy(wrt, req)
 		}
 
 		for _, scope := range *resources[0].ResourceScopes {
@@ -209,8 +209,8 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 				zap.String("resourceID", *resourceID),
 				zap.Error(err),
 			)
-			w.WriteHeader(http.StatusUnauthorized)
-			return r.revokeProxy(w, req)
+			wrt.WriteHeader(http.StatusUnauthorized)
+			return r.revokeProxy(wrt, req)
 		}
 
 		permHeader := fmt.Sprintf(
@@ -220,16 +220,16 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 			*permTicket.Ticket,
 		)
 
-		w.Header().Add(
+		wrt.Header().Add(
 			"WWW-Authenticate",
 			permHeader,
 		)
-		w.WriteHeader(http.StatusUnauthorized)
-		return r.revokeProxy(w, req)
+		wrt.WriteHeader(http.StatusUnauthorized)
+		return r.revokeProxy(wrt, req)
 	}
 
 	// step: add a state referrer to the authorization page
-	uuid := r.writeStateParameterCookie(req, w)
+	uuid := r.writeStateParameterCookie(req, wrt)
 	authQuery := fmt.Sprintf("?state=%s", uuid)
 
 	// step: if verification is switched off, we can't authorization
@@ -239,18 +239,18 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 				"skip token verification switched on",
 		)
 
-		w.WriteHeader(http.StatusForbidden)
-		return r.revokeProxy(w, req)
+		wrt.WriteHeader(http.StatusForbidden)
+		return r.revokeProxy(wrt, req)
 	}
 
 	r.redirectToURL(
 		r.config.WithOAuthURI(authorizationURL+authQuery),
-		w,
+		wrt,
 		req,
 		http.StatusSeeOther,
 	)
 
-	return r.revokeProxy(w, req)
+	return r.revokeProxy(wrt, req)
 }
 
 // getAccessCookieExpiration calculates the expiration of the access token cookie

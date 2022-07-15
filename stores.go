@@ -40,16 +40,16 @@ func (r *oauthProxy) StoreRefreshToken(token string, value string, expiration ti
 // Get retrieves a token from the store, the key we are using here is the access token
 func (r *oauthProxy) GetRefreshToken(token string) (string, error) {
 	// step: the key is the access token
-	v, err := r.store.Get(getHashKey(token))
+	val, err := r.store.Get(getHashKey(token))
 
 	if err != nil {
-		return v, err
+		return val, err
 	}
-	if v == "" {
-		return v, apperrors.ErrNoSessionStateFound
+	if val == "" {
+		return val, apperrors.ErrNoSessionStateFound
 	}
 
-	return v, nil
+	return val, nil
 }
 
 // DeleteRefreshToken removes a key from the store

@@ -30,17 +30,17 @@ import (
 )
 
 func TestGetUserinfo(t *testing.T) {
-	px, idp, _ := newTestProxyService(nil)
+	proxy, idp, _ := newTestProxyService(nil)
 	token, err := newTestToken(idp.getLocation()).getToken()
 	assert.NoError(t, err)
 	tokenSource := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: token},
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), px.config.OpenIDProviderTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), proxy.config.OpenIDProviderTimeout)
 	defer cancel()
 
-	userInfo, err := px.provider.UserInfo(ctx, tokenSource)
+	userInfo, err := proxy.provider.UserInfo(ctx, tokenSource)
 	assert.NoError(t, err)
 
 	claims := DefaultTestTokenClaims{}
@@ -51,9 +51,9 @@ func TestGetUserinfo(t *testing.T) {
 }
 
 func TestTokenExpired(t *testing.T) {
-	px, idp, _ := newTestProxyService(nil)
+	proxy, idp, _ := newTestProxyService(nil)
 	token := newTestToken(idp.getLocation())
-	cs := []struct {
+	testCases := []struct {
 		Expire time.Duration
 		OK     bool
 	}{
@@ -65,27 +65,27 @@ func TestTokenExpired(t *testing.T) {
 			Expire: -5 * time.Hour,
 		},
 	}
-	for i, x := range cs {
-		token.setExpiration(time.Now().Add(x.Expire))
+	for idx, testCase := range testCases {
+		token.setExpiration(time.Now().Add(testCase.Expire))
 		jwt, err := token.getToken()
 		if err != nil {
-			t.Errorf("case %d unable to sign the token, error: %s", i, err)
+			t.Errorf("case %d unable to sign the token, error: %s", idx, err)
 			continue
 		}
 
-		verifier := px.provider.Verifier(
+		verifier := proxy.provider.Verifier(
 			&oidc3.Config{
-				ClientID:          px.config.ClientID,
+				ClientID:          proxy.config.ClientID,
 				SkipClientIDCheck: true,
 			},
 		)
 		_, err = verifier.Verify(context.Background(), jwt)
 
-		if x.OK && err != nil {
-			t.Errorf("case %d, expected: %t got error: %s", i, x.OK, err)
+		if testCase.OK && err != nil {
+			t.Errorf("case %d, expected: %t got error: %s", idx, testCase.OK, err)
 		}
-		if !x.OK && err == nil {
-			t.Errorf("case %d, expected: %t got no error", i, x.OK)
+		if !testCase.OK && err == nil {
+			t.Errorf("case %d, expected: %t got no error", idx, testCase.OK)
 		}
 	}
 }

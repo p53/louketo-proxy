@@ -33,7 +33,7 @@ const (
 )
 
 // dropCookie drops a cookie into the response
-func (r *oauthProxy) dropCookie(w http.ResponseWriter, host, name, value string, duration time.Duration) {
+func (r *oauthProxy) dropCookie(wrt http.ResponseWriter, host, name, value string, duration time.Duration) {
 	// step: default to the host header, else the config domain
 	domain := ""
 
@@ -67,7 +67,7 @@ func (r *oauthProxy) dropCookie(w http.ResponseWriter, host, name, value string,
 		cookie.SameSite = http.SameSiteLaxMode
 	}
 
-	http.SetCookie(w, cookie)
+	http.SetCookie(wrt, cookie)
 }
 
 // maxCookieChunkSize calculates max cookie chunk size, which can be used for cookie value
@@ -103,27 +103,27 @@ func (r *oauthProxy) getMaxCookieChunkLength(req *http.Request, cookieName strin
 }
 
 // dropCookieWithChunks drops a cookie from the response, taking into account possible chunks
-func (r *oauthProxy) dropCookieWithChunks(req *http.Request, w http.ResponseWriter, name, value string, duration time.Duration) {
+func (r *oauthProxy) dropCookieWithChunks(req *http.Request, wrt http.ResponseWriter, name, value string, duration time.Duration) {
 	maxCookieChunkLength := r.getMaxCookieChunkLength(req, name)
 
 	if len(value) <= maxCookieChunkLength {
-		r.dropCookie(w, req.Host, name, value, duration)
+		r.dropCookie(wrt, req.Host, name, value, duration)
 	} else {
 		// write divided cookies because payload is too long for single cookie
-		r.dropCookie(w, req.Host, name, value[0:maxCookieChunkLength], duration)
+		r.dropCookie(wrt, req.Host, name, value[0:maxCookieChunkLength], duration)
 
-		for i := maxCookieChunkLength; i < len(value); i += maxCookieChunkLength {
-			end := i + maxCookieChunkLength
+		for idx := maxCookieChunkLength; idx < len(value); idx += maxCookieChunkLength {
+			end := idx + maxCookieChunkLength
 
 			if end > len(value) {
 				end = len(value)
 			}
 
 			r.dropCookie(
-				w,
+				wrt,
 				req.Host,
-				name+"-"+strconv.Itoa(i/maxCookieChunkLength),
-				value[i:end],
+				name+"-"+strconv.Itoa(idx/maxCookieChunkLength),
+				value[idx:end],
 				duration,
 			)
 		}
@@ -141,17 +141,17 @@ func (r *oauthProxy) dropRefreshTokenCookie(req *http.Request, w http.ResponseWr
 }
 
 // writeStateParameterCookie sets a state parameter cookie into the response
-func (r *oauthProxy) writeStateParameterCookie(req *http.Request, w http.ResponseWriter) string {
+func (r *oauthProxy) writeStateParameterCookie(req *http.Request, wrt http.ResponseWriter) string {
 	uuid, err := uuid.NewV4()
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		wrt.WriteHeader(http.StatusInternalServerError)
 	}
 
 	requestURI := base64.StdEncoding.EncodeToString([]byte(req.URL.RequestURI()))
 
-	r.dropCookie(w, req.Host, r.config.CookieRequestURIName, requestURI, 0)
-	r.dropCookie(w, req.Host, r.config.CookieOAuthStateName, uuid.String(), 0)
+	r.dropCookie(wrt, req.Host, r.config.CookieRequestURIName, requestURI, 0)
+	r.dropCookie(wrt, req.Host, r.config.CookieOAuthStateName, uuid.String(), 0)
 
 	return uuid.String()
 }
@@ -163,18 +163,18 @@ func (r *oauthProxy) clearAllCookies(req *http.Request, w http.ResponseWriter) {
 }
 
 // clearRefreshSessionCookie clears the session cookie
-func (r *oauthProxy) clearRefreshTokenCookie(req *http.Request, w http.ResponseWriter) {
-	r.dropCookie(w, req.Host, r.config.CookieRefreshName, "", -10*time.Hour)
+func (r *oauthProxy) clearRefreshTokenCookie(req *http.Request, wrt http.ResponseWriter) {
+	r.dropCookie(wrt, req.Host, r.config.CookieRefreshName, "", -10*time.Hour)
 
 	// clear divided cookies
-	for i := 1; i < 600; i++ {
-		var _, err = req.Cookie(r.config.CookieRefreshName + "-" + strconv.Itoa(i))
+	for idx := 1; idx < 600; idx++ {
+		var _, err = req.Cookie(r.config.CookieRefreshName + "-" + strconv.Itoa(idx))
 
 		if err == nil {
 			r.dropCookie(
-				w,
+				wrt,
 				req.Host,
-				r.config.CookieRefreshName+"-"+strconv.Itoa(i),
+				r.config.CookieRefreshName+"-"+strconv.Itoa(idx),
 				"",
 				-10*time.Hour,
 			)
@@ -185,18 +185,18 @@ func (r *oauthProxy) clearRefreshTokenCookie(req *http.Request, w http.ResponseW
 }
 
 // clearAccessTokenCookie clears the session cookie
-func (r *oauthProxy) clearAccessTokenCookie(req *http.Request, w http.ResponseWriter) {
-	r.dropCookie(w, req.Host, r.config.CookieAccessName, "", -10*time.Hour)
+func (r *oauthProxy) clearAccessTokenCookie(req *http.Request, wrt http.ResponseWriter) {
+	r.dropCookie(wrt, req.Host, r.config.CookieAccessName, "", -10*time.Hour)
 
 	// clear divided cookies
-	for i := 1; i < len(req.Cookies()); i++ {
-		var _, err = req.Cookie(r.config.CookieAccessName + "-" + strconv.Itoa(i))
+	for idx := 1; idx < len(req.Cookies()); idx++ {
+		var _, err = req.Cookie(r.config.CookieAccessName + "-" + strconv.Itoa(idx))
 
 		if err == nil {
 			r.dropCookie(
-				w,
+				wrt,
 				req.Host,
-				r.config.CookieAccessName+"-"+strconv.Itoa(i),
+				r.config.CookieAccessName+"-"+strconv.Itoa(idx),
 				"",
 				-10*time.Hour,
 			)

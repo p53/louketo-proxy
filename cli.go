@@ -47,8 +47,8 @@ func newOauthProxyApp() *cli.App {
 	}
 
 	// step: set the default action
-	app.Action = func(cx *cli.Context) error {
-		configFile := cx.String("config")
+	app.Action = func(cliCx *cli.Context) error {
+		configFile := cliCx.String("config")
 		// step: do we have a configuration file?
 		if configFile != "" {
 			if err := readConfigFile(configFile, config); err != nil {
@@ -57,7 +57,7 @@ func newOauthProxyApp() *cli.App {
 		}
 
 		// step: parse the command line options
-		if err := parseCLIOptions(cx, config); err != nil {
+		if err := parseCLIOptions(cliCx, config); err != nil {
 			return printError(err.Error())
 		}
 
@@ -111,7 +111,7 @@ func getCommandLineOptions() []cli.Flag {
 
 		optName := field.Tag.Get("yaml")
 
-		switch t := field.Type; t.Kind() {
+		switch fType := field.Type; fType.Kind() {
 		case reflect.Bool:
 			dv := reflect.ValueOf(defaults).Elem().FieldByName(field.Name).Bool()
 			msg := fmt.Sprintf("%s (default: %t)", usage, dv)
@@ -144,7 +144,7 @@ func getCommandLineOptions() []cli.Flag {
 				EnvVar: envName,
 			})
 		case reflect.Int64:
-			switch t.String() {
+			switch fType.String() {
 			case durationType:
 				dv := reflect.ValueOf(defaults).Elem().FieldByName(field.Name).Int()
 
@@ -158,7 +158,7 @@ func getCommandLineOptions() []cli.Flag {
 				panic("unknown uint64 type in the Config struct")
 			}
 		default:
-			errMsg := fmt.Sprintf("field: %s, type: %s, kind: %s is not being handled", field.Name, t.String(), t.Kind())
+			errMsg := fmt.Sprintf("field: %s, type: %s, kind: %s is not being handled", field.Name, fType.String(), fType.Kind())
 			panic(errMsg)
 		}
 	}

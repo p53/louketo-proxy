@@ -31,9 +31,9 @@ import (
 )
 
 func TestDebugHandler(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.Resources = make([]*Resource, 0)
-	c.EnableProfiling = true
+	cfg := newFakeKeycloakConfig()
+	cfg.Resources = make([]*Resource, 0)
+	cfg.EnableProfiling = true
 	requests := []fakeRequest{
 		{URI: "/debug/pprof/no_there", ExpectedCode: http.StatusNotFound},
 		{URI: "/debug/pprof/heap", ExpectedCode: http.StatusOK},
@@ -46,7 +46,7 @@ func TestDebugHandler(t *testing.T) {
 		{URI: "/debug/pprof/symbol", Method: http.MethodPost, ExpectedCode: http.StatusOK},
 		{URI: "/debug/pprof/symbol", Method: http.MethodPost, ExpectedCode: http.StatusOK},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestExpirationHandler(t *testing.T) {
@@ -85,27 +85,27 @@ func TestOauthRequestNotProxying(t *testing.T) {
 }
 
 func TestLoginHandlerDisabled(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.EnableLoginHandler = false
+	cfg := newFakeKeycloakConfig()
+	cfg.EnableLoginHandler = false
 	requests := []fakeRequest{
-		{URI: c.WithOAuthURI(loginURL), Method: http.MethodPost, ExpectedCode: http.StatusNotImplemented},
-		{URI: c.WithOAuthURI(loginURL), ExpectedCode: http.StatusMethodNotAllowed},
+		{URI: cfg.WithOAuthURI(loginURL), Method: http.MethodPost, ExpectedCode: http.StatusNotImplemented},
+		{URI: cfg.WithOAuthURI(loginURL), ExpectedCode: http.StatusMethodNotAllowed},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLoginHandlerNotDisabled(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.EnableLoginHandler = true
+	cfg := newFakeKeycloakConfig()
+	cfg.EnableLoginHandler = true
 	requests := []fakeRequest{
 		{URI: "/oauth/login", Method: http.MethodPost, ExpectedCode: http.StatusBadRequest},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestLoginHandler(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	uri := c.WithOAuthURI(loginURL)
+	cfg := newFakeKeycloakConfig()
+	uri := cfg.WithOAuthURI(loginURL)
 
 	testCases := []struct {
 		Name              string
@@ -198,20 +198,21 @@ func TestLoginHandler(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
+		cfg := *cfg
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				testCase.ProxySettings(c)
-				newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, testCase.ExecutionSettings)
+				testCase.ProxySettings(&cfg)
+				newFakeProxy(&cfg, &fakeAuthConfig{}).RunTests(t, testCase.ExecutionSettings)
 			},
 		)
 	}
 }
 
 func TestSkipOpenIDProviderTLSVerifyLoginHandler(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.SkipOpenIDProviderTLSVerify = true
-	uri := c.WithOAuthURI(loginURL)
+	cfg := newFakeKeycloakConfig()
+	cfg.SkipOpenIDProviderTLSVerify = true
+	uri := cfg.WithOAuthURI(loginURL)
 	requests := []fakeRequest{
 		{
 			URI:          uri,
@@ -249,9 +250,9 @@ func TestSkipOpenIDProviderTLSVerifyLoginHandler(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 
-	c.SkipOpenIDProviderTLSVerify = false
+	cfg.SkipOpenIDProviderTLSVerify = false
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -263,13 +264,15 @@ func TestSkipOpenIDProviderTLSVerifyLoginHandler(t *testing.T) {
 		}
 	}()
 
-	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 
 // nolint:funlen
 func TestTokenEncryptionLoginHandler(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	uri := c.WithOAuthURI(loginURL)
+	cfg := newFakeKeycloakConfig()
+	uri := cfg.WithOAuthURI(loginURL)
+	// !! it must be here because of how test is written
+	cfg.EncryptionKey = testEncryptionKey
 
 	testCases := []struct {
 		Name              string
@@ -278,13 +281,13 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 	}{
 		{
 			Name: "TestEncryptedTokenEnabled",
-			ProxySettings: func(c *Config) {
-				c.EnableEncryptedToken = true
-				c.ForceEncryptedCookie = false
-				c.EnableLoginHandler = true
-				c.Verbose = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableEncryptedToken = true
+				conf.ForceEncryptedCookie = false
+				conf.EnableLoginHandler = true
+				conf.Verbose = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -294,16 +297,16 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{c.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						c.CookieAccessName: checkAccessTokenEncryption,
+						cfg.CookieAccessName: checkAccessTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
 						resp := tokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
-						assert.True(t, checkAccessTokenEncryption(t, c, resp.AccessToken))
-						assert.True(t, checkRefreshTokenEncryption(t, c, resp.RefreshToken))
+						assert.True(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
+						assert.True(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -311,14 +314,14 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestEncryptedTokenWithRefreshTokenEnabled",
-			ProxySettings: func(c *Config) {
-				c.EnableEncryptedToken = true
-				c.ForceEncryptedCookie = false
-				c.EnableLoginHandler = true
-				c.Verbose = true
-				c.EnableLogging = true
-				c.EnableRefreshTokens = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableEncryptedToken = true
+				conf.ForceEncryptedCookie = false
+				conf.EnableLoginHandler = true
+				conf.Verbose = true
+				conf.EnableLogging = true
+				conf.EnableRefreshTokens = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -328,17 +331,17 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{c.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						c.CookieAccessName:  checkAccessTokenEncryption,
-						c.CookieRefreshName: checkRefreshTokenEncryption,
+						cfg.CookieAccessName:  checkAccessTokenEncryption,
+						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
 						resp := tokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
-						assert.True(t, checkAccessTokenEncryption(t, c, resp.AccessToken))
-						assert.True(t, checkRefreshTokenEncryption(t, c, resp.RefreshToken))
+						assert.True(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
+						assert.True(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -346,13 +349,13 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestForceEncryptedCookie",
-			ProxySettings: func(c *Config) {
-				c.EnableEncryptedToken = false
-				c.ForceEncryptedCookie = true
-				c.EnableLoginHandler = true
-				c.Verbose = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableEncryptedToken = false
+				conf.ForceEncryptedCookie = true
+				conf.EnableLoginHandler = true
+				conf.Verbose = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -362,16 +365,16 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{c.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						c.CookieAccessName: checkAccessTokenEncryption,
+						cfg.CookieAccessName: checkAccessTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
 						resp := tokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
-						assert.False(t, checkAccessTokenEncryption(t, c, resp.AccessToken))
-						assert.False(t, checkRefreshTokenEncryption(t, c, resp.RefreshToken))
+						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
+						assert.False(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -379,14 +382,14 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestForceEncryptedCookieWithRefreshToken",
-			ProxySettings: func(c *Config) {
-				c.EnableEncryptedToken = false
-				c.ForceEncryptedCookie = true
-				c.EnableLoginHandler = true
-				c.Verbose = true
-				c.EnableRefreshTokens = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableEncryptedToken = false
+				conf.ForceEncryptedCookie = true
+				conf.EnableLoginHandler = true
+				conf.Verbose = true
+				conf.EnableRefreshTokens = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -396,17 +399,17 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{c.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						c.CookieAccessName:  checkAccessTokenEncryption,
-						c.CookieRefreshName: checkRefreshTokenEncryption,
+						cfg.CookieAccessName:  checkAccessTokenEncryption,
+						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
 						resp := tokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
-						assert.False(t, checkAccessTokenEncryption(t, c, resp.AccessToken))
-						assert.False(t, checkRefreshTokenEncryption(t, c, resp.RefreshToken))
+						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
+						assert.False(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -414,13 +417,13 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestEncryptionDisabled",
-			ProxySettings: func(c *Config) {
-				c.EnableEncryptedToken = false
-				c.ForceEncryptedCookie = false
-				c.EnableLoginHandler = true
-				c.Verbose = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableEncryptedToken = false
+				conf.ForceEncryptedCookie = false
+				conf.EnableLoginHandler = true
+				conf.Verbose = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -430,9 +433,9 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{c.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						c.CookieAccessName: func(t *testing.T, config *Config, rawToken string) bool {
+						cfg.CookieAccessName: func(t *testing.T, config *Config, rawToken string) bool {
 							token, err := jwt.ParseSigned(rawToken)
 							if err != nil {
 								return false
@@ -451,8 +454,8 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						resp := tokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
-						assert.False(t, checkAccessTokenEncryption(t, c, resp.AccessToken))
-						assert.False(t, checkRefreshTokenEncryption(t, c, resp.RefreshToken))
+						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
+						assert.False(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -460,14 +463,14 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestEncryptionDisabledWithRefreshToken",
-			ProxySettings: func(c *Config) {
-				c.EnableEncryptedToken = false
-				c.ForceEncryptedCookie = false
-				c.EnableLoginHandler = true
-				c.Verbose = true
-				c.EnableRefreshTokens = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableEncryptedToken = false
+				conf.ForceEncryptedCookie = false
+				conf.EnableLoginHandler = true
+				conf.Verbose = true
+				conf.EnableRefreshTokens = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -477,9 +480,9 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{c.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						c.CookieAccessName: func(t *testing.T, config *Config, rawToken string) bool {
+						cfg.CookieAccessName: func(t *testing.T, config *Config, rawToken string) bool {
 							token, err := jwt.ParseSigned(rawToken)
 							if err != nil {
 								return false
@@ -493,14 +496,14 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 
 							return assert.Contains(t, user.claims, "aud") && assert.Contains(t, user.claims, "email")
 						},
-						c.CookieRefreshName: checkRefreshTokenEncryption,
+						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
 						resp := tokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
-						assert.False(t, checkAccessTokenEncryption(t, c, resp.AccessToken))
-						assert.False(t, checkRefreshTokenEncryption(t, c, resp.RefreshToken))
+						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
+						assert.False(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -510,11 +513,12 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
+		cfg := *cfg
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				testCase.ProxySettings(c)
-				newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, testCase.ExecutionSettings)
+				testCase.ProxySettings(&cfg)
+				newFakeProxy(&cfg, &fakeAuthConfig{}).RunTests(t, testCase.ExecutionSettings)
 			},
 		)
 	}
@@ -531,20 +535,20 @@ func TestLogoutHandlerBadRequest(t *testing.T) {
 }
 
 func TestLogoutHandlerBadToken(t *testing.T) {
-	c := newFakeKeycloakConfig()
+	cfg := newFakeKeycloakConfig()
 	requests := []fakeRequest{
 		{
-			URI:          c.WithOAuthURI(logoutURL),
+			URI:          cfg.WithOAuthURI(logoutURL),
 			ExpectedCode: http.StatusUnauthorized,
 		},
 		{
-			URI:            c.WithOAuthURI(logoutURL),
+			URI:            cfg.WithOAuthURI(logoutURL),
 			HasCookieToken: true,
 			RawToken:       "this.is.a.bad.token",
 			ExpectedCode:   http.StatusUnauthorized,
 		},
 		{
-			URI:          c.WithOAuthURI(logoutURL),
+			URI:          cfg.WithOAuthURI(logoutURL),
 			RawToken:     "this.is.a.bad.token",
 			ExpectedCode: http.StatusUnauthorized,
 		},
@@ -629,13 +633,13 @@ func TestLogoutHandlerGood(t *testing.T) {
 	for _, testCase := range testCases {
 		testCase := testCase
 		cfgCopy := *cfg
-		c := &cfgCopy
+		cfg := &cfgCopy
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				testCase.ProxySettings(c)
-				proxy := newFakeProxy(c, &fakeAuthConfig{})
-				testCase.ProxySettings(c)
+				testCase.ProxySettings(cfg)
+				proxy := newFakeProxy(cfg, &fakeAuthConfig{})
+				testCase.ProxySettings(cfg)
 				proxy.RunTests(t, testCase.ExecutionSettings)
 			},
 		)
@@ -643,24 +647,24 @@ func TestLogoutHandlerGood(t *testing.T) {
 }
 
 func TestSkipOpenIDProviderTLSVerifyLogoutHandler(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.SkipOpenIDProviderTLSVerify = true
+	cfg := newFakeKeycloakConfig()
+	cfg.SkipOpenIDProviderTLSVerify = true
 	requests := []fakeRequest{
 		{
-			URI:          c.WithOAuthURI(logoutURL),
+			URI:          cfg.WithOAuthURI(logoutURL),
 			HasToken:     true,
 			ExpectedCode: http.StatusOK,
 		},
 		{
-			URI:              c.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
+			URI:              cfg.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
 			HasToken:         true,
 			ExpectedCode:     http.StatusSeeOther,
 			ExpectedLocation: "http://example.com",
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 
-	c.SkipOpenIDProviderTLSVerify = false
+	cfg.SkipOpenIDProviderTLSVerify = false
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -672,41 +676,41 @@ func TestSkipOpenIDProviderTLSVerifyLogoutHandler(t *testing.T) {
 		}
 	}()
 
-	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 
 func TestRevocation(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.RevocationEndpoint = ""
+	cfg := newFakeKeycloakConfig()
+	cfg.RevocationEndpoint = ""
 	requests := []fakeRequest{
 		{
-			URI:          c.WithOAuthURI(logoutURL),
+			URI:          cfg.WithOAuthURI(logoutURL),
 			HasToken:     true,
 			ExpectedCode: http.StatusOK,
 		},
 		{
-			URI:              c.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
+			URI:              cfg.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
 			HasToken:         true,
 			ExpectedCode:     http.StatusSeeOther,
 			ExpectedLocation: "http://example.com",
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 
-	c.RevocationEndpoint = "http://non-existent.com/revoke"
+	cfg.RevocationEndpoint = "http://non-existent.com/revoke"
 	requests = []fakeRequest{
 		{
-			URI:          c.WithOAuthURI(logoutURL),
+			URI:          cfg.WithOAuthURI(logoutURL),
 			HasToken:     true,
 			ExpectedCode: http.StatusInternalServerError,
 		},
 		{
-			URI:          c.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
+			URI:          cfg.WithOAuthURI(logoutURL) + "?redirect=http://example.com",
 			HasToken:     true,
 			ExpectedCode: http.StatusInternalServerError,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestTokenHandler(t *testing.T) {
@@ -857,10 +861,10 @@ func TestCallbackURL(t *testing.T) {
 }
 
 func TestHealthHandler(t *testing.T) {
-	c := newFakeKeycloakConfig()
+	cfg := newFakeKeycloakConfig()
 	requests := []fakeRequest{
 		{
-			URI:          c.WithOAuthURI(healthURL),
+			URI:          cfg.WithOAuthURI(healthURL),
 			ExpectedCode: http.StatusOK,
 			ExpectedContent: func(body string, testNum int) {
 				assert.Equal(
@@ -871,7 +875,7 @@ func TestHealthHandler(t *testing.T) {
 			},
 		},
 		{
-			URI:          c.WithOAuthURI(healthURL),
+			URI:          cfg.WithOAuthURI(healthURL),
 			Method:       http.MethodHead,
 			ExpectedCode: http.StatusMethodNotAllowed,
 		},

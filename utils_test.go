@@ -74,23 +74,23 @@ func TestDecodeKeyPairs(t *testing.T) {
 		},
 	}
 
-	for i, c := range testCases {
-		kp, err := decodeKeyPairs(c.List)
-		if err != nil && c.Ok {
-			t.Errorf("test case %d should not have failed", i)
+	for idx, testCase := range testCases {
+		keyPair, err := decodeKeyPairs(testCase.List)
+		if err != nil && testCase.Ok {
+			t.Errorf("test case %d should not have failed", idx)
 			continue
 		}
-		if !c.Ok {
+		if !testCase.Ok {
 			continue
 		}
-		if !reflect.DeepEqual(kp, c.KeyPairs) {
-			t.Errorf("test case %d are not equal %v <-> %v", i, kp, c.KeyPairs)
+		if !reflect.DeepEqual(keyPair, testCase.KeyPairs) {
+			t.Errorf("test case %d are not equal %v <-> %v", idx, keyPair, testCase.KeyPairs)
 		}
 	}
 }
 
 func TestGetRequestHostURL(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Expected string
 		Hostname string
 		Headers  map[string]string
@@ -128,22 +128,22 @@ func TestGetRequestHostURL(t *testing.T) {
 		},
 	}
 
-	for i := range cs {
+	for idx := range testCases {
 		request := &http.Request{
 			Method: http.MethodGet,
-			Host:   cs[i].Hostname,
-			TLS:    cs[i].TLS,
+			Host:   testCases[idx].Hostname,
+			TLS:    testCases[idx].TLS,
 		}
 
-		if cs[i].Headers != nil {
+		if testCases[idx].Headers != nil {
 			request.Header = make(http.Header)
-			for key := range cs[i].Headers {
-				request.Header.Set(key, cs[i].Headers[key])
+			for key := range testCases[idx].Headers {
+				request.Header.Set(key, testCases[idx].Headers[key])
 			}
 		}
 
 		url := getRequestHostURL(request)
-		assert.Equal(t, cs[i].Expected, url, "case %d, expected: %s, got: %s", i, cs[i].Expected, url)
+		assert.Equal(t, testCases[idx].Expected, url, "case %d, expected: %s, got: %s", idx, testCases[idx].Expected, url)
 	}
 }
 
@@ -158,7 +158,7 @@ func BenchmarkUUID(b *testing.B) {
 }
 
 func TestDefaultTo(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Value    string
 		Default  string
 		Expected string
@@ -174,8 +174,8 @@ func TestDefaultTo(t *testing.T) {
 			Expected: "world",
 		},
 	}
-	for _, c := range cs {
-		assert.Equal(t, c.Expected, defaultTo(c.Value, c.Default))
+	for _, testCases := range testCases {
+		assert.Equal(t, testCases.Expected, defaultTo(testCases.Value, testCases.Default))
 	}
 }
 
@@ -300,25 +300,25 @@ func TestDecryptDataBlock(t *testing.T) {
 		},
 	}
 
-	for i, test := range testCase {
+	for idx, test := range testCase {
 		cipher, err := encryptDataBlock(bytes.NewBufferString(test.Text).Bytes(), bytes.NewBufferString(test.Key).Bytes())
 		if err != nil && test.Ok {
-			t.Errorf("test case: %d should not have failed, %s", i, err)
+			t.Errorf("test case: %d should not have failed, %s", idx, err)
 		}
 
 		plain, err := decryptDataBlock(cipher, bytes.NewBufferString(test.Key).Bytes())
 		if err != nil {
-			t.Errorf("test case: %d should not have failed, %s", i, err)
+			t.Errorf("test case: %d should not have failed, %s", idx, err)
 		}
 
 		if string(plain) != test.Text {
-			t.Errorf("test case: %d are not the same", i)
+			t.Errorf("test case: %d are not the same", idx)
 		}
 	}
 }
 
 func TestHasAccessOK(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Have     []string
 		Need     []string
 		Required bool
@@ -363,13 +363,21 @@ func TestHasAccessOK(t *testing.T) {
 			Required: true,
 		},
 	}
-	for i, x := range cs {
-		assert.True(t, hasAccess(x.Need, x.Have, x.Required), "case: %d should be true, have: %v, need: %v, require: %t ", i, x.Have, x.Need, x.Required)
+	for idx, testCase := range testCases {
+		assert.True(
+			t,
+			hasAccess(testCase.Need, testCase.Have, testCase.Required),
+			"case: %d should be true, have: %v, need: %v, require: %t ",
+			idx,
+			testCase.Have,
+			testCase.Need,
+			testCase.Required,
+		)
 	}
 }
 
 func TestHasAccessBad(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Have     []string
 		Need     []string
 		Required bool
@@ -400,8 +408,16 @@ func TestHasAccessBad(t *testing.T) {
 		},
 	}
 
-	for i, x := range cs {
-		assert.False(t, hasAccess(x.Need, x.Have, x.Required), "case: %d should be false, have: %v, need: %v, require: %t ", i, x.Have, x.Need, x.Required)
+	for idx, testCase := range testCases {
+		assert.False(
+			t,
+			hasAccess(testCase.Need, testCase.Have, testCase.Required),
+			"case: %d should be false, have: %v, need: %v, require: %t ",
+			idx,
+			testCase.Have,
+			testCase.Need,
+			testCase.Required,
+		)
 	}
 }
 
@@ -445,7 +461,7 @@ func TestIsUpgradedConnection(t *testing.T) {
 }
 
 func TestIdValidHTTPMethod(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Method string
 		Ok     bool
 	}{
@@ -455,8 +471,8 @@ func TestIdValidHTTPMethod(t *testing.T) {
 		{Method: "PUT", Ok: true},
 		{Method: "PATCH", Ok: true},
 	}
-	for _, x := range cs {
-		assert.Equal(t, x.Ok, isValidHTTPMethod(x.Method))
+	for _, testCase := range testCases {
+		assert.Equal(t, testCase.Ok, isValidHTTPMethod(testCase.Method))
 	}
 }
 
@@ -476,7 +492,7 @@ func TestFileExists(t *testing.T) {
 }
 
 func TestGetWithin(t *testing.T) {
-	cs := []struct {
+	testCases := []struct {
 		Expires  time.Time
 		Percent  float64
 		Expected time.Duration
@@ -492,8 +508,13 @@ func TestGetWithin(t *testing.T) {
 			Expected: 719000000000,
 		},
 	}
-	for _, x := range cs {
-		assert.InDelta(t, x.Expected, getWithin(x.Expires, x.Percent), 1000000001)
+	for _, testCase := range testCases {
+		assert.InDelta(
+			t,
+			testCase.Expected,
+			getWithin(testCase.Expires, testCase.Percent),
+			1000000001,
+		)
 	}
 }
 
@@ -598,7 +619,7 @@ redirection_url: http://127.0.0.1:3000
 		},
 	}
 
-	for i, test := range testCases {
+	for idx, test := range testCases {
 		// step: write the fake config file
 		file := writeFakeConfigFile(t, test.Content)
 
@@ -606,7 +627,7 @@ redirection_url: http://127.0.0.1:3000
 		err := readConfigFile(file.Name(), config)
 		if test.Ok && err != nil {
 			os.Remove(file.Name())
-			t.Errorf("test case %d should not have failed, config: %v, error: %s", i, config, err)
+			t.Errorf("test case %d should not have failed, config: %v, error: %s", idx, config, err)
 		}
 		os.Remove(file.Name())
 	}
@@ -618,15 +639,15 @@ func getFakeURL(location string) *url.URL {
 }
 
 func writeFakeConfigFile(t *testing.T, content string) *os.File {
-	f, err := ioutil.TempFile("", "node_label_file")
+	file, err := ioutil.TempFile("", "node_label_file")
 	if err != nil {
 		t.Fatalf("unexpected error creating node_label_file: %v", err)
 	}
-	f.Close()
+	file.Close()
 
-	if err := ioutil.WriteFile(f.Name(), []byte(content), 0600); err != nil {
+	if err := ioutil.WriteFile(file.Name(), []byte(content), 0600); err != nil {
 		t.Fatalf("unexpected error writing node label file: %v", err)
 	}
 
-	return f
+	return file
 }

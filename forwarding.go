@@ -26,15 +26,15 @@ import (
 
 // proxyMiddleware is responsible for handles reverse proxy request to the upstream endpoint
 func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		next.ServeHTTP(w, req)
+	return http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
+		next.ServeHTTP(wrt, req)
 
 		// @step: retrieve the request scope
-		scope := req.Context().Value(contextScopeName)
-		var sc *RequestScope
-		if scope != nil {
-			sc = scope.(*RequestScope)
-			if sc.AccessDenied {
+		ctxVal := req.Context().Value(contextScopeName)
+		var scope *RequestScope
+		if ctxVal != nil {
+			scope = ctxVal.(*RequestScope)
+			if scope.AccessDenied {
 				return
 			}
 		}
@@ -63,9 +63,9 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 		req.URL.Scheme = r.endpoint.Scheme
 		// Restore the unprocessed original path, so that we pass upstream exactly what we received
 		// as the resource request.
-		if sc != nil {
-			req.URL.Path = sc.Path
-			req.URL.RawPath = sc.RawPath
+		if scope != nil {
+			req.URL.Path = scope.Path
+			req.URL.RawPath = scope.RawPath
 		}
 		if v := req.Header.Get("Host"); v != "" {
 			req.Host = v
@@ -76,15 +76,15 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 
 		if isUpgradedConnection(req) {
 			r.log.Debug("upgrading the connnection", zap.String("client_ip", req.RemoteAddr))
-			if err := tryUpdateConnection(req, w, r.endpoint); err != nil {
+			if err := tryUpdateConnection(req, wrt, r.endpoint); err != nil {
 				r.log.Error("failed to upgrade connection", zap.Error(err))
-				w.WriteHeader(http.StatusInternalServerError)
+				wrt.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			return
 		}
 
-		r.upstream.ServeHTTP(w, req)
+		r.upstream.ServeHTTP(wrt, req)
 	})
 }
 

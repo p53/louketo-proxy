@@ -170,29 +170,29 @@ type fakeProxy struct {
 	cookies map[string]*http.Cookie
 }
 
-func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
+func newFakeProxy(cfg *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	log.SetOutput(ioutil.Discard)
 
-	if c == nil {
-		c = newFakeKeycloakConfig()
+	if cfg == nil {
+		cfg = newFakeKeycloakConfig()
 	}
 
 	auth := newFakeAuthServer(authConfig)
 
 	if authConfig.EnableProxy {
-		c.OpenIDProviderProxy = auth.getProxyURL()
+		cfg.OpenIDProviderProxy = auth.getProxyURL()
 	}
 
-	c.DiscoveryURL = auth.getLocation()
+	cfg.DiscoveryURL = auth.getLocation()
 	// c.Verbose = true
-	c.DisableAllLogging = true
-	err := c.update()
+	cfg.DisableAllLogging = true
+	err := cfg.update()
 
 	if err != nil {
 		panic("failed to create fake proxy service, error: " + err.Error())
 	}
 
-	proxy, err := newProxy(c)
+	proxy, err := newProxy(cfg)
 
 	if err != nil {
 		panic("failed to create fake proxy service, error: " + err.Error())
@@ -200,7 +200,7 @@ func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 
 	// proxy.log = zap.NewNop()
 
-	if c.Upstream == "" {
+	if cfg.Upstream == "" {
 		proxy.upstream = &fakeUpstreamService{}
 	}
 
@@ -208,9 +208,9 @@ func newFakeProxy(c *Config, authConfig *fakeAuthConfig) *fakeProxy {
 		panic("failed to create the proxy service, error: " + err.Error())
 	}
 
-	c.RedirectionURL = fmt.Sprintf("http://%s", proxy.listener.Addr().String())
+	cfg.RedirectionURL = fmt.Sprintf("http://%s", proxy.listener.Addr().String())
 
-	return &fakeProxy{c, auth, proxy, make(map[string]*http.Cookie)}
+	return &fakeProxy{cfg, auth, proxy, make(map[string]*http.Cookie)}
 }
 
 func (f *fakeProxy) getServiceURL() string {
@@ -225,31 +225,31 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 		f.proxy.server.Close()
 	}()
 
-	for i := range requests {
-		c := requests[i]
+	for idx := range requests {
+		reqCfg := requests[idx]
 		var upstream fakeUpstreamResponse
 
-		f.config.NoRedirects = !c.Redirects
-		f.config.SkipAccessTokenClientIDCheck = c.SkipClientIDCheck
-		f.config.SkipAccessTokenIssuerCheck = c.SkipIssuerCheck
+		f.config.NoRedirects = !reqCfg.Redirects
+		f.config.SkipAccessTokenClientIDCheck = reqCfg.SkipClientIDCheck
+		f.config.SkipAccessTokenIssuerCheck = reqCfg.SkipIssuerCheck
 		// we need to set any defaults
-		if c.Method == "" {
-			c.Method = http.MethodGet
+		if reqCfg.Method == "" {
+			reqCfg.Method = http.MethodGet
 		}
 		// create a http client
 		client := resty.New()
 
-		if c.TLSMin != 0 {
-			client.SetTLSClientConfig(&tls.Config{MinVersion: c.TLSMin})
+		if reqCfg.TLSMin != 0 {
+			client.SetTLSClientConfig(&tls.Config{MinVersion: reqCfg.TLSMin})
 		}
 
-		if c.TLSMax != 0 {
-			client.SetTLSClientConfig(&tls.Config{MaxVersion: c.TLSMax})
+		if reqCfg.TLSMax != 0 {
+			client.SetTLSClientConfig(&tls.Config{MaxVersion: reqCfg.TLSMax})
 		}
 
 		request := client.SetRedirectPolicy(resty.NoRedirectPolicy()).R()
 
-		if c.ProxyProtocol != "" {
+		if reqCfg.ProxyProtocol != "" {
 			client.SetTransport(&http.Transport{
 				Dial: func(network, addr string) (net.Conn, error) {
 					conn, err := net.Dial("tcp", addr)
@@ -260,7 +260,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 
 					header := fmt.Sprintf(
 						"PROXY TCP4 %s 10.0.0.1 1000 2000\r\n",
-						c.ProxyProtocol,
+						reqCfg.ProxyProtocol,
 					)
 					_, _ = conn.Write([]byte(header))
 
@@ -269,16 +269,16 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 			})
 		}
 
-		if c.RequestCA != "" {
-			client.SetRootCertificateFromString(c.RequestCA)
+		if reqCfg.RequestCA != "" {
+			client.SetRootCertificateFromString(reqCfg.RequestCA)
 		}
 
 		// are we performing a oauth login beforehand
-		if c.HasLogin {
-			if err := f.performUserLogin(c.URI); err != nil {
+		if reqCfg.HasLogin {
+			if err := f.performUserLogin(reqCfg.URI); err != nil {
 				t.Errorf(
 					"case %d, unable to login to oauth server, error: %s",
-					i,
+					idx,
 					err,
 				)
 				return
@@ -291,72 +291,72 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 			}
 		}
 
-		if c.ExpectedProxy {
+		if reqCfg.ExpectedProxy {
 			request.SetResult(&upstream)
 		}
 
-		if c.ProxyRequest {
+		if reqCfg.ProxyRequest {
 			client.SetProxy(f.getServiceURL())
 		}
 
-		if c.BasicAuth {
-			request.SetBasicAuth(c.Username, c.Password)
+		if reqCfg.BasicAuth {
+			request.SetBasicAuth(reqCfg.Username, reqCfg.Password)
 		}
 
-		if c.RawToken != "" {
-			setRequestAuthentication(f.config, client, request, &c, c.RawToken)
+		if reqCfg.RawToken != "" {
+			setRequestAuthentication(f.config, client, request, &reqCfg, reqCfg.RawToken)
 		}
 
-		if len(c.Cookies) > 0 {
-			client.SetCookies(c.Cookies)
+		if len(reqCfg.Cookies) > 0 {
+			client.SetCookies(reqCfg.Cookies)
 		}
 
-		if len(c.Headers) > 0 {
-			request.SetHeaders(c.Headers)
+		if len(reqCfg.Headers) > 0 {
+			request.SetHeaders(reqCfg.Headers)
 		}
 
-		if c.FormValues != nil {
-			request.SetFormData(c.FormValues)
+		if reqCfg.FormValues != nil {
+			request.SetFormData(reqCfg.FormValues)
 		}
 
-		if c.HasToken {
+		if reqCfg.HasToken {
 			token := newTestToken(f.idp.getLocation())
 
-			if c.TokenClaims != nil && len(c.TokenClaims) > 0 {
-				for i := range c.TokenClaims {
+			if reqCfg.TokenClaims != nil && len(reqCfg.TokenClaims) > 0 {
+				for i := range reqCfg.TokenClaims {
 					err := reflections.SetField(
 						&token.claims,
 						strcase.UpperCamelCase(i),
-						c.TokenClaims[i],
+						reqCfg.TokenClaims[i],
 					)
 					assert.NoError(t, err)
 				}
 			}
 
-			if len(c.Roles) > 0 {
-				token.addRealmRoles(c.Roles)
+			if len(reqCfg.Roles) > 0 {
+				token.addRealmRoles(reqCfg.Roles)
 			}
 
-			if len(c.Groups) > 0 {
-				token.addGroups(c.Groups)
+			if len(reqCfg.Groups) > 0 {
+				token.addGroups(reqCfg.Groups)
 			}
 
-			if c.Expires > 0 || c.Expires < 0 {
-				token.setExpiration(time.Now().Add(c.Expires))
+			if reqCfg.Expires > 0 || reqCfg.Expires < 0 {
+				token.setExpiration(time.Now().Add(reqCfg.Expires))
 			}
 
-			if c.TokenAuthorization != nil {
-				token.claims.Authorization = *c.TokenAuthorization
+			if reqCfg.TokenAuthorization != nil {
+				token.claims.Authorization = *reqCfg.TokenAuthorization
 			}
 
-			if c.NotSigned {
+			if reqCfg.NotSigned {
 				authToken, err := token.getUnsignedToken()
 				assert.NoError(t, err)
-				setRequestAuthentication(f.config, client, request, &c, authToken)
+				setRequestAuthentication(f.config, client, request, &reqCfg, authToken)
 			} else {
 				authToken, err := token.getToken()
 				assert.NoError(t, err)
-				setRequestAuthentication(f.config, client, request, &c, authToken)
+				setRequestAuthentication(f.config, client, request, &reqCfg, authToken)
 			}
 		}
 
@@ -364,20 +364,20 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 		var resp *resty.Response
 		var err error
 
-		switch c.URL {
+		switch reqCfg.URL {
 		case "":
-			resp, err = request.Execute(c.Method, f.getServiceURL()+c.URI)
+			resp, err = request.Execute(reqCfg.Method, f.getServiceURL()+reqCfg.URI)
 		default:
-			resp, err = request.Execute(c.Method, c.URL)
+			resp, err = request.Execute(reqCfg.Method, reqCfg.URL)
 		}
 
-		if c.ExpectedRequestError != "" {
-			if !strings.Contains(err.Error(), c.ExpectedRequestError) {
+		if reqCfg.ExpectedRequestError != "" {
+			if !strings.Contains(err.Error(), reqCfg.ExpectedRequestError) {
 				assert.Fail(
 					t,
 					"case %d, expected error %s, got error: %s",
-					i,
-					c.ExpectedRequestError,
+					idx,
+					reqCfg.ExpectedRequestError,
 					err,
 				)
 			}
@@ -387,7 +387,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 					t,
 					err,
 					"case %d, unable to make request, error: %s",
-					i,
+					idx,
 					err,
 				)
 				continue
@@ -396,32 +396,32 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 
 		status := resp.StatusCode()
 
-		if c.ExpectedCode != 0 {
+		if reqCfg.ExpectedCode != 0 {
 			assert.Equal(
 				t,
-				c.ExpectedCode,
+				reqCfg.ExpectedCode,
 				status,
 				"case %d, expected status code: %d, got: %d",
-				i,
-				c.ExpectedCode,
+				idx,
+				reqCfg.ExpectedCode,
 				status,
 			)
 		}
 
-		if c.ExpectedLocation != "" {
-			l, _ := url.Parse(resp.Header().Get("Location"))
+		if reqCfg.ExpectedLocation != "" {
+			loc, _ := url.Parse(resp.Header().Get("Location"))
 			assert.True(
 				t,
 				strings.Contains(
-					l.String(),
-					c.ExpectedLocation,
+					loc.String(),
+					reqCfg.ExpectedLocation,
 				),
 				"expected location to contain %s",
-				l.String(),
+				loc.String(),
 			)
 
-			if l.Query().Get("state") != "" {
-				state, err := uuid.FromString(l.Query().Get("state"))
+			if loc.Query().Get("state") != "" {
+				state, err := uuid.FromString(loc.Query().Get("state"))
 
 				if err != nil {
 					assert.Fail(
@@ -434,192 +434,192 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 			}
 		}
 
-		if len(c.ExpectedHeaders) > 0 {
-			for k, v := range c.ExpectedHeaders {
-				e := resp.Header().Get(k)
+		if len(reqCfg.ExpectedHeaders) > 0 {
+			for headerName, expVal := range reqCfg.ExpectedHeaders {
+				realVal := resp.Header().Get(headerName)
 
 				assert.Equal(
 					t,
-					v,
-					e,
+					expVal,
+					realVal,
 					"case %d, expected header %s=%s, got: %s",
-					i,
-					k,
-					v,
-					e,
+					idx,
+					headerName,
+					expVal,
+					realVal,
 				)
 			}
 		}
 
-		if c.ExpectedProxy {
+		if reqCfg.ExpectedProxy {
 			assert.NotEmpty(
 				t,
 				resp.Header().Get(testProxyAccepted),
 				"case %d, did not proxy request",
-				i,
+				idx,
 			)
 		} else {
 			assert.Empty(
 				t,
 				resp.Header().Get(testProxyAccepted),
 				"case %d, should NOT proxy request",
-				i,
+				idx,
 			)
 		}
 
-		if c.ExpectedProxyHeaders != nil && len(c.ExpectedProxyHeaders) > 0 {
-			for k, v := range c.ExpectedProxyHeaders {
+		if reqCfg.ExpectedProxyHeaders != nil && len(reqCfg.ExpectedProxyHeaders) > 0 {
+			for headerName, headerVal := range reqCfg.ExpectedProxyHeaders {
 				headers := upstream.Headers
 
-				switch v {
+				switch headerVal {
 				case "":
 					assert.NotEmpty(
 						t,
-						headers.Get(k),
+						headers.Get(headerName),
 						"case %d, expected the proxy header: %s to exist",
-						i,
-						k,
+						idx,
+						headerName,
 					)
 				default:
 					assert.Equal(
 						t,
-						v,
-						headers.Get(k),
+						headerVal,
+						headers.Get(headerName),
 						"case %d, expected proxy header %s=%s, got: %s",
-						i,
-						k,
-						v,
-						headers.Get(k),
+						idx,
+						headerName,
+						headerVal,
+						headers.Get(headerName),
 					)
 				}
 			}
 		}
 
-		if c.ExpectedProxyHeadersValidator != nil &&
-			len(c.ExpectedProxyHeadersValidator) > 0 {
+		if reqCfg.ExpectedProxyHeadersValidator != nil &&
+			len(reqCfg.ExpectedProxyHeadersValidator) > 0 {
 			// comment
-			for k, v := range c.ExpectedProxyHeadersValidator {
+			for headerName, headerValidator := range reqCfg.ExpectedProxyHeadersValidator {
 				headers := upstream.Headers
-				switch v {
+				switch headerValidator {
 				case nil:
 					assert.NotNil(
 						t,
-						v,
+						headerValidator,
 						"Validation function is nil, forgot to configure?",
 					)
 				default:
-					v(t, f.config, headers.Get(k))
+					headerValidator(t, f.config, headers.Get(headerName))
 				}
 			}
 		}
 
-		if len(c.ExpectedNoProxyHeaders) > 0 {
-			for _, k := range c.ExpectedNoProxyHeaders {
+		if len(reqCfg.ExpectedNoProxyHeaders) > 0 {
+			for _, headerName := range reqCfg.ExpectedNoProxyHeaders {
 				assert.Empty(
 					t,
-					upstream.Headers.Get(k),
+					upstream.Headers.Get(headerName),
 					"case %d, header: %s was not expected to exist",
-					i,
-					k,
+					idx,
+					headerName,
 				)
 			}
 		}
 
-		if c.ExpectedContent != nil {
+		if reqCfg.ExpectedContent != nil {
 			e := string(resp.Body())
-			c.ExpectedContent(e, i)
+			reqCfg.ExpectedContent(e, idx)
 		}
 
-		if c.ExpectedContentContains != "" {
-			e := string(resp.Body())
+		if reqCfg.ExpectedContentContains != "" {
+			body := string(resp.Body())
 
 			assert.Contains(
 				t,
-				e,
-				c.ExpectedContentContains,
+				body,
+				reqCfg.ExpectedContentContains,
 				"case %d, expected content: %s, got: %s",
-				i,
-				c.ExpectedContentContains,
-				e,
+				idx,
+				reqCfg.ExpectedContentContains,
+				body,
 			)
 		}
 
-		if len(c.ExpectedCookies) > 0 {
-			for k, v := range c.ExpectedCookies {
-				cookie := findCookie(k, resp.Cookies())
+		if len(reqCfg.ExpectedCookies) > 0 {
+			for cookName, expVal := range reqCfg.ExpectedCookies {
+				cookie := findCookie(cookName, resp.Cookies())
 
 				if !assert.NotNil(
 					t,
 					cookie,
 					"case %d, expected cookie %s not found",
-					i,
-					k,
+					idx,
+					cookName,
 				) {
 					continue
 				}
 
-				if v != "" {
+				if expVal != "" {
 					assert.Equal(
 						t,
 						cookie.Value,
-						v,
+						expVal,
 						"case %d, expected cookie value: %s, got: %s",
-						i,
-						v,
+						idx,
+						expVal,
 						cookie.Value,
 					)
 				}
 			}
 		}
 
-		if len(c.ExpectedCookiesValidator) > 0 {
-			for k, v := range c.ExpectedCookiesValidator {
-				cookie := findCookie(k, resp.Cookies())
+		if len(reqCfg.ExpectedCookiesValidator) > 0 {
+			for cookName, cookValidator := range reqCfg.ExpectedCookiesValidator {
+				cookie := findCookie(cookName, resp.Cookies())
 
 				if !assert.NotNil(
 					t,
 					cookie,
 					"case %d, expected cookie %s not found",
-					i,
-					k,
+					idx,
+					cookName,
 				) {
 					continue
 				}
 
-				if v != nil {
+				if cookValidator != nil {
 					assert.True(
 						t,
-						v(t, f.config, cookie.Value),
+						cookValidator(t, f.config, cookie.Value),
 						"case %d, invalid cookie value: %s in expected cookie validator",
-						i,
+						idx,
 						cookie.Value,
 					)
 				}
 			}
 		}
 
-		if len(c.ExpectedLoginCookiesValidator) > 0 {
-			for k, v := range c.ExpectedLoginCookiesValidator {
-				cookie, ok := f.cookies[k]
+		if len(reqCfg.ExpectedLoginCookiesValidator) > 0 {
+			for cookName, cookValidator := range reqCfg.ExpectedLoginCookiesValidator {
+				cookie, ok := f.cookies[cookName]
 
-				if !assert.True(t, ok, "case %d, expected cookie %s not found", i, k) {
+				if !assert.True(t, ok, "case %d, expected cookie %s not found", idx, cookName) {
 					continue
 				}
 
-				if v != nil {
+				if cookValidator != nil {
 					assert.True(
 						t,
-						v(t, f.config, cookie.Value),
+						cookValidator(t, f.config, cookie.Value),
 						"case %d, invalid cookie value in login cookie validator: %s",
-						i,
+						idx,
 						cookie.Value,
 					)
 				}
 			}
 		}
 
-		if c.OnResponse != nil {
-			c.OnResponse(i, request, resp)
+		if reqCfg.OnResponse != nil {
+			reqCfg.OnResponse(idx, request, resp)
 		}
 	}
 }
@@ -629,13 +629,13 @@ func (f *fakeProxy) performUserLogin(uri string) error {
 	if err != nil {
 		return err
 	}
-	for _, c := range resp.Cookies() {
-		if c.Name == f.config.CookieAccessName || c.Name == f.config.CookieRefreshName {
-			f.cookies[c.Name] = &http.Cookie{
-				Name:   c.Name,
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == f.config.CookieAccessName || cookie.Name == f.config.CookieRefreshName {
+			f.cookies[cookie.Name] = &http.Cookie{
+				Name:   cookie.Name,
 				Path:   "/",
 				Domain: "127.0.0.1",
-				Value:  c.Value,
+				Value:  cookie.Value,
 			}
 		}
 	}
@@ -781,7 +781,7 @@ func newFakeKeycloakConfig() *Config {
 func makeTestCodeFlowLogin(location string) (*http.Response, []*http.Cookie, error) {
 	flowCookies := make([]*http.Cookie, 0)
 
-	u, err := url.Parse(location)
+	uri, err := url.Parse(location)
 
 	if err != nil {
 		return nil, nil, err
@@ -821,7 +821,7 @@ func makeTestCodeFlowLogin(location string) (*http.Response, []*http.Cookie, err
 		location = resp.Header.Get("Location")
 
 		if !strings.HasPrefix(location, "http") && !strings.HasPrefix(location, "https") {
-			location = fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, location)
+			location = fmt.Sprintf("%s://%s%s", uri.Scheme, uri.Host, location)
 		}
 	}
 	return resp, flowCookies, nil
@@ -838,40 +838,40 @@ type fakeUpstreamResponse struct {
 // fakeUpstreamService acts as a fake upstream service, returns the headers and request
 type fakeUpstreamService struct{}
 
-func (f *fakeUpstreamService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set(testProxyAccepted, "true")
+func (f *fakeUpstreamService) ServeHTTP(wrt http.ResponseWriter, req *http.Request) {
+	wrt.Header().Set(testProxyAccepted, "true")
 
-	upgrade := strings.ToLower(r.Header.Get("Upgrade"))
+	upgrade := strings.ToLower(req.Header.Get("Upgrade"))
 	if upgrade == "websocket" {
-		websocket.Handler(func(ws *websocket.Conn) {
-			defer ws.Close()
+		websocket.Handler(func(wsock *websocket.Conn) {
+			defer wsock.Close()
 			var data []byte
-			err := websocket.Message.Receive(ws, &data)
+			err := websocket.Message.Receive(wsock, &data)
 			if err != nil {
-				ws.WriteClose(http.StatusBadRequest)
+				wsock.WriteClose(http.StatusBadRequest)
 				return
 			}
 			content, _ := json.Marshal(&fakeUpstreamResponse{
-				URI:     r.RequestURI,
-				Method:  r.Method,
-				Address: r.RemoteAddr,
-				Headers: r.Header,
+				URI:     req.RequestURI,
+				Method:  req.Method,
+				Address: req.RemoteAddr,
+				Headers: req.Header,
 			})
-			_ = websocket.Message.Send(ws, content)
-		}).ServeHTTP(w, r)
+			_ = websocket.Message.Send(wsock, content)
+		}).ServeHTTP(wrt, req)
 	} else {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		wrt.Header().Set("Content-Type", "application/json")
+		wrt.WriteHeader(http.StatusOK)
 		content, _ := json.Marshal(&fakeUpstreamResponse{
 			// r.RequestURI is what was received by the proxy.
 			// r.URL.String() is what is actually sent to the upstream service.
 			// KEYCLOAK-10864, KEYCLOAK-11276, KEYCLOAK-13315
-			URI:     r.URL.String(),
-			Method:  r.Method,
-			Address: r.RemoteAddr,
-			Headers: r.Header,
+			URI:     req.URL.String(),
+			Method:  req.Method,
+			Address: req.RemoteAddr,
+			Headers: req.Header,
 		})
-		_, _ = w.Write(content)
+		_, _ = wrt.Write(content)
 	}
 }
 
@@ -1109,24 +1109,24 @@ func newFakeAuthServer(config *fakeAuthConfig) *fakeAuthServer {
 		},
 	}
 
-	r := chi.NewRouter()
-	r.Use(middleware.Recoverer)
-	r.Get("/auth/realms/hod-test/.well-known/openid-configuration", service.discoveryHandler)
-	r.Get("/auth/realms/hod-test/protocol/openid-connect/certs", service.keysHandler)
-	r.Get("/auth/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
-	r.Get("/auth/realms/hod-test/protocol/openid-connect/auth", service.authHandler)
-	r.Get("/auth/realms/hod-test/protocol/openid-connect/userinfo", service.userInfoHandler)
-	r.Post("/auth/realms/hod-test/protocol/openid-connect/logout", service.logoutHandler)
-	r.Post("/auth/realms/hod-test/protocol/openid-connect/revoke", service.revocationHandler)
-	r.Post("/auth/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
-	r.Get("/auth/realms/hod-test/authz/protection/resource_set", service.ResourcesHandler)
-	r.Get("/auth/realms/hod-test/authz/protection/resource_set/{id}", service.ResourceHandler)
-	r.Post("/auth/realms/hod-test/authz/protection/permission", service.PermissionTicketHandler)
+	router := chi.NewRouter()
+	router.Use(middleware.Recoverer)
+	router.Get("/auth/realms/hod-test/.well-known/openid-configuration", service.discoveryHandler)
+	router.Get("/auth/realms/hod-test/protocol/openid-connect/certs", service.keysHandler)
+	router.Get("/auth/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
+	router.Get("/auth/realms/hod-test/protocol/openid-connect/auth", service.authHandler)
+	router.Get("/auth/realms/hod-test/protocol/openid-connect/userinfo", service.userInfoHandler)
+	router.Post("/auth/realms/hod-test/protocol/openid-connect/logout", service.logoutHandler)
+	router.Post("/auth/realms/hod-test/protocol/openid-connect/revoke", service.revocationHandler)
+	router.Post("/auth/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
+	router.Get("/auth/realms/hod-test/authz/protection/resource_set", service.ResourcesHandler)
+	router.Get("/auth/realms/hod-test/authz/protection/resource_set/{id}", service.ResourceHandler)
+	router.Post("/auth/realms/hod-test/authz/protection/permission", service.PermissionTicketHandler)
 
 	if config.EnableTLS {
-		service.server = httptest.NewTLSServer(r)
+		service.server = httptest.NewTLSServer(router)
 	} else {
-		service.server = httptest.NewServer(r)
+		service.server = httptest.NewServer(router)
 	}
 
 	if config.EnableProxy {
@@ -1187,11 +1187,11 @@ func (r *fakeAuthServer) keysHandler(w http.ResponseWriter, req *http.Request) {
 	renderJSON(http.StatusOK, w, req, jose2.JSONWebKeySet{Keys: []jose2.JSONWebKey{r.key}})
 }
 
-func (r *fakeAuthServer) authHandler(w http.ResponseWriter, req *http.Request) {
+func (r *fakeAuthServer) authHandler(wrt http.ResponseWriter, req *http.Request) {
 	state := req.URL.Query().Get("state")
 	redirect := req.URL.Query().Get("redirect_uri")
 	if redirect == "" {
-		w.WriteHeader(http.StatusInternalServerError)
+		wrt.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	if state == "" {
@@ -1201,53 +1201,53 @@ func (r *fakeAuthServer) authHandler(w http.ResponseWriter, req *http.Request) {
 	randString, err := getRandomString(32)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		wrt.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	redirectionURL := fmt.Sprintf("%s?state=%s&code=%s", redirect, state, randString)
 
-	http.Redirect(w, req, redirectionURL, http.StatusSeeOther)
+	http.Redirect(wrt, req, redirectionURL, http.StatusSeeOther)
 }
 
 func (r *fakeAuthServer) logoutHandler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (r *fakeAuthServer) revocationHandler(w http.ResponseWriter, req *http.Request) {
+func (r *fakeAuthServer) revocationHandler(wrt http.ResponseWriter, req *http.Request) {
 	// according RFC revocation endpoint can be access/refresh token, keycloak
 	// implementation https://github.com/keycloak/keycloak/pull/6704, accepts
 	// refresh/offline tokens
 	if token := req.FormValue("token"); token == "" {
-		w.WriteHeader(http.StatusBadRequest)
+		wrt.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	wrt.WriteHeader(http.StatusOK)
 }
 
-func (r *fakeAuthServer) userInfoHandler(w http.ResponseWriter, req *http.Request) {
+func (r *fakeAuthServer) userInfoHandler(wrt http.ResponseWriter, req *http.Request) {
 	items := strings.Split(req.Header.Get("Authorization"), " ")
 	if len(items) != 2 {
-		w.WriteHeader(http.StatusUnauthorized)
+		wrt.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	token, err := jwt.ParseSigned(items[1])
 
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		wrt.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	user, err := extractIdentity(token)
 
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+		wrt.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	renderJSON(http.StatusOK, w, req, map[string]interface{}{
+	renderJSON(http.StatusOK, wrt, req, map[string]interface{}{
 		"sub":                user.claims["sub"],
 		"name":               user.claims["name"],
 		"given_name":         user.claims["given_name"],
@@ -1413,9 +1413,9 @@ func (r *fakeAuthServer) ResourcesHandler(w http.ResponseWriter, req *http.Reque
 	renderJSON(http.StatusOK, w, req, response)
 }
 
-func (r *fakeAuthServer) ResourceHandler(w http.ResponseWriter, req *http.Request) {
+func (r *fakeAuthServer) ResourceHandler(wrt http.ResponseWriter, req *http.Request) {
 	if r.resourceSetHandlerFailure {
-		renderJSON(http.StatusNotFound, w, req, []string{})
+		renderJSON(http.StatusNotFound, wrt, req, []string{})
 	}
 
 	type Resource struct {
@@ -1449,15 +1449,15 @@ func (r *fakeAuthServer) ResourceHandler(w http.ResponseWriter, req *http.Reques
 			Name string `json:"name"`
 		}{{Name: "test"}},
 	}
-	renderJSON(http.StatusOK, w, req, response)
+	renderJSON(http.StatusOK, wrt, req, response)
 }
 
-func (r *fakeAuthServer) PermissionTicketHandler(w http.ResponseWriter, req *http.Request) {
+func (r *fakeAuthServer) PermissionTicketHandler(wrt http.ResponseWriter, req *http.Request) {
 	token := newTestToken(r.getLocation())
 	acc, err := token.getToken()
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		wrt.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -1468,21 +1468,21 @@ func (r *fakeAuthServer) PermissionTicketHandler(w http.ResponseWriter, req *htt
 	response := Ticket{
 		Ticket: acc,
 	}
-	renderJSON(http.StatusOK, w, req, response)
+	renderJSON(http.StatusOK, wrt, req, response)
 }
 
 func getRandomString(n int) (string, error) {
-	b := make([]rune, n)
-	for i := range b {
+	runes := make([]rune, n)
+	for idx := range runes {
 		num, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
 
 		if err != nil {
 			return "", err
 		}
 
-		b[i] = letterRunes[num.Int64()]
+		runes[idx] = letterRunes[num.Int64()]
 	}
-	return string(b), nil
+	return string(runes), nil
 }
 
 func renderJSON(code int, w http.ResponseWriter, req *http.Request, data interface{}) {

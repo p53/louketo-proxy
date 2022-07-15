@@ -186,26 +186,26 @@ func createLogger(config *Config) (*zap.Logger, error) {
 		return zap.NewNop(), nil
 	}
 
-	c := zap.NewProductionConfig()
-	c.DisableStacktrace = true
-	c.DisableCaller = true
+	cfg := zap.NewProductionConfig()
+	cfg.DisableStacktrace = true
+	cfg.DisableCaller = true
 	// Use human-readable timestamps in the logs until KEYCLOAK-12100 is fixed
-	c.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
 	// are we enabling json logging?
 	if !config.EnableJSONLogging {
-		c.Encoding = "console"
+		cfg.Encoding = "console"
 	}
 
 	// are we running verbose mode?
 	if config.Verbose {
 		httplog.SetOutput(os.Stderr)
-		c.DisableCaller = false
-		c.Development = true
-		c.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+		cfg.DisableCaller = false
+		cfg.Development = true
+		cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	}
 
-	return c.Build()
+	return cfg.Build()
 }
 
 // useDefaultStack sets the default middleware stack for router
@@ -297,21 +297,21 @@ func (r *oauthProxy) createReverseProxy() error {
 	}
 
 	// step: add the routing for oauth
-	engine.With(proxyDenyMiddleware).Route(r.config.BaseURI+r.config.OAuthURI, func(e chi.Router) {
-		e.MethodNotAllowed(methodNotAllowHandlder)
-		e.HandleFunc(authorizationURL, r.oauthAuthorizationHandler)
-		e.Get(callbackURL, r.oauthCallbackHandler)
-		e.Get(expiredURL, r.expirationHandler)
-		e.With(r.authenticationMiddleware()).Get(logoutURL, r.logoutHandler)
-		e.With(r.authenticationMiddleware()).Get(tokenURL, r.tokenHandler)
-		e.Post(loginURL, r.loginHandler)
-		e.Get(discoveryURL, r.discoveryHandler)
+	engine.With(proxyDenyMiddleware).Route(r.config.BaseURI+r.config.OAuthURI, func(eng chi.Router) {
+		eng.MethodNotAllowed(methodNotAllowHandlder)
+		eng.HandleFunc(authorizationURL, r.oauthAuthorizationHandler)
+		eng.Get(callbackURL, r.oauthCallbackHandler)
+		eng.Get(expiredURL, r.expirationHandler)
+		eng.With(r.authenticationMiddleware()).Get(logoutURL, r.logoutHandler)
+		eng.With(r.authenticationMiddleware()).Get(tokenURL, r.tokenHandler)
+		eng.Post(loginURL, r.loginHandler)
+		eng.Get(discoveryURL, r.discoveryHandler)
 
 		if r.config.ListenAdmin == "" {
-			e.Mount("/", adminEngine)
+			eng.Mount("/", adminEngine)
 		}
 
-		e.NotFound(http.NotFound)
+		eng.NotFound(http.NotFound)
 	})
 
 	// step: define profiling subrouter
@@ -377,16 +377,16 @@ func (r *oauthProxy) createReverseProxy() error {
 	enableDefaultDeny := r.config.EnableDefaultDeny
 	enableDefaultDenyStrict := r.config.EnableDefaultDenyStrict
 
-	for _, x := range r.config.Resources {
-		if x.URL[len(x.URL)-1:] == "/" {
+	for _, res := range r.config.Resources {
+		if res.URL[len(res.URL)-1:] == "/" {
 			r.log.Warn("the resource url is not a prefix",
-				zap.String("resource", x.URL),
-				zap.String("change", x.URL),
-				zap.String("amended", strings.TrimRight(x.URL, "/")))
+				zap.String("resource", res.URL),
+				zap.String("change", res.URL),
+				zap.String("amended", strings.TrimRight(res.URL, "/")))
 		}
 
-		if x.URL == allPath && (r.config.EnableDefaultDeny || r.config.EnableDefaultDenyStrict) {
-			switch x.WhiteListed {
+		if res.URL == allPath && (r.config.EnableDefaultDeny || r.config.EnableDefaultDenyStrict) {
+			switch res.WhiteListed {
 			case true:
 				return errors.New("you've asked for a default denial but whitelisted everything")
 			default:
@@ -405,19 +405,19 @@ func (r *oauthProxy) createReverseProxy() error {
 		)
 	}
 
-	for _, x := range r.config.Resources {
+	for _, res := range r.config.Resources {
 		r.log.Info(
 			"protecting resource",
-			zap.String("resource", x.String()),
+			zap.String("resource", res.String()),
 		)
 
 		middlewares := []func(http.Handler) http.Handler{
 			r.authenticationMiddleware(),
-			r.admissionMiddleware(x),
+			r.admissionMiddleware(res),
 			r.identityHeadersMiddleware(r.config.AddClaims),
 		}
 
-		if x.URL == allPath && !x.WhiteListed && enableDefaultDenyStrict {
+		if res.URL == allPath && !res.WhiteListed && enableDefaultDenyStrict {
 			middlewares = []func(http.Handler) http.Handler{
 				r.denyMiddleware,
 				proxyDenyMiddleware,
@@ -428,20 +428,20 @@ func (r *oauthProxy) createReverseProxy() error {
 			middlewares = []func(http.Handler) http.Handler{
 				r.authenticationMiddleware(),
 				r.authorizationMiddleware(),
-				r.admissionMiddleware(x),
+				r.admissionMiddleware(res),
 				r.identityHeadersMiddleware(r.config.AddClaims),
 			}
 		}
 
 		e := engine.With(middlewares...)
 
-		for _, m := range x.Methods {
-			if !x.WhiteListed {
-				e.MethodFunc(m, x.URL, emptyHandler)
+		for _, method := range res.Methods {
+			if !res.WhiteListed {
+				e.MethodFunc(method, res.URL, emptyHandler)
 				continue
 			}
 
-			engine.MethodFunc(m, x.URL, emptyHandler)
+			engine.MethodFunc(method, res.URL, emptyHandler)
 		}
 	}
 
@@ -490,7 +490,7 @@ func (r *oauthProxy) createForwardingProxy() error {
 
 	// setup the tls configuration
 	if r.config.TLSCaCertificate != "" && r.config.TLSCaPrivateKey != "" {
-		ca, err := loadCA(r.config.TLSCaCertificate, r.config.TLSCaPrivateKey)
+		cAuthority, err := loadCA(r.config.TLSCaCertificate, r.config.TLSCaPrivateKey)
 
 		if err != nil {
 			return fmt.Errorf("unable to load certificate authority, error: %s", err)
@@ -501,7 +501,7 @@ func (r *oauthProxy) createForwardingProxy() error {
 			func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
 				return &goproxy.ConnectAction{
 					Action:    goproxy.ConnectMitm,
-					TLSConfig: goproxy.TLSConfigFromCA(ca),
+					TLSConfig: goproxy.TLSConfigFromCA(cAuthority),
 				}, host
 			},
 		)
@@ -930,14 +930,14 @@ func (r *oauthProxy) createUpstreamProxy(upstream *url.URL) error {
 				zap.String("path", r.config.UpstreamCA),
 			)
 
-			ca, err := ioutil.ReadFile(r.config.UpstreamCA)
+			cAuthority, err := ioutil.ReadFile(r.config.UpstreamCA)
 
 			if err != nil {
 				return err
 			}
 
 			pool := x509.NewCertPool()
-			pool.AppendCertsFromPEM(ca)
+			pool.AppendCertsFromPEM(cAuthority)
 			tlsConfig.RootCAs = pool
 		}
 	}

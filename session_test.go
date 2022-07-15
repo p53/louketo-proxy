@@ -122,7 +122,7 @@ func TestGetIndentity(t *testing.T) {
 		},
 	}
 
-	for i, testCase := range testCases {
+	for idx, testCase := range testCases {
 		c := newFakeKeycloakConfig()
 		testCase := testCase
 		testCase.ProxySettings(c)
@@ -134,12 +134,12 @@ func TestGetIndentity(t *testing.T) {
 		user, err := p.getIdentity(testCase.Request(token))
 
 		if err != nil && testCase.Ok {
-			t.Errorf("test case %d should not have errored", i)
+			t.Errorf("test case %d should not have errored", idx)
 			continue
 		}
 
 		if err == nil && !testCase.Ok {
-			t.Errorf("test case %d should not have errored", i)
+			t.Errorf("test case %d should not have errored", idx)
 			continue
 		}
 
@@ -148,7 +148,7 @@ func TestGetIndentity(t *testing.T) {
 		}
 
 		if user.rawToken != token {
-			t.Errorf("test case %d the tokens are not the same", i)
+			t.Errorf("test case %d the tokens are not the same", idx)
 		}
 	}
 }
@@ -157,7 +157,7 @@ func TestGetTokenInRequest(t *testing.T) {
 	defaultName := newDefaultConfig().CookieAccessName
 	token, err := newTestToken("test").getToken()
 	assert.NoError(t, err)
-	cs := []struct {
+	testCases := []struct {
 		Token                           string
 		AuthScheme                      string
 		Error                           error
@@ -212,34 +212,34 @@ func TestGetTokenInRequest(t *testing.T) {
 			SkipAuthorizationHeaderIdentity: false,
 		},
 	}
-	for i, x := range cs {
+	for idx, testCase := range testCases {
 		req := newFakeHTTPRequest(http.MethodGet, "/")
-		if x.Token != "" {
-			if x.AuthScheme != "" {
-				req.Header.Set(authorizationHeader, x.AuthScheme+" "+x.Token)
+		if testCase.Token != "" {
+			if testCase.AuthScheme != "" {
+				req.Header.Set(authorizationHeader, testCase.AuthScheme+" "+testCase.Token)
 			} else {
 				req.AddCookie(&http.Cookie{
 					Name:   defaultName,
 					Path:   req.URL.Path,
 					Domain: req.Host,
-					Value:  x.Token,
+					Value:  testCase.Token,
 				})
 			}
 		}
-		access, bearer, err := getTokenInRequest(req, defaultName, x.SkipAuthorizationHeaderIdentity)
-		switch x.Error {
+		access, bearer, err := getTokenInRequest(req, defaultName, testCase.SkipAuthorizationHeaderIdentity)
+		switch testCase.Error {
 		case nil:
-			assert.NoError(t, err, "case %d should not have thrown an error", i)
-			assert.Equal(t, x.AuthScheme == "Bearer", bearer)
+			assert.NoError(t, err, "case %d should not have thrown an error", idx)
+			assert.Equal(t, testCase.AuthScheme == "Bearer", bearer)
 			assert.Equal(t, token, access)
 		default:
-			assert.Equal(t, x.Error, err, "case %d, expected error: %s", i, x.Error)
+			assert.Equal(t, testCase.Error, err, "case %d, expected error: %s", idx, testCase.Error)
 		}
 	}
 }
 
 func TestGetRefreshTokenFromCookie(t *testing.T) {
-	p, _, _ := newTestProxyService(nil)
+	proxy, _, _ := newTestProxyService(nil)
 	cases := []struct {
 		Cookies  *http.Cookie
 		Expected string
@@ -267,15 +267,15 @@ func TestGetRefreshTokenFromCookie(t *testing.T) {
 		},
 	}
 
-	for _, x := range cases {
+	for _, testCase := range cases {
 		req := newFakeHTTPRequest(http.MethodGet, "/")
-		req.AddCookie(x.Cookies)
-		token, err := p.getRefreshTokenFromCookie(req)
-		switch x.Ok {
+		req.AddCookie(testCase.Cookies)
+		token, err := proxy.getRefreshTokenFromCookie(req)
+		switch testCase.Ok {
 		case true:
 			assert.NoError(t, err)
 			assert.NotEmpty(t, token)
-			assert.Equal(t, x.Expected, token)
+			assert.Equal(t, testCase.Expected, token)
 		default:
 			assert.Error(t, err)
 			assert.Empty(t, token)

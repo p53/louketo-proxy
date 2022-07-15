@@ -121,13 +121,13 @@ func TestOauthRequests(t *testing.T) {
 func TestAdminListener(t *testing.T) {
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(conf *Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestAdminOnSameListener",
-			ProxySettings: func(c *Config) {
-				c.EnableMetrics = true
+			ProxySettings: func(conf *Config) {
+				conf.EnableMetrics = true
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -145,9 +145,9 @@ func TestAdminListener(t *testing.T) {
 		},
 		{
 			Name: "TestAdminOnDifferentListener",
-			ProxySettings: func(c *Config) {
-				c.EnableMetrics = true
-				c.ListenAdmin = "127.0.0.1:12300"
+			ProxySettings: func(conf *Config) {
+				conf.EnableMetrics = true
+				conf.ListenAdmin = "127.0.0.1:12300"
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -175,13 +175,13 @@ func TestAdminListener(t *testing.T) {
 		},
 		{
 			Name: "TestAdminOnDifferentListenerWithHTTPS",
-			ProxySettings: func(c *Config) {
-				c.EnableMetrics = true
-				c.ListenAdmin = "127.0.0.1:12301"
-				c.ListenAdminScheme = secureScheme
-				c.TLSAdminCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSAdminPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSAdminCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
+			ProxySettings: func(conf *Config) {
+				conf.EnableMetrics = true
+				conf.ListenAdmin = "127.0.0.1:12301"
+				conf.ListenAdminScheme = secureScheme
+				conf.TLSAdminCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				conf.TLSAdminPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				conf.TLSAdminCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -201,13 +201,13 @@ func TestAdminListener(t *testing.T) {
 		},
 		{
 			Name: "TestAdminOnDifferentListenerWithHTTPSandCommonCreds",
-			ProxySettings: func(c *Config) {
-				c.EnableMetrics = true
-				c.ListenAdmin = "127.0.0.1:12302"
-				c.ListenAdminScheme = secureScheme
-				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
+			ProxySettings: func(conf *Config) {
+				conf.EnableMetrics = true
+				conf.ListenAdmin = "127.0.0.1:12302"
+				conf.ListenAdminScheme = secureScheme
+				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				conf.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -229,38 +229,38 @@ func TestAdminListener(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
-		c := newFakeKeycloakConfig()
+		cfg := newFakeKeycloakConfig()
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				testCase.ProxySettings(c)
+				testCase.ProxySettings(cfg)
 
 				certFile := ""
 				privFile := ""
 				caFile := ""
 
-				if c.TLSAdminCertificate != "" {
-					certFile = c.TLSAdminCertificate
+				if cfg.TLSAdminCertificate != "" {
+					certFile = cfg.TLSAdminCertificate
 				}
 
-				if c.TLSCertificate != "" {
-					certFile = c.TLSCertificate
+				if cfg.TLSCertificate != "" {
+					certFile = cfg.TLSCertificate
 				}
 
-				if c.TLSAdminPrivateKey != "" {
-					privFile = c.TLSAdminPrivateKey
+				if cfg.TLSAdminPrivateKey != "" {
+					privFile = cfg.TLSAdminPrivateKey
 				}
 
-				if c.TLSPrivateKey != "" {
-					privFile = c.TLSPrivateKey
+				if cfg.TLSPrivateKey != "" {
+					privFile = cfg.TLSPrivateKey
 				}
 
-				if c.TLSAdminCaCertificate != "" {
-					caFile = c.TLSAdminCaCertificate
+				if cfg.TLSAdminCaCertificate != "" {
+					caFile = cfg.TLSAdminCaCertificate
 				}
 
-				if c.TLSCaCertificate != "" {
-					caFile = c.TLSCaCertificate
+				if cfg.TLSCaCertificate != "" {
+					caFile = cfg.TLSCaCertificate
 				}
 
 				if certFile != "" {
@@ -293,7 +293,7 @@ func TestAdminListener(t *testing.T) {
 					defer os.Remove(caFile)
 				}
 
-				p := newFakeProxy(c, &fakeAuthConfig{})
+				p := newFakeProxy(cfg, &fakeAuthConfig{})
 				p.RunTests(t, testCase.ExecutionSettings)
 			},
 		)
@@ -531,8 +531,8 @@ func TestStrangeRoutingError(t *testing.T) {
 }
 
 func TestNoProxyingRequests(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.Resources = []*Resource{
+	cfg := newFakeKeycloakConfig()
+	cfg.Resources = []*Resource{
 		{
 			URL:     "/*",
 			Methods: allHTTPMethods,
@@ -560,7 +560,7 @@ func TestNoProxyingRequests(t *testing.T) {
 			ExpectedCode: http.StatusSeeOther,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 const testAdminURI = "/admin/test"
@@ -1097,16 +1097,16 @@ func TestCrossSiteHandler(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
+	for _, testCase := range cases {
 		cfg := newFakeKeycloakConfig()
-		cfg.CorsCredentials = c.Cors.AllowCredentials
-		cfg.CorsExposedHeaders = c.Cors.ExposedHeaders
-		cfg.CorsHeaders = c.Cors.AllowedHeaders
-		cfg.CorsMaxAge = time.Duration(c.Cors.MaxAge) * time.Second
-		cfg.CorsMethods = c.Cors.AllowedMethods
-		cfg.CorsOrigins = c.Cors.AllowedOrigins
+		cfg.CorsCredentials = testCase.Cors.AllowCredentials
+		cfg.CorsExposedHeaders = testCase.Cors.ExposedHeaders
+		cfg.CorsHeaders = testCase.Cors.AllowedHeaders
+		cfg.CorsMaxAge = time.Duration(testCase.Cors.MaxAge) * time.Second
+		cfg.CorsMethods = testCase.Cors.AllowedMethods
+		cfg.CorsOrigins = testCase.Cors.AllowedOrigins
 
-		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
+		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{testCase.Request})
 	}
 }
 
@@ -1250,13 +1250,13 @@ func TestAccessTokenEncryption(t *testing.T) {
 	}{
 		{
 			Name: "TestEnableEncryptedTokenWithRedis",
-			ProxySettings: func(c *Config) {
-				c.EnableRefreshTokens = true
-				c.EnableEncryptedToken = true
-				c.Verbose = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+			ProxySettings: func(conf *Config) {
+				conf.EnableRefreshTokens = true
+				conf.EnableEncryptedToken = true
+				conf.Verbose = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1282,12 +1282,12 @@ func TestAccessTokenEncryption(t *testing.T) {
 		},
 		{
 			Name: "TestEnableEncryptedToken",
-			ProxySettings: func(c *Config) {
-				c.EnableRefreshTokens = true
-				c.EnableEncryptedToken = true
-				c.Verbose = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableRefreshTokens = true
+				conf.EnableEncryptedToken = true
+				conf.Verbose = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1313,13 +1313,13 @@ func TestAccessTokenEncryption(t *testing.T) {
 		},
 		{
 			Name: "ForceEncryptedCookie",
-			ProxySettings: func(c *Config) {
-				c.EnableRefreshTokens = true
-				c.EnableEncryptedToken = false
-				c.ForceEncryptedCookie = true
-				c.Verbose = true
-				c.EnableLogging = true
-				c.EncryptionKey = testEncryptionKey
+			ProxySettings: func(conf *Config) {
+				conf.EnableRefreshTokens = true
+				conf.EnableEncryptedToken = false
+				conf.ForceEncryptedCookie = true
+				conf.Verbose = true
+				conf.EnableLogging = true
+				conf.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1680,7 +1680,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 
 func TestGzipCompression(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	s := httptest.NewServer(&fakeUpstreamService{})
+	server := httptest.NewServer(&fakeUpstreamService{})
 
 	requests := []struct {
 		Name              string
@@ -1733,7 +1733,7 @@ func TestGzipCompression(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URL:                     s.URL + "/test",
+					URL:                     server.URL + "/test",
 					ProxyRequest:            true,
 					ExpectedProxy:           true,
 					ExpectedCode:            http.StatusOK,
@@ -1785,14 +1785,14 @@ func TestGzipCompression(t *testing.T) {
 
 	for _, testCase := range requests {
 		testCase := testCase
-		c := *cfg
-		c.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
+		cfg := *cfg
+		cfg.Resources = []*Resource{{URL: "/admin*", Methods: allHTTPMethods}}
 
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				testCase.ProxySettings(&c)
-				p := newFakeProxy(&c, &fakeAuthConfig{})
+				testCase.ProxySettings(&cfg)
+				p := newFakeProxy(&cfg, &fakeAuthConfig{})
 				p.RunTests(t, testCase.ExecutionSettings)
 			},
 		)
@@ -1809,13 +1809,13 @@ func TestEnableUma(t *testing.T) {
 	}{
 		{
 			Name: "TestUmaNoToken",
-			ProxySettings: func(c *Config) {
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1835,13 +1835,13 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaTokenWithoutAuthz",
-			ProxySettings: func(c *Config) {
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1863,13 +1863,13 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaTokenWithoutResourceId",
-			ProxySettings: func(c *Config) {
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1899,13 +1899,13 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaTokenWithoutScope",
-			ProxySettings: func(c *Config) {
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1935,13 +1935,13 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaOK",
-			ProxySettings: func(c *Config) {
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1995,20 +1995,20 @@ func TestEnableUmaWithCache(t *testing.T) {
 	}{
 		{
 			Name: "TestUmaTokenWithoutAuthzWithDifferentTokens",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2063,20 +2063,20 @@ func TestEnableUmaWithCache(t *testing.T) {
 		},
 		{
 			Name: "TestUmaOKWithDifferentTokens",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2147,20 +2147,20 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				return reqs, nil
 			},
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2202,20 +2202,20 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				return reqs, nil
 			},
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2276,20 +2276,20 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				return reqs, nil
 			},
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.EnableUma = true
-				c.EnableDefaultDeny = true
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.EnableUma = true
+				conf.EnableDefaultDeny = true
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			ExecutionSettings: []fakeRequest{
 				{

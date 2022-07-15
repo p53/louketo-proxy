@@ -112,13 +112,13 @@ func TestGetAccessCookieExpiration_PastExp(t *testing.T) {
 }
 
 func TestGetAccessCookieExpiration_ValidExp(t *testing.T) {
-	ft := newTestToken("foo")
-	token, err := ft.getToken()
+	fToken := newTestToken("foo")
+	token, err := fToken.getToken()
 	assert.NoError(t, err)
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
 	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
 	duration := proxy.getAccessCookieExpiration(token)
-	expectedDuration := time.Until(time.Unix(ft.claims.Exp, 0))
+	expectedDuration := time.Until(time.Unix(fToken.claims.Exp, 0))
 	assertAlmostEquals(t, expectedDuration, duration)
 }

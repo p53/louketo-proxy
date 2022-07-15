@@ -113,16 +113,16 @@ func createCertificate(key *rsa.PrivateKey, hostnames []string, expire time.Dura
 }
 
 // getRequestHostURL returns the hostname from the request
-func getRequestHostURL(r *http.Request) string {
+func getRequestHostURL(req *http.Request) string {
 	scheme := unsecureScheme
 
-	if r.TLS != nil {
+	if req.TLS != nil {
 		scheme = secureScheme
 	}
 
 	redirect := fmt.Sprintf("%s://%s",
-		defaultTo(r.Header.Get("X-Forwarded-Proto"), scheme),
-		defaultTo(r.Header.Get("X-Forwarded-Host"), r.Host))
+		defaultTo(req.Header.Get("X-Forwarded-Proto"), scheme),
+		defaultTo(req.Header.Get("X-Forwarded-Host"), req.Host))
 
 	return redirect
 }
@@ -223,19 +223,19 @@ func decodeText(state, key string) (string, error) {
 
 // decodeKeyPairs converts a list of strings (key=pair) to a map
 func decodeKeyPairs(list []string) (map[string]string, error) {
-	kp := make(map[string]string)
+	keyPairs := make(map[string]string)
 
-	for _, x := range list {
-		items := strings.Split(x, "=")
+	for _, pair := range list {
+		items := strings.Split(pair, "=")
 
 		if len(items) < 2 || items[0] == "" {
-			return kp, fmt.Errorf("invalid tag '%s' should be key=pair", x)
+			return keyPairs, fmt.Errorf("invalid tag '%s' should be key=pair", pair)
 		}
 
-		kp[items[0]] = strings.Join(items[1:], "=")
+		keyPairs[items[0]] = strings.Join(items[1:], "=")
 	}
 
-	return kp, nil
+	return keyPairs, nil
 }
 
 // isValidHTTPMethod ensure this is a valid http method type
@@ -424,13 +424,13 @@ func toHeader(v string) string {
 }
 
 // capitalize capitalizes the first letter of a word
-func capitalize(s string) string {
-	if s == "" {
+func capitalize(word string) string {
+	if word == "" {
 		return ""
 	}
-	r, n := utf8.DecodeRuneInString(s)
+	r, n := utf8.DecodeRuneInString(word)
 
-	return string(unicode.ToUpper(r)) + s[n:]
+	return string(unicode.ToUpper(r)) + word[n:]
 }
 
 // mergeMaps simples copies the keys from source to destination
@@ -456,15 +456,15 @@ func loadCA(cert, key string) (*tls.Certificate, error) {
 		return nil, err
 	}
 
-	ca, err := tls.X509KeyPair(caCert, caKey)
+	cAuthority, err := tls.X509KeyPair(caCert, caKey)
 
 	if err != nil {
 		return nil, err
 	}
 
-	ca.Leaf, err = x509.ParseCertificate(ca.Certificate[0])
+	cAuthority.Leaf, err = x509.ParseCertificate(cAuthority.Certificate[0])
 
-	return &ca, err
+	return &cAuthority, err
 }
 
 // getWithin calculates a duration of x percent of the time period, i.e. something
@@ -494,15 +494,15 @@ func printError(message string, args ...interface{}) *cli.ExitError {
 
 // realIP retrieves the client ip address from a http request
 func realIP(req *http.Request) string {
-	ra := req.RemoteAddr
+	rAddr := req.RemoteAddr
 
 	if ip := req.Header.Get(headerXForwardedFor); ip != "" {
-		ra = strings.Split(ip, ", ")[0]
+		rAddr = strings.Split(ip, ", ")[0]
 	} else if ip := req.Header.Get(headerXRealIP); ip != "" {
-		ra = ip
+		rAddr = ip
 	} else {
-		ra, _, _ = net.SplitHostPort(ra)
+		rAddr, _, _ = net.SplitHostPort(rAddr)
 	}
 
-	return ra
+	return rAddr
 }

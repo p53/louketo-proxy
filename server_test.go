@@ -188,7 +188,7 @@ func TestAuthTokenHeader(t *testing.T) {
 }
 
 func TestForwardingProxy(t *testing.T) {
-	s := httptest.NewServer(&fakeUpstreamService{})
+	server := httptest.NewServer(&fakeUpstreamService{})
 
 	testCases := []struct {
 		Name              string
@@ -197,19 +197,19 @@ func TestForwardingProxy(t *testing.T) {
 	}{
 		{
 			Name: "TestPasswordGrant",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.ForwardingDomains = []string{}
-				c.ForwardingUsername = validUsername
-				c.ForwardingPassword = validPassword
-				c.ForwardingGrantType = GrantTypeUserCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.OpenIDProviderTimeout = 30 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.ForwardingDomains = []string{}
+				conf.ForwardingUsername = validUsername
+				conf.ForwardingPassword = validPassword
+				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.OpenIDProviderTimeout = 30 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URL:                     s.URL + "/test",
+					URL:                     server.URL + "/test",
 					ProxyRequest:            true,
 					ExpectedProxy:           true,
 					ExpectedCode:            http.StatusOK,
@@ -219,18 +219,18 @@ func TestForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestPasswordGrantWithRefreshing",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.ForwardingDomains = []string{}
-				c.ForwardingUsername = validUsername
-				c.ForwardingPassword = validPassword
-				c.ForwardingGrantType = GrantTypeUserCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.ForwardingDomains = []string{}
+				conf.ForwardingUsername = validUsername
+				conf.ForwardingPassword = validPassword
+				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URL:                     s.URL + "/test",
+					URL:                     server.URL + "/test",
 					ProxyRequest:            true,
 					ExpectedProxy:           true,
 					ExpectedCode:            http.StatusOK,
@@ -238,7 +238,7 @@ func TestForwardingProxy(t *testing.T) {
 					ExpectedContentContains: "Bearer ey",
 				},
 				{
-					URL:                     s.URL + "/test",
+					URL:                     server.URL + "/test",
 					ProxyRequest:            true,
 					ExpectedProxy:           true,
 					ExpectedCode:            http.StatusOK,
@@ -248,18 +248,18 @@ func TestForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestClientCredentialsGrant",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.ForwardingDomains = []string{}
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.ForwardingGrantType = GrantTypeClientCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.ForwardingDomains = []string{}
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.ForwardingGrantType = GrantTypeClientCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URL:                     s.URL + "/test",
+					URL:                     server.URL + "/test",
 					ProxyRequest:            true,
 					ExpectedProxy:           true,
 					ExpectedCode:            http.StatusOK,
@@ -269,18 +269,18 @@ func TestForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestClientCredentialsGrantWithRefreshing",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.ForwardingDomains = []string{}
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.ForwardingGrantType = GrantTypeClientCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.ForwardingDomains = []string{}
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.ForwardingGrantType = GrantTypeClientCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URL:                     s.URL + "/test",
+					URL:                     server.URL + "/test",
 					ProxyRequest:            true,
 					ExpectedProxy:           true,
 					ExpectedCode:            http.StatusOK,
@@ -288,7 +288,7 @@ func TestForwardingProxy(t *testing.T) {
 					ExpectedContentContains: "Bearer ey",
 				},
 				{
-					URL:                     s.URL + "/test",
+					URL:                     server.URL + "/test",
 					ProxyRequest:            true,
 					ExpectedProxy:           true,
 					ExpectedCode:            http.StatusOK,
@@ -304,7 +304,7 @@ func TestForwardingProxy(t *testing.T) {
 			testCase.Name,
 			func(t *testing.T) {
 				c := newFakeKeycloakConfig()
-				c.Upstream = s.URL
+				c.Upstream = server.URL
 				testCase.ProxySettings(c)
 				p := newFakeProxy(c, &fakeAuthConfig{Expiration: 900 * time.Millisecond})
 				<-time.After(time.Duration(100) * time.Millisecond)
@@ -337,20 +337,20 @@ func TestUmaForwardingProxy(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(conf *Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestFailureOnDisabledUmaOnForwardingProxy",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.ForwardingDomains = []string{}
-				c.ForwardingUsername = validUsername
-				c.ForwardingPassword = validPassword
-				c.ForwardingGrantType = GrantTypeUserCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.OpenIDProviderTimeout = 30 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.ForwardingDomains = []string{}
+				conf.ForwardingUsername = validUsername
+				conf.ForwardingPassword = validPassword
+				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.OpenIDProviderTimeout = 30 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -366,16 +366,16 @@ func TestUmaForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestPasswordGrant",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.EnableUma = true
-				c.ForwardingDomains = []string{}
-				c.ForwardingUsername = validUsername
-				c.ForwardingPassword = validPassword
-				c.ForwardingGrantType = GrantTypeUserCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
-				c.OpenIDProviderTimeout = 30 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.EnableUma = true
+				conf.ForwardingDomains = []string{}
+				conf.ForwardingUsername = validUsername
+				conf.ForwardingPassword = validPassword
+				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
+				conf.OpenIDProviderTimeout = 30 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -389,15 +389,15 @@ func TestUmaForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestPasswordGrantWithRefreshing",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.EnableUma = true
-				c.ForwardingDomains = []string{}
-				c.ForwardingUsername = validUsername
-				c.ForwardingPassword = validPassword
-				c.ForwardingGrantType = GrantTypeUserCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.EnableUma = true
+				conf.ForwardingDomains = []string{}
+				conf.ForwardingUsername = validUsername
+				conf.ForwardingPassword = validPassword
+				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -419,15 +419,15 @@ func TestUmaForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestClientCredentialsGrant",
-			ProxySettings: func(c *Config) {
-				c.EnableForwarding = true
-				c.EnableUma = true
-				c.ForwardingDomains = []string{}
-				c.ClientID = validUsername
-				c.ClientSecret = validPassword
-				c.ForwardingGrantType = GrantTypeClientCreds
-				c.PatRetryCount = 5
-				c.PatRetryInterval = 2 * time.Second
+			ProxySettings: func(conf *Config) {
+				conf.EnableForwarding = true
+				conf.EnableUma = true
+				conf.ForwardingDomains = []string{}
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.ForwardingGrantType = GrantTypeClientCreds
+				conf.PatRetryCount = 5
+				conf.PatRetryInterval = 2 * time.Second
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -594,8 +594,8 @@ func TestErrorTemplate(t *testing.T) {
 }
 
 func TestSkipOpenIDProviderTLSVerify(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.SkipOpenIDProviderTLSVerify = true
+	cfg := newFakeKeycloakConfig()
+	cfg.SkipOpenIDProviderTLSVerify = true
 	requests := []fakeRequest{
 		{
 			URI:           "/auth_all/test",
@@ -605,8 +605,8 @@ func TestSkipOpenIDProviderTLSVerify(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
-	c.SkipOpenIDProviderTLSVerify = false
+	newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+	cfg.SkipOpenIDProviderTLSVerify = false
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -618,13 +618,13 @@ func TestSkipOpenIDProviderTLSVerify(t *testing.T) {
 		}
 	}()
 
-	newFakeProxy(c, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{EnableTLS: true}).RunTests(t, requests)
 }
 
 func TestOpenIDProviderProxy(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.SkipOpenIDProviderTLSVerify = true
-	c.OpenIDProviderProxy = "http://127.0.0.1:1000"
+	cfg := newFakeKeycloakConfig()
+	cfg.SkipOpenIDProviderTLSVerify = true
+	cfg.OpenIDProviderProxy = "http://127.0.0.1:1000"
 
 	requests := []fakeRequest{
 		{
@@ -641,7 +641,7 @@ func TestOpenIDProviderProxy(t *testing.T) {
 		EnableProxy: true,
 	}
 
-	newFakeProxy(c, fakeAuthConf).RunTests(t, requests)
+	newFakeProxy(cfg, fakeAuthConf).RunTests(t, requests)
 
 	fakeAuthConf = &fakeAuthConfig{
 		EnableTLS:   false,
@@ -658,12 +658,12 @@ func TestOpenIDProviderProxy(t *testing.T) {
 		}
 	}()
 
-	newFakeProxy(c, fakeAuthConf).RunTests(t, requests)
+	newFakeProxy(cfg, fakeAuthConf).RunTests(t, requests)
 }
 
 func TestRequestIDHeader(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.EnableRequestID = true
+	cfg := newFakeKeycloakConfig()
+	cfg.EnableRequestID = true
 	requests := []fakeRequest{
 		{
 			URI:           "/auth_all/test",
@@ -676,7 +676,7 @@ func TestRequestIDHeader(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestAuthTokenHeaderDisabled(t *testing.T) {
@@ -699,8 +699,8 @@ func TestAuthTokenHeaderDisabled(t *testing.T) {
 }
 
 func TestAudienceHeader(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.NoRedirects = false
+	cfg := newFakeKeycloakConfig()
+	cfg.NoRedirects = false
 	requests := []fakeRequest{
 		{
 			URI:           "/auth_all/test",
@@ -713,7 +713,7 @@ func TestAudienceHeader(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestDefaultDenial(t *testing.T) {
@@ -898,8 +898,8 @@ func TestAuthorizationTemplate(t *testing.T) {
 }
 
 func TestProxyProtocol(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.EnableProxyProtocol = true
+	cfg := newFakeKeycloakConfig()
+	cfg.EnableProxyProtocol = true
 	requests := []fakeRequest{
 		{
 			URI:           fakeAuthAllURL + "/test",
@@ -921,7 +921,7 @@ func TestProxyProtocol(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestXForwarded(t *testing.T) {
@@ -1004,9 +1004,9 @@ func TestXForwarded(t *testing.T) {
 }
 
 func TestTokenEncryption(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.EnableEncryptedToken = true
-	c.EncryptionKey = "US36S5kubc4BXbfzCIKTQcTzG6lvixVv"
+	cfg := newFakeKeycloakConfig()
+	cfg.EnableEncryptedToken = true
+	cfg.EncryptionKey = "US36S5kubc4BXbfzCIKTQcTzG6lvixVv"
 	requests := []fakeRequest{
 		{
 			URI:           "/auth_all/test",
@@ -1028,7 +1028,7 @@ func TestTokenEncryption(t *testing.T) {
 			ExpectedCode: http.StatusUnauthorized,
 		},
 	}
-	newFakeProxy(c, &fakeAuthConfig{}).RunTests(t, requests)
+	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestCustomResponseHeaders(t *testing.T) {
@@ -1162,9 +1162,9 @@ func TestAuthTokenHeaderEnabled(t *testing.T) {
 }
 
 func TestDisableAuthorizationCookie(t *testing.T) {
-	c := newFakeKeycloakConfig()
-	c.EnableAuthorizationCookies = false
-	p := newFakeProxy(c, &fakeAuthConfig{})
+	cfg := newFakeKeycloakConfig()
+	cfg.EnableAuthorizationCookies = false
+	p := newFakeProxy(cfg, &fakeAuthConfig{})
 	token := newTestToken(p.idp.getLocation())
 	signed, _ := token.getToken()
 
@@ -1172,7 +1172,7 @@ func TestDisableAuthorizationCookie(t *testing.T) {
 		{
 			URI: "/auth_all/test",
 			Cookies: []*http.Cookie{
-				{Name: c.CookieAccessName, Value: signed},
+				{Name: cfg.CookieAccessName, Value: signed},
 				{Name: "mycookie", Value: "myvalue"},
 			},
 			HasToken:                true,
@@ -1188,17 +1188,17 @@ func TestTLS(t *testing.T) {
 	testProxyAddr := "127.0.0.1:14302"
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(conf *Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestProxyTLS",
-			ProxySettings: func(c *Config) {
-				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
-				c.Listen = testProxyAddr
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				conf.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
+				conf.Listen = testProxyAddr
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1210,13 +1210,13 @@ func TestTLS(t *testing.T) {
 		},
 		{
 			Name: "TestProxyTLSMatch",
-			ProxySettings: func(c *Config) {
-				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
-				c.Listen = testProxyAddr
-				c.TLSMinVersion = "tlsv1.0"
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				conf.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
+				conf.Listen = testProxyAddr
+				conf.TLSMinVersion = "tlsv1.0"
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1229,13 +1229,13 @@ func TestTLS(t *testing.T) {
 		},
 		{
 			Name: "TestProxyTLSDiffer",
-			ProxySettings: func(c *Config) {
-				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
-				c.Listen = testProxyAddr
-				c.TLSMinVersion = "tlsv1.2"
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				conf.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
+				conf.Listen = testProxyAddr
+				conf.TLSMinVersion = "tlsv1.2"
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1248,13 +1248,13 @@ func TestTLS(t *testing.T) {
 		},
 		{
 			Name: "TestProxyTLSMinNotFullfilled",
-			ProxySettings: func(c *Config) {
-				c.EnableDefaultDeny = true
-				c.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
-				c.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
-				c.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
-				c.Listen = testProxyAddr
-				c.TLSMinVersion = "tlsv1.3"
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
+				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
+				conf.TLSCaCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_ca_%d", rand.Intn(10000))
+				conf.Listen = testProxyAddr
+				conf.TLSMinVersion = "tlsv1.3"
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1269,26 +1269,26 @@ func TestTLS(t *testing.T) {
 
 	for _, testCase := range testCases {
 		testCase := testCase
-		c := newFakeKeycloakConfig()
+		cfg := newFakeKeycloakConfig()
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				testCase.ProxySettings(c)
+				testCase.ProxySettings(cfg)
 
 				certFile := ""
 				privFile := ""
 				caFile := ""
 
-				if c.TLSCertificate != "" {
-					certFile = c.TLSCertificate
+				if cfg.TLSCertificate != "" {
+					certFile = cfg.TLSCertificate
 				}
 
-				if c.TLSPrivateKey != "" {
-					privFile = c.TLSPrivateKey
+				if cfg.TLSPrivateKey != "" {
+					privFile = cfg.TLSPrivateKey
 				}
 
-				if c.TLSCaCertificate != "" {
-					caFile = c.TLSCaCertificate
+				if cfg.TLSCaCertificate != "" {
+					caFile = cfg.TLSCaCertificate
 				}
 
 				if certFile != "" {
@@ -1321,7 +1321,7 @@ func TestTLS(t *testing.T) {
 					defer os.Remove(caFile)
 				}
 
-				p := newFakeProxy(c, &fakeAuthConfig{})
+				p := newFakeProxy(cfg, &fakeAuthConfig{})
 				p.RunTests(t, testCase.ExecutionSettings)
 			},
 		)
@@ -1613,55 +1613,55 @@ func TestGetAuthz(t *testing.T) {
 	}{
 		{
 			Name: "TestEntryInStore",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			JWT: jwt,
 		},
 		{
 			Name: "TestZeroLengthToken",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			JWT:             "",
 			ExpectedFailure: true,
 		},
 		{
 			Name: "TestEmptyResponse",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
+				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 			JWT:             jwt,
 			ExpectedFailure: true,
 		},
 		{
 			Name: "TestFailedStore",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(conf *Config) {
 				_, err := miniredis.Run()
 
 				if err != nil {
 					t.Fatalf("Starting redis failed %s", err)
 				}
 
-				c.StoreURL = fmt.Sprintf("redis://%s", "failed:65000")
+				conf.StoreURL = fmt.Sprintf("redis://%s", "failed:65000")
 			},
 			JWT:             jwt,
 			ExpectedFailure: true,
@@ -1670,12 +1670,12 @@ func TestGetAuthz(t *testing.T) {
 
 	for _, testCase := range tests {
 		testCase := testCase
-		c := *cfg
+		cfg := *cfg
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				testCase.ProxySettings(&c)
-				p := newFakeProxy(&c, &fakeAuthConfig{})
+				testCase.ProxySettings(&cfg)
+				p := newFakeProxy(&cfg, &fakeAuthConfig{})
 
 				url, err := url.Parse("http://test.com/test")
 
@@ -1706,7 +1706,7 @@ func TestGetAuthz(t *testing.T) {
 						t.Fatalf("expected error %s, got %s", apperrors.ErrZeroLengthToken, err)
 					}
 
-					if testCase.JWT != "" && err != apperrors.ErrNoAuthzFound && !strings.Contains(c.StoreURL, "failed") {
+					if testCase.JWT != "" && err != apperrors.ErrNoAuthzFound && !strings.Contains(cfg.StoreURL, "failed") {
 						t.Fatalf("expected error %s, got %s", apperrors.ErrNoAuthzFound, err)
 					}
 				}
