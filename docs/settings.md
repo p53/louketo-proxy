@@ -30,7 +30,8 @@
 |    --self-signed-tls-expiration value      | the expiration of the certificate before rotation | 3h0m0s | PROXY_SELF_SIGNED_TLS_EXPIRATION
 |    --enable-request-id                     | indicates we should add a request id if none found | false | PROXY_ENABLE_REQUEST_ID |
 |    --enable-logout-redirect                | indicates we should redirect to the identity provider for logging out | false | PROXY_ENABLE_LOGOUT_REDIRECT
-|    --enable-default-deny                   | enables a default denial on all requests, you have to explicitly say what is permitted (recommended) | true | PROXY_ENABLE_DEFAULT_DENY
+|    --enable-default-deny                   | enables a default denial on all requests, requests with valid token are permitted, you have to explicitly say what is permitted | true | PROXY_ENABLE_DEFAULT_DENY
+|    --enable-default-deny-strict            | enables a default denial on all requests, requests with valid token are denied, you have to explicitly say what is permitted (recommended) | false | PROXY_ENABLE_DEFAULT_DENY_STRICT
 |    --enable-encrypted-token                | enable encryption for the access tokens | false | PROXY_ENABLE_ENCRYPTED_TOKEN
 |    --force-encrypted-cookie                | force encryption for the access tokens in cookies | false | PROXY_FORCE_ENCRYPTED_COOKIE
 |    --enable-logging                        | enable http logging of the requests | false | PROXY_ENABLE_LOGGING
