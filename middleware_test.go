@@ -32,6 +32,7 @@ import (
 	resty "github.com/go-resty/resty/v2"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/storage"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/rs/cors"
@@ -1203,7 +1204,7 @@ func delay(no int, req *resty.Request, resp *resty.Response) {
 }
 
 func checkAccessTokenEncryption(t *testing.T, cfg *Config, value string) bool {
-	rawToken, err := utils.DecodeText(value, cfg.EncryptionKey)
+	rawToken, err := encryption.DecodeText(value, cfg.EncryptionKey)
 
 	if err != nil {
 		return false
@@ -1225,7 +1226,7 @@ func checkAccessTokenEncryption(t *testing.T, cfg *Config, value string) bool {
 }
 
 func checkRefreshTokenEncryption(t *testing.T, cfg *Config, value string) bool {
-	rawToken, err := utils.DecodeText(value, cfg.EncryptionKey)
+	rawToken, err := encryption.DecodeText(value, cfg.EncryptionKey)
 
 	if err != nil {
 		return false

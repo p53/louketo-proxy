@@ -16,23 +16,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package encryption
 
 import (
 	"crypto/tls"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
 
 const (
-	testCertificateFile = "./tests/proxy.pem"
-	testPrivateKeyFile  = "./tests/proxy-key.pem"
+	testCertificateFile = "../../tests/proxy.pem"
+	testPrivateKeyFile  = "../../tests/proxy-key.pem"
 )
 
 func newTestCertificateRotator(t *testing.T) *certificationRotation {
-	rotation, err := newCertificateRotator(testCertificateFile, testPrivateKeyFile, zap.NewNop())
+	counter := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "proxy_certificate_rotation_total",
+			Help: "The total amount of times the certificate has been rotated",
+		},
+	)
+	rotation, err := NewCertificateRotator(testCertificateFile, testPrivateKeyFile, zap.NewNop(), &counter)
 	assert.NotNil(t, rotation)
 	assert.Equal(t, testCertificateFile, rotation.certificateFile)
 	assert.Equal(t, testPrivateKeyFile, rotation.privateKeyFile)
@@ -44,13 +51,25 @@ func newTestCertificateRotator(t *testing.T) *certificationRotation {
 }
 
 func TestNewCeritifacteRotator(t *testing.T) {
-	c, err := newCertificateRotator(testCertificateFile, testPrivateKeyFile, zap.NewNop())
+	counter := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "proxy_certificate_rotation_total",
+			Help: "The total amount of times the certificate has been rotated",
+		},
+	)
+	c, err := NewCertificateRotator(testCertificateFile, testPrivateKeyFile, zap.NewNop(), &counter)
 	assert.NotNil(t, c)
 	assert.NoError(t, err)
 }
 
 func TestNewCeritifacteRotatorFailure(t *testing.T) {
-	c, err := newCertificateRotator("./tests/does_not_exist", testPrivateKeyFile, zap.NewNop())
+	counter := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "proxy_certificate_rotation_total",
+			Help: "The total amount of times the certificate has been rotated",
+		},
+	)
+	c, err := NewCertificateRotator("./tests/does_not_exist", testPrivateKeyFile, zap.NewNop(), &counter)
 	assert.Nil(t, c)
 	assert.Error(t, err)
 }
@@ -74,6 +93,6 @@ func TestLoadCertificate(t *testing.T) {
 
 func TestWatchCertificate(t *testing.T) {
 	c := newTestCertificateRotator(t)
-	err := c.watch()
+	err := c.Watch()
 	assert.NoError(t, err)
 }

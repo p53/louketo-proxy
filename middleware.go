@@ -26,6 +26,7 @@ import (
 	uuid "github.com/gofrs/uuid"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 
 	"github.com/PuerkitoBio/purell"
@@ -350,7 +351,7 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 					accessToken := newRawAccToken
 
 					if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie {
-						if accessToken, err = utils.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
+						if accessToken, err = encryption.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
 							scope.Logger.Error(
 								"unable to encode the access token", zap.Error(err),
 								zap.String("email", user.email),
@@ -374,7 +375,7 @@ func (r *oauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 							zap.String("sub", user.id),
 						)
 
-						encryptedRefreshToken, err := utils.EncodeText(newRefreshToken, r.config.EncryptionKey)
+						encryptedRefreshToken, err := encryption.EncodeText(newRefreshToken, r.config.EncryptionKey)
 
 						if err != nil {
 							scope.Logger.Error(

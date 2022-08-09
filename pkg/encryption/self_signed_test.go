@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package encryption
 
 import (
 	"crypto/tls"
@@ -30,26 +30,26 @@ import (
 )
 
 func TestNewSelfSignedCertificate(t *testing.T) {
-	c, err := newSelfSignedCertificate([]string{"localhost"}, 5*time.Minute, zap.NewNop())
+	c, err := NewSelfSignedCertificate([]string{"localhost"}, 5*time.Minute, zap.NewNop())
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	c.close()
 }
 
 func TestSelfSignedNoHostnames(t *testing.T) {
-	c, err := newSelfSignedCertificate([]string{}, 5*time.Minute, zap.NewNop())
+	c, err := NewSelfSignedCertificate([]string{}, 5*time.Minute, zap.NewNop())
 	assert.Error(t, err)
 	assert.Nil(t, c)
 }
 
 func TestSelfSignedExpirationBad(t *testing.T) {
-	c, err := newSelfSignedCertificate([]string{"localhost"}, 1*time.Minute, zap.NewNop())
+	c, err := NewSelfSignedCertificate([]string{"localhost"}, 1*time.Minute, zap.NewNop())
 	assert.Error(t, err)
 	assert.Nil(t, c)
 }
 
 func TestSelfSignedGetCertificate(t *testing.T) {
-	c, err := newSelfSignedCertificate([]string{"localhost"}, 5*time.Minute, zap.NewNop())
+	c, err := NewSelfSignedCertificate([]string{"localhost"}, 5*time.Minute, zap.NewNop())
 	require.NoError(t, err)
 	require.NotNil(t, c)
 	defer c.close()

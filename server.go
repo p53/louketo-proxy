@@ -48,6 +48,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/storage"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
@@ -500,7 +501,7 @@ func (r *oauthProxy) createForwardingProxy() error {
 
 	// setup the tls configuration
 	if r.config.TLSCaCertificate != "" && r.config.TLSCaPrivateKey != "" {
-		cAuthority, err := utils.LoadCA(r.config.TLSCaCertificate, r.config.TLSCaPrivateKey)
+		cAuthority, err := encryption.LoadCA(r.config.TLSCaCertificate, r.config.TLSCaPrivateKey)
 
 		if err != nil {
 			return fmt.Errorf("unable to load certificate authority, error: %s", err)
@@ -825,7 +826,7 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 				zap.Duration("expiration", r.config.SelfSignedTLSExpiration),
 			)
 
-			rotate, err := newSelfSignedCertificate(
+			rotate, err := encryption.NewSelfSignedCertificate(
 				r.config.SelfSignedTLSHostnames,
 				r.config.SelfSignedTLSExpiration,
 				r.log,
@@ -845,10 +846,11 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 				zap.String("private_key", config.privateKey),
 			)
 
-			rotate, err := newCertificateRotator(
+			rotate, err := encryption.NewCertificateRotator(
 				config.certificate,
 				config.privateKey,
 				r.log,
+				&certificateRotationMetric,
 			)
 
 			if err != nil {
@@ -856,7 +858,7 @@ func (r *oauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 			}
 
 			// start watching the files for changes
-			if err := rotate.watch(); err != nil {
+			if err := rotate.Watch(); err != nil {
 				return nil, err
 			}
 

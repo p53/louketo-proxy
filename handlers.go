@@ -36,6 +36,7 @@ import (
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -266,7 +267,7 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 
 	// step: are we encrypting the access token?
 	if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie {
-		if accessToken, err = utils.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
+		if accessToken, err = encryption.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
 			scope.Logger.Error("unable to encode the access token", zap.Error(err))
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
@@ -296,7 +297,7 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	// step: does the response have a refresh token and we do NOT ignore refresh tokens?
 	if r.config.EnableRefreshTokens && resp.RefreshToken != "" {
 		var encrypted string
-		encrypted, err = utils.EncodeText(resp.RefreshToken, r.config.EncryptionKey)
+		encrypted, err = encryption.EncodeText(resp.RefreshToken, r.config.EncryptionKey)
 
 		if err != nil {
 			scope.Logger.Error(
@@ -503,14 +504,14 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 		var plainIDToken string
 
 		if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie {
-			if accessToken, err = utils.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
+			if accessToken, err = encryption.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
 				scope.Logger.Error("unable to encode the access token", zap.Error(err))
 				return "unable to encode the access token",
 					http.StatusInternalServerError,
 					err
 			}
 
-			if refreshToken, err = utils.EncodeText(refreshToken, r.config.EncryptionKey); err != nil {
+			if refreshToken, err = encryption.EncodeText(refreshToken, r.config.EncryptionKey); err != nil {
 				scope.Logger.Error("unable to encode the refresh token", zap.Error(err))
 				return "unable to encode the refresh token",
 					http.StatusInternalServerError,
@@ -519,7 +520,7 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 
 			plainIDToken = idToken
 
-			if idToken, err = utils.EncodeText(idToken, r.config.EncryptionKey); err != nil {
+			if idToken, err = encryption.EncodeText(idToken, r.config.EncryptionKey); err != nil {
 				scope.Logger.Error("unable to encode the idToken token", zap.Error(err))
 				return "unable to encode the idToken token",
 					http.StatusInternalServerError,
@@ -530,7 +531,7 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 		// step: does the response have a refresh token and we do NOT ignore refresh tokens?
 		if r.config.EnableRefreshTokens && token.RefreshToken != "" {
 			var encrypted string
-			encrypted, err = utils.EncodeText(token.RefreshToken, r.config.EncryptionKey)
+			encrypted, err = encryption.EncodeText(token.RefreshToken, r.config.EncryptionKey)
 
 			if err != nil {
 				scope.Logger.Error("failed to encrypt the refresh token", zap.Error(err))
@@ -963,7 +964,7 @@ func (r *oauthProxy) retrieveRefreshToken(req *http.Request, user *userContext) 
 	}
 
 	encrypted := token // returns encrypted, avoids encoding twice
-	token, err = utils.DecodeText(token, r.config.EncryptionKey)
+	token, err = encryption.DecodeText(token, r.config.EncryptionKey)
 	return token, encrypted, err
 }
 

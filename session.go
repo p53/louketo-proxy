@@ -24,6 +24,7 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"go.uber.org/zap"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -44,7 +45,7 @@ func (r *oauthProxy) getIdentity(req *http.Request) (*userContext, error) {
 	}
 
 	if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie && !isBearer {
-		if access, err = utils.DecodeText(access, r.config.EncryptionKey); err != nil {
+		if access, err = encryption.DecodeText(access, r.config.EncryptionKey); err != nil {
 			return nil, apperrors.ErrDecryption
 		}
 	}

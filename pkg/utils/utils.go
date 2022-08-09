@@ -17,21 +17,12 @@ package utils
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	cryptorand "crypto/rand"
-	"crypto/rsa"
 	sha "crypto/sha512"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/base64"
-	"encoding/pem"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -66,52 +57,6 @@ var (
 	symbolsFilter = regexp.MustCompilePOSIX("[_$><\\[\\].,\\+-/'%^&*()!\\\\]+")
 )
 
-// createCertificate is responsible for creating a certificate
-func CreateCertificate(key *rsa.PrivateKey, hostnames []string, expire time.Duration) (tls.Certificate, error) {
-	// @step: create a serial for the certificate
-	serial, err := cryptorand.Int(cryptorand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-
-	template := x509.Certificate{
-		BasicConstraintsValid: true,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IsCA:                  false,
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		NotAfter:              time.Now().Add(expire),
-		NotBefore:             time.Now().Add(-30 * time.Second),
-		PublicKeyAlgorithm:    x509.ECDSA,
-		SerialNumber:          serial,
-		SignatureAlgorithm:    x509.SHA512WithRSA,
-		Subject: pkix.Name{
-			CommonName:   hostnames[0],
-			Organization: []string{"Gatekeeper"},
-		},
-	}
-
-	// @step: add the hostnames to the certificate template
-	if len(hostnames) > 1 {
-		for _, x := range hostnames[1:] {
-			if ip := net.ParseIP(x); ip != nil {
-				template.IPAddresses = append(template.IPAddresses, ip)
-			} else {
-				template.DNSNames = append(template.DNSNames, x)
-			}
-		}
-	}
-
-	// @step: create the certificate
-	cert, err := x509.CreateCertificate(cryptorand.Reader, &template, &template, &key.PublicKey, key)
-	if err != nil {
-		return tls.Certificate{}, err
-	}
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert})
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
-
-	return tls.X509KeyPair(certPEM, keyPEM)
-}
-
 // getRequestHostURL returns the hostname from the request
 func GetRequestHostURL(req *http.Request) string {
 	scheme := constant.UnsecureScheme
@@ -125,82 +70,6 @@ func GetRequestHostURL(req *http.Request) string {
 		DefaultTo(req.Header.Get("X-Forwarded-Host"), req.Host))
 
 	return redirect
-}
-
-// encryptDataBlock encrypts the plaintext string with the key
-func EncryptDataBlock(plaintext, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	gcm, err := cipher.NewGCM(block)
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-
-	if _, err = io.ReadFull(cryptorand.Reader, nonce); err != nil {
-		return nil, err
-	}
-
-	return gcm.Seal(nonce, nonce, plaintext, nil), nil
-}
-
-// decryptDataBlock decrypts some cipher text
-func DecryptDataBlock(cipherText, key []byte) ([]byte, error) {
-	block, err := aes.NewCipher(key)
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	gcm, err := cipher.NewGCM(block)
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	nonceSize := gcm.NonceSize()
-
-	if len(cipherText) < nonceSize {
-		return nil, errors.New("failed to decrypt the ciphertext, the text is too short")
-	}
-
-	nonce, input := cipherText[:nonceSize], cipherText[nonceSize:]
-
-	return gcm.Open(nil, nonce, input, nil)
-}
-
-// encodeText encodes the session state information into a value for a cookie to consume
-func EncodeText(plaintext string, key string) (string, error) {
-	cipherText, err := EncryptDataBlock([]byte(plaintext), []byte(key))
-
-	if err != nil {
-		return "", err
-	}
-
-	return base64.RawStdEncoding.EncodeToString(cipherText), nil
-}
-
-// decodeText decodes the session state cookie value
-func DecodeText(state, key string) (string, error) {
-	cipherText, err := base64.RawStdEncoding.DecodeString(state)
-
-	if err != nil {
-		return "", err
-	}
-	// step: decrypt the cookie back in the expiration|token
-	encoded, err := DecryptDataBlock(cipherText, []byte(key))
-
-	if err != nil {
-		return "", apperrors.ErrInvalidSession
-	}
-
-	return string(encoded), nil
 }
 
 // decodeKeyPairs converts a list of strings (key=pair) to a map
@@ -424,31 +293,6 @@ func MergeMaps(dest, source map[string]string) map[string]string {
 	}
 
 	return dest
-}
-
-// loadCA loads the certificate authority
-func LoadCA(cert, key string) (*tls.Certificate, error) {
-	caCert, err := ioutil.ReadFile(cert)
-
-	if err != nil {
-		return nil, err
-	}
-
-	caKey, err := ioutil.ReadFile(key)
-
-	if err != nil {
-		return nil, err
-	}
-
-	cAuthority, err := tls.X509KeyPair(caCert, caKey)
-
-	if err != nil {
-		return nil, err
-	}
-
-	cAuthority.Leaf, err = x509.ParseCertificate(cAuthority.Certificate[0])
-
-	return &cAuthority, err
 }
 
 // getWithin calculates a duration of x percent of the time period, i.e. something

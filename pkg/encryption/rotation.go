@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package encryption
 
 import (
 	"crypto/tls"
@@ -23,6 +23,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
 
@@ -35,11 +36,12 @@ type certificationRotation struct {
 	// the privateKeyFile is the path of the private key
 	privateKeyFile string
 	// the logger for this service
-	log *zap.Logger
+	log            *zap.Logger
+	rotationMetric *prometheus.Counter
 }
 
 // newCertificateRotator creates a new certificate
-func newCertificateRotator(cert, key string, log *zap.Logger) (*certificationRotation, error) {
+func NewCertificateRotator(cert, key string, log *zap.Logger, metric *prometheus.Counter) (*certificationRotation, error) {
 	// step: attempt to load the certificate
 	certificate, err := tls.LoadX509KeyPair(cert, key)
 
@@ -53,11 +55,12 @@ func newCertificateRotator(cert, key string, log *zap.Logger) (*certificationRot
 		certificateFile: cert,
 		log:             log,
 		privateKeyFile:  key,
+		rotationMetric:  metric,
 	}, nil
 }
 
 // watch is responsible for adding a file notification and watch on the files for changes
-func (c *certificationRotation) watch() error {
+func (c *certificationRotation) Watch() error {
 	c.log.Info(
 		"adding a file watch on the certificates, certificate",
 		zap.String("certificate", c.certificateFile),
@@ -97,7 +100,7 @@ func (c *certificationRotation) watch() error {
 							zap.Error(err))
 					}
 					// @metric inform of the rotation
-					certificateRotationMetric.Inc()
+					(*c.rotationMetric).Inc()
 					// step: load the new certificate
 					_ = c.storeCertificate(certificate)
 					// step: print a debug message for us
