@@ -27,7 +27,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type certificationRotation struct {
+type CertificationRotation struct {
 	sync.RWMutex
 	// certificate holds the current issuing certificate
 	certificate tls.Certificate
@@ -41,7 +41,7 @@ type certificationRotation struct {
 }
 
 // newCertificateRotator creates a new certificate
-func NewCertificateRotator(cert, key string, log *zap.Logger, metric *prometheus.Counter) (*certificationRotation, error) {
+func NewCertificateRotator(cert, key string, log *zap.Logger, metric *prometheus.Counter) (*CertificationRotation, error) {
 	// step: attempt to load the certificate
 	certificate, err := tls.LoadX509KeyPair(cert, key)
 
@@ -50,7 +50,7 @@ func NewCertificateRotator(cert, key string, log *zap.Logger, metric *prometheus
 	}
 
 	// @step: are we watching the files for changes?
-	return &certificationRotation{
+	return &CertificationRotation{
 		certificate:     certificate,
 		certificateFile: cert,
 		log:             log,
@@ -60,7 +60,7 @@ func NewCertificateRotator(cert, key string, log *zap.Logger, metric *prometheus
 }
 
 // watch is responsible for adding a file notification and watch on the files for changes
-func (c *certificationRotation) Watch() error {
+func (c *CertificationRotation) Watch() error {
 	c.log.Info(
 		"adding a file watch on the certificates, certificate",
 		zap.String("certificate", c.certificateFile),
@@ -116,7 +116,7 @@ func (c *certificationRotation) Watch() error {
 }
 
 // storeCertificate provides entrypoint to update the certificate
-func (c *certificationRotation) storeCertificate(certifacte tls.Certificate) error {
+func (c *CertificationRotation) storeCertificate(certifacte tls.Certificate) error {
 	c.Lock()
 	defer c.Unlock()
 	c.certificate = certifacte
@@ -125,7 +125,7 @@ func (c *certificationRotation) storeCertificate(certifacte tls.Certificate) err
 }
 
 // GetCertificate is responsible for retrieving
-func (c *certificationRotation) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (c *CertificationRotation) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	c.RLock()
 	defer c.RUnlock()
 

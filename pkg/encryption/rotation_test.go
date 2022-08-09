@@ -32,7 +32,7 @@ const (
 	testPrivateKeyFile  = "../../tests/proxy-key.pem"
 )
 
-func newTestCertificateRotator(t *testing.T) *certificationRotation {
+func newTestCertificateRotator(t *testing.T) *CertificationRotation {
 	counter := prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Name: "proxy_certificate_rotation_total",

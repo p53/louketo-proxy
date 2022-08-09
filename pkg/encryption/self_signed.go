@@ -34,7 +34,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type selfSignedCertificate struct {
+type SelfSignedCertificate struct {
 	sync.RWMutex
 	// certificate holds the current issuing certificate
 	certificate tls.Certificate
@@ -51,7 +51,7 @@ type selfSignedCertificate struct {
 }
 
 // newSelfSignedCertificate creates and returns a self signed certificate manager
-func NewSelfSignedCertificate(hostnames []string, expiry time.Duration, log *zap.Logger) (*selfSignedCertificate, error) {
+func NewSelfSignedCertificate(hostnames []string, expiry time.Duration, log *zap.Logger) (*SelfSignedCertificate, error) {
 	if len(hostnames) == 0 {
 		return nil, fmt.Errorf("no hostnames specified")
 	}
@@ -82,7 +82,7 @@ func NewSelfSignedCertificate(hostnames []string, expiry time.Duration, log *zap
 	// @step: create a context to run under
 	ctx, cancel := context.WithCancel(context.Background())
 
-	svc := &selfSignedCertificate{
+	svc := &SelfSignedCertificate{
 		certificate: certificate,
 		expiration:  expiry,
 		hostnames:   hostnames,
@@ -99,7 +99,7 @@ func NewSelfSignedCertificate(hostnames []string, expiry time.Duration, log *zap
 }
 
 // rotate is responsible for rotation the certificate
-func (c *selfSignedCertificate) rotate(ctx context.Context) error {
+func (c *SelfSignedCertificate) rotate(ctx context.Context) error {
 	go func() {
 		c.log.Info("starting the self-signed certificate rotation",
 			zap.Duration("expiration", c.expiration))
@@ -132,12 +132,12 @@ func (c *selfSignedCertificate) rotate(ctx context.Context) error {
 
 // Deprecated:unused
 // close is used to shutdown resources
-func (c *selfSignedCertificate) close() {
+func (c *SelfSignedCertificate) close() {
 	c.cancel()
 }
 
 // updateCertificate is responsible for update the certificate
-func (c *selfSignedCertificate) updateCertificate(cert tls.Certificate) {
+func (c *SelfSignedCertificate) updateCertificate(cert tls.Certificate) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -145,7 +145,7 @@ func (c *selfSignedCertificate) updateCertificate(cert tls.Certificate) {
 }
 
 // GetCertificate is responsible for retrieving
-func (c *selfSignedCertificate) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (c *SelfSignedCertificate) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	c.RLock()
 	defer c.RUnlock()
 
