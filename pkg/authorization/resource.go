@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package authorization
 
 import (
 	"errors"
@@ -25,7 +25,23 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 )
 
-func newResource() *Resource {
+// Resource represents a url resource to protect
+type Resource struct {
+	// URL the url for the resource
+	URL string `json:"uri" yaml:"uri"`
+	// Methods the method type
+	Methods []string `json:"methods" yaml:"methods"`
+	// WhiteListed permits the prefix through
+	WhiteListed bool `json:"white-listed" yaml:"white-listed"`
+	// RequireAnyRole indicates that ANY of the roles are required, the default is all
+	RequireAnyRole bool `json:"require-any-role" yaml:"require-any-role"`
+	// Roles the roles required to access this url
+	Roles []string `json:"roles" yaml:"roles"`
+	// Groups is a list of groups the user is in
+	Groups []string `json:"groups" yaml:"groups"`
+}
+
+func NewResource() *Resource {
 	return &Resource{
 		Methods: utils.AllHTTPMethods,
 	}
@@ -35,7 +51,7 @@ func newResource() *Resource {
 	parse decodes a resource definition
 */
 //nolint:cyclop
-func (r *Resource) parse(resource string) (*Resource, error) {
+func (r *Resource) Parse(resource string) (*Resource, error) {
 	if resource == "" {
 		return nil, errors.New("the resource has no options")
 	}
@@ -99,7 +115,7 @@ func (r *Resource) parse(resource string) (*Resource, error) {
 }
 
 // valid ensure the resource is valid
-func (r *Resource) valid() error {
+func (r *Resource) Valid() error {
 	if r.Methods == nil {
 		r.Methods = make([]string, 0)
 	}
@@ -135,7 +151,7 @@ func (r *Resource) valid() error {
 }
 
 // getRoles returns a list of roles for this resource
-func (r Resource) getRoles() string {
+func (r Resource) GetRoles() string {
 	return strings.Join(r.Roles, ",")
 }
 

@@ -47,6 +47,7 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/storage"
@@ -407,7 +408,7 @@ func (r *oauthProxy) createReverseProxy() error {
 
 		r.config.Resources = append(
 			r.config.Resources,
-			&Resource{URL: allPath, Methods: utils.AllHTTPMethods},
+			&authorization.Resource{URL: allPath, Methods: utils.AllHTTPMethods},
 		)
 	}
 

@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package authorization
 
 import (
 	"testing"
@@ -38,7 +38,7 @@ func TestDecodeResourceBad(t *testing.T) {
 		{Option: "uri=/|require-any-role=BAD"},
 	}
 	for i, testCase := range testCases {
-		if _, err := newResource().parse(testCase.Option); err == nil {
+		if _, err := NewResource().Parse(testCase.Option); err == nil {
 			t.Errorf("case %d should have errored", i)
 		}
 	}
@@ -91,7 +91,7 @@ func TestResourceParseOk(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		r, err := newResource().parse(testCase.Option)
+		r, err := NewResource().Parse(testCase.Option)
 		assert.NoError(t, err, "case %d should not have errored with: %s", i, err)
 		assert.Equal(t, r, testCase.Resource, "case %d, expected: %#v, got: %#v", i, testCase.Resource, r)
 	}
@@ -145,7 +145,7 @@ func TestIsValid(t *testing.T) {
 			utils.AllHTTPMethods = append(utils.AllHTTPMethods, customHTTPMethod)
 		}
 
-		err := testCase.Resource.valid()
+		err := testCase.Resource.Valid()
 
 		if err != nil && testCase.Ok {
 			t.Errorf("case %d should not have failed, error: %s", idx, err)
@@ -171,7 +171,7 @@ func TestGetRoles(t *testing.T) {
 		Roles: expectedRoles,
 	}
 
-	if resource.getRoles() != rolesList {
+	if resource.GetRoles() != rolesList {
 		t.Error("the resource roles not as expected")
 	}
 }

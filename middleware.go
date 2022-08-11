@@ -614,7 +614,7 @@ func (r *oauthProxy) checkClaim(user *userContext, claimName string, match *rege
 }
 
 // admissionMiddleware is responsible for checking the access token against the protected resource
-func (r *oauthProxy) admissionMiddleware(resource *Resource) func(http.Handler) http.Handler {
+func (r *oauthProxy) admissionMiddleware(resource *authorization.Resource) func(http.Handler) http.Handler {
 	claimMatches := make(map[string]*regexp.Regexp)
 
 	for k, v := range r.config.MatchClaims {
@@ -646,7 +646,7 @@ func (r *oauthProxy) admissionMiddleware(resource *Resource) func(http.Handler) 
 					zap.String("access", "denied"),
 					zap.String("email", user.email),
 					zap.String("resource", resource.URL),
-					zap.String("roles", resource.getRoles()))
+					zap.String("roles", resource.GetRoles()))
 
 				next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 				return

@@ -515,7 +515,7 @@ func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
 func TestForbiddenTemplate(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.ForbiddenPage = "templates/forbidden.html.tmpl"
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
@@ -739,7 +739,7 @@ func TestAudienceHeader(t *testing.T) {
 func TestDefaultDenial(t *testing.T) {
 	config := newFakeKeycloakConfig()
 	config.EnableDefaultDeny = true
-	config.Resources = []*Resource{
+	config.Resources = []*authorization.Resource{
 		{
 			URL:         "/public/*",
 			Methods:     utils.AllHTTPMethods,
@@ -811,7 +811,7 @@ func TestDefaultDenial(t *testing.T) {
 func TestDefaultDenialStrict(t *testing.T) {
 	config := newFakeKeycloakConfig()
 	config.EnableDefaultDenyStrict = true
-	config.Resources = []*Resource{
+	config.Resources = []*authorization.Resource{
 		{
 			URL:         "/public/*",
 			Methods:     utils.AllHTTPMethods,
@@ -899,7 +899,7 @@ func TestDefaultDenialStrict(t *testing.T) {
 func TestAuthorizationTemplate(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.SignInPage = "templates/sign_in.html.tmpl"
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
@@ -1360,7 +1360,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
-				c.Resources = []*Resource{
+				c.Resources = []*authorization.Resource{
 					{
 						URL:         "/public/*",
 						Methods:     utils.AllHTTPMethods,
@@ -1382,7 +1382,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
-				c.Resources = []*Resource{
+				c.Resources = []*authorization.Resource{
 					{
 						URL:         "/public/*",
 						Methods:     utils.AllHTTPMethods,
@@ -1423,7 +1423,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
-				c.Resources = []*Resource{
+				c.Resources = []*authorization.Resource{
 					{
 						URL:     "/api/*",
 						Methods: []string{http.MethodGet, http.MethodPost, http.MethodPut},
@@ -1447,7 +1447,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
-				c.Resources = []*Resource{
+				c.Resources = []*authorization.Resource{
 					{
 						URL:     "/webdav/*",
 						Methods: []string{"PROPFIND"},
@@ -1471,7 +1471,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
-				c.Resources = []*Resource{
+				c.Resources = []*authorization.Resource{
 					{
 						URL:     "/webdav/*",
 						Methods: []string{"PROPFIND"},
@@ -1495,7 +1495,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 			ProxySettings: func(c *Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
-				c.Resources = []*Resource{
+				c.Resources = []*authorization.Resource{
 					{
 						URL:     "/webdav/*",
 						Methods: []string{"PROPFIND"},

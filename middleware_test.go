@@ -344,7 +344,7 @@ func TestOauthRequestsWithBaseURI(t *testing.T) {
 
 func TestMethodExclusions(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/post",
 			Methods: []string{http.MethodPost, http.MethodPut},
@@ -369,7 +369,7 @@ func TestMethodExclusions(t *testing.T) {
 func TestPreserveURLEncoding(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.EnableLogging = true
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/api/v2/*",
 			Methods: utils.AllHTTPMethods,
@@ -462,7 +462,7 @@ func TestPreserveURLEncoding(t *testing.T) {
 
 func TestStrangeRoutingError(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/api/v1/events/123456789",
 			Methods: utils.AllHTTPMethods,
@@ -536,7 +536,7 @@ func TestStrangeRoutingError(t *testing.T) {
 
 func TestNoProxyingRequests(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
@@ -571,7 +571,7 @@ const testAdminURI = "/admin/test"
 
 func TestStrangeAdminRequests(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/admin*",
 			Methods: utils.AllHTTPMethods,
@@ -639,7 +639,7 @@ func TestStrangeAdminRequests(t *testing.T) {
 
 func TestWhiteListedRequests(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
@@ -685,7 +685,7 @@ func TestWhiteListedRequests(t *testing.T) {
 
 func TestRequireAnyRoles(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:            "/require_any_role/*",
 			Methods:        utils.AllHTTPMethods,
@@ -717,7 +717,7 @@ func TestRequireAnyRoles(t *testing.T) {
 
 func TestGroupPermissionsMiddleware(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/with_role_and_group*",
 			Methods: utils.AllHTTPMethods,
@@ -829,7 +829,7 @@ func TestGroupPermissionsMiddleware(t *testing.T) {
 
 func TestRolePermissionsMiddleware(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/admin*",
 			Methods: utils.AllHTTPMethods,
@@ -1422,7 +1422,7 @@ func TestCustomHeadersHandler(t *testing.T) {
 func TestAdmissionHandlerRoles(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.NoRedirects = true
-	cfg.Resources = []*Resource{
+	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/admin",
 			Methods: utils.AllHTTPMethods,
@@ -1536,7 +1536,7 @@ func TestCustomHeaders(t *testing.T) {
 	}
 	for _, c := range requests {
 		cfg := newFakeKeycloakConfig()
-		cfg.Resources = []*Resource{{URL: "/admin*", Methods: utils.AllHTTPMethods}}
+		cfg.Resources = []*authorization.Resource{{URL: "/admin*", Methods: utils.AllHTTPMethods}}
 		cfg.Headers = c.Headers
 		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
@@ -1676,7 +1676,7 @@ func TestRolesAdmissionHandlerClaims(t *testing.T) {
 	}
 	for _, c := range requests {
 		cfg := newFakeKeycloakConfig()
-		cfg.Resources = []*Resource{{URL: "/admin*", Methods: utils.AllHTTPMethods}}
+		cfg.Resources = []*authorization.Resource{{URL: "/admin*", Methods: utils.AllHTTPMethods}}
 		cfg.MatchClaims = c.Matches
 		newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, []fakeRequest{c.Request})
 	}
@@ -1788,7 +1788,7 @@ func TestGzipCompression(t *testing.T) {
 	for _, testCase := range requests {
 		testCase := testCase
 		cfg := *cfg
-		cfg.Resources = []*Resource{{URL: "/admin*", Methods: utils.AllHTTPMethods}}
+		cfg.Resources = []*authorization.Resource{{URL: "/admin*", Methods: utils.AllHTTPMethods}}
 
 		t.Run(
 			testCase.Name,

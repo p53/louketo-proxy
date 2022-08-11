@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -33,7 +34,7 @@ import (
 
 func TestDebugHandler(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.Resources = make([]*Resource, 0)
+	cfg.Resources = make([]*authorization.Resource, 0)
 	cfg.EnableProfiling = true
 	requests := []fakeRequest{
 		{URI: "/debug/pprof/no_there", ExpectedCode: http.StatusNotFound},

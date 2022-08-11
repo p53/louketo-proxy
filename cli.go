@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/urfave/cli"
@@ -239,7 +240,7 @@ func parseCLIOptions(cliCtx *cli.Context, config *Config) error {
 
 	if cliCtx.IsSet("resources") {
 		for _, x := range cliCtx.StringSlice("resources") {
-			resource, err := newResource().parse(x)
+			resource, err := authorization.NewResource().Parse(x)
 			if err != nil {
 				return fmt.Errorf("invalid resource %s, %s", x, err)
 			}

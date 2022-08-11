@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 )
 
@@ -1713,7 +1714,7 @@ func TestIsResourceValid(t *testing.T) {
 		{
 			Name: "ValidResource",
 			Config: &Config{
-				Resources: []*Resource{
+				Resources: []*authorization.Resource{
 					{
 						URL:     fakeAdminRoleURL,
 						Methods: []string{"GET"},
@@ -1732,7 +1733,7 @@ func TestIsResourceValid(t *testing.T) {
 			Name: "ValidResourceWithCustomHTTP",
 			Config: &Config{
 				CustomHTTPMethods: []string{"SOME"},
-				Resources: []*Resource{
+				Resources: []*authorization.Resource{
 					{
 						URL:     fakeAdminRoleURL,
 						Methods: []string{"SOME"},
@@ -1750,7 +1751,7 @@ func TestIsResourceValid(t *testing.T) {
 		{
 			Name: "InValidResourceWithCustomHTTP",
 			Config: &Config{
-				Resources: []*Resource{
+				Resources: []*authorization.Resource{
 					{
 						URL:     fakeAdminRoleURL,
 						Methods: []string{"SOMER"},
@@ -1768,7 +1769,7 @@ func TestIsResourceValid(t *testing.T) {
 		{
 			Name: "InValidResourceMissingURL",
 			Config: &Config{
-				Resources: []*Resource{
+				Resources: []*authorization.Resource{
 					{
 						URL:     "",
 						Methods: []string{"GET"},

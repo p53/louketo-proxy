@@ -748,7 +748,7 @@ func newFakeKeycloakConfig() *Config {
 		SkipUpstreamTLSVerify:       false,
 		Scopes:                      []string{},
 		Verbose:                     false,
-		Resources: []*Resource{
+		Resources: []*authorization.Resource{
 			{
 				URL:     fakeAdminRoleURL,
 				Methods: []string{"GET"},

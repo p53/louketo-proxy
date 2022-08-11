@@ -575,7 +575,7 @@ func (r *Config) isResourceValid() error {
 
 	// check: ensure each of the resource are valid
 	for _, resource := range r.Resources {
-		if err := resource.valid(); err != nil {
+		if err := resource.Valid(); err != nil {
 			return err
 		}
 	}
