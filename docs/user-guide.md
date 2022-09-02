@@ -53,7 +53,7 @@ redirection-url: http://127.0.0.1:3000
 encryption-key: <ENCRYPTION_KEY>
 # the upstream endpoint which we should proxy request
 upstream-url: http://127.0.0.1:80
-# Returns HTTP 401 when no authentication is present, used with forward proxies.
+# Returns HTTP 401 when no authentication is present, used with forward proxies or API protection with client credentials grant.
 no-redirects: false
 # additional scopes to add to the default (openid+email+profile)
 scopes:
@@ -172,6 +172,16 @@ By default, the roles defined on a resource perform a logical `AND` so
 all roles specified must be present in the claims, this behavior can be
 altered by the `require-any-role` option, however, so as long as one
 role is present the permission is granted.
+
+## Authentication flows
+
+You can use gatekeeper to protect APIs, frontend server applications, frontend client applications.
+Frontend server-side applications can be protected by Authorization Code Flow, during which several redirection
+steps take place. For protecting APIs you can use Client Credentials Grant to avoid redirections steps
+involved in authorization code flow you have to use `--no-redirects=true`. For frontend applications
+there is PKCE flow which is currently not implemented in gatekeeper, instead you can use Authorization
+Code Flow with encrypted refresh token cookies enabled, in this case however you have to handle redirections
+at login/logout and you must make cookies available to js (less secure, altough at least they are encrypted).
 
 ## Default Deny
 
