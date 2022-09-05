@@ -1260,6 +1260,48 @@ func TestIsTLSMinValid(t *testing.T) {
 	}
 }
 
+func TestIsNoProxyValid(t *testing.T) {
+	testCases := []struct {
+		Name   string
+		Config *Config
+		Valid  bool
+	}{
+		{
+			Name: "ValidNoProxy",
+			Config: &Config{
+				NoProxy:     true,
+				NoRedirects: true,
+			},
+			Valid: true,
+		},
+		{
+			Name: "InValidNoProxy",
+			Config: &Config{
+				NoProxy:     true,
+				NoRedirects: false,
+			},
+			Valid: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				err := testCase.Config.isNoProxyValid()
+				if err != nil && testCase.Valid {
+					t.Fatalf("Expected test not to fail")
+				}
+
+				if err == nil && !testCase.Valid {
+					t.Fatalf("Expected test to fail")
+				}
+			},
+		)
+	}
+}
+
 func TestIsUpstreamValid(t *testing.T) {
 	testCases := []struct {
 		Name   string

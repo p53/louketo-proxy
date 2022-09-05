@@ -715,6 +715,238 @@ func TestRequireAnyRoles(t *testing.T) {
 	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
+//nolint:funlen
+func TestHeaderPermissionsMiddleware(t *testing.T) {
+	cfg := newFakeKeycloakConfig()
+
+	requests := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestMissingHeadersCodeFlow",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/with_headers*",
+						Methods: utils.AllHTTPMethods,
+						Headers: []string{
+							"x-test-header1:validvalue",
+							"x-test-header2:validvalue",
+						},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/with_headers",
+					ExpectedProxy: false,
+					HasToken:      true,
+					ExpectedCode:  http.StatusForbidden,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+		{
+			Name: "TestHeadersCodeFlow",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/with_headers*",
+						Methods: utils.AllHTTPMethods,
+						Headers: []string{
+							"x-test-header1:validvalue",
+							"x-test-header2:validvalue",
+						},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/with_headers",
+					ExpectedProxy: true,
+					HasToken:      true,
+					Headers: map[string]string{
+						"x-test-header1": "validvalue",
+						"x-test-header2": "validvalue",
+					},
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+			},
+		},
+		{
+			Name: "TestMissingHeadersNoRedirects",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.NoRedirects = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/with_headers*",
+						Methods: utils.AllHTTPMethods,
+						Headers: []string{
+							"x-test-header1:validvalue",
+							"x-test-header2:validvalue",
+						},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/with_headers",
+					ExpectedProxy: false,
+					HasToken:      true,
+					ExpectedCode:  http.StatusForbidden,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+		{
+			Name: "TestOnlyOneHeaderNoRedirects",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.NoRedirects = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/with_headers*",
+						Methods: utils.AllHTTPMethods,
+						Headers: []string{
+							"x-test-header1:validvalue",
+							"x-test-header2:validvalue",
+						},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/with_headers",
+					ExpectedProxy: false,
+					HasToken:      true,
+					Headers: map[string]string{
+						"x-test-header1": "validvalue",
+					},
+					ExpectedCode: http.StatusForbidden,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+		{
+			Name: "TestHeadersNoRedirects",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.NoRedirects = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/with_headers*",
+						Methods: utils.AllHTTPMethods,
+						Headers: []string{
+							"x-test-header1:validvalue",
+							"x-test-header2:validvalue",
+						},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/with_headers",
+					ExpectedProxy: true,
+					HasToken:      true,
+					Headers: map[string]string{
+						"x-test-header1": "validvalue",
+						"x-test-header2": "validvalue",
+					},
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+			},
+		},
+		{
+			Name: "TestMissingHeadersNoProxyNoRedirects",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.NoRedirects = true
+				conf.NoProxy = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/with_headers*",
+						Methods: utils.AllHTTPMethods,
+						Headers: []string{
+							"x-test-header1:validvalue",
+							"x-test-header2:validvalue",
+						},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/with_headers",
+					ExpectedProxy: false,
+					HasToken:      true,
+					ExpectedCode:  http.StatusForbidden,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+		{
+			Name: "TestHeadersNoProxyNoRedirects",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.NoRedirects = true
+				conf.NoProxy = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/with_headers*",
+						Methods: utils.AllHTTPMethods,
+						Headers: []string{
+							"x-test-header1:validvalue",
+							"x-test-header2:validvalue",
+						},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/with_headers",
+					ExpectedProxy: false,
+					HasToken:      true,
+					Headers: map[string]string{
+						"x-test-header1": "validvalue",
+						"x-test-header2": "validvalue",
+					},
+					ExpectedCode: http.StatusOK,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range requests {
+		testCase := testCase
+		c := *cfg
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(&c)
+				p := newFakeProxy(&c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
+}
+
 func TestGroupPermissionsMiddleware(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.Resources = []*authorization.Resource{

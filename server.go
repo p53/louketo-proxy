@@ -249,7 +249,7 @@ func (r *oauthProxy) useDefaultStack(engine chi.Router) {
 }
 
 // createReverseProxy creates a reverse proxy
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (r *oauthProxy) createReverseProxy() error {
 	r.log.Info(
 		"enabled reverse proxy mode, upstream url",
@@ -278,7 +278,10 @@ func (r *oauthProxy) createReverseProxy() error {
 		engine.Use(corsHandler.Handler)
 	}
 
-	engine.Use(r.proxyMiddleware)
+	if !r.config.NoProxy {
+		engine.Use(r.proxyMiddleware)
+	}
+
 	r.router = engine
 
 	if len(r.config.ResponseHeaders) > 0 {

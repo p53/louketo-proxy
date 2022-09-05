@@ -382,6 +382,7 @@ func (r *Config) isForwardingProxySettingsValid() error {
 func (r *Config) isReverseProxySettingsValid() error {
 	if !r.EnableForwarding {
 		validationRegistry := []func() error{
+			r.isNoProxyValid,
 			r.isUpstreamValid,
 			r.isDefaultDenyValid,
 			r.isEnableUmaValid,
@@ -428,13 +429,22 @@ func (r *Config) isTokenVerificationSettingsValid() error {
 	return nil
 }
 
+func (r *Config) isNoProxyValid() error {
+	if r.NoProxy && !r.NoRedirects {
+		return errors.New("noproxy option must be used with noredirects")
+	}
+	return nil
+}
+
 func (r *Config) isUpstreamValid() error {
-	if r.Upstream == "" {
+	if r.Upstream == "" && !r.NoProxy {
 		return errors.New("you have not specified an upstream endpoint to proxy to")
 	}
 
-	if _, err := url.ParseRequestURI(r.Upstream); err != nil {
-		return fmt.Errorf("the upstream endpoint is invalid, %s", err)
+	if !r.NoProxy {
+		if _, err := url.ParseRequestURI(r.Upstream); err != nil {
+			return fmt.Errorf("the upstream endpoint is invalid, %s", err)
+		}
 	}
 
 	if r.SkipUpstreamTLSVerify && r.UpstreamCA != "" {

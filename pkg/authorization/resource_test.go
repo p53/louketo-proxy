@@ -48,52 +48,124 @@ func TestResourceParseOk(t *testing.T) {
 	testCases := []struct {
 		Option   string
 		Resource *Resource
+		Ok       bool
 	}{
 		{
-			Option:   "uri=/admin",
-			Resource: &Resource{URL: "/admin", Methods: utils.AllHTTPMethods},
+			Option: "uri=/admin",
+			Resource: &Resource{
+				URL:     "/admin",
+				Methods: utils.AllHTTPMethods,
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/",
-			Resource: &Resource{URL: "/", Methods: utils.AllHTTPMethods},
+			Option: "uri=/",
+			Resource: &Resource{
+				URL:     "/",
+				Methods: utils.AllHTTPMethods,
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/admin/sso|roles=test,test1",
-			Resource: &Resource{URL: "/admin/sso", Roles: []string{"test", "test1"}, Methods: utils.AllHTTPMethods},
+			Option: "uri=/admin/sso|roles=test,test1",
+			Resource: &Resource{
+				URL:     "/admin/sso",
+				Roles:   []string{"test", "test1"},
+				Methods: utils.AllHTTPMethods,
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/admin/sso|roles=test,test1|methods=GET,POST",
-			Resource: &Resource{URL: "/admin/sso", Roles: []string{"test", "test1"}, Methods: []string{"GET", "POST"}},
+			Option: "uri=/admin/sso|roles=test,test1|headers=x-test:val",
+			Resource: &Resource{
+				URL:     "/admin/sso",
+				Roles:   []string{"test", "test1"},
+				Headers: []string{"x-test:val"},
+				Methods: utils.AllHTTPMethods,
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/allow_me|white-listed=true",
-			Resource: &Resource{URL: "/allow_me", WhiteListed: true, Methods: utils.AllHTTPMethods},
+			Option: "uri=/admin/sso|roles=test,test1|headers=x-test:val,x-test1val",
+			Resource: &Resource{
+				URL:     "/admin/sso",
+				Roles:   []string{"test", "test1"},
+				Headers: []string{"x-test:val", "x-test1:val"},
+				Methods: utils.AllHTTPMethods,
+			},
+			Ok: false,
 		},
 		{
-			Option:   "uri=/*|methods=any",
-			Resource: &Resource{URL: "/*", Methods: utils.AllHTTPMethods},
+			Option: "uri=/admin/sso|roles=test,test1|methods=GET,POST",
+			Resource: &Resource{
+				URL:     "/admin/sso",
+				Roles:   []string{"test", "test1"},
+				Methods: []string{"GET", "POST"},
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/*|methods=any",
-			Resource: &Resource{URL: "/*", Methods: utils.AllHTTPMethods},
+			Option: "uri=/allow_me|white-listed=true",
+			Resource: &Resource{
+				URL:         "/allow_me",
+				WhiteListed: true,
+				Methods:     utils.AllHTTPMethods,
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/*|groups=admin,test",
-			Resource: &Resource{URL: "/*", Methods: utils.AllHTTPMethods, Groups: []string{"admin", "test"}},
+			Option: "uri=/*|methods=any",
+			Resource: &Resource{
+				URL:     "/*",
+				Methods: utils.AllHTTPMethods,
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/*|groups=admin",
-			Resource: &Resource{URL: "/*", Methods: utils.AllHTTPMethods, Groups: []string{"admin"}},
+			Option: "uri=/*|methods=any",
+			Resource: &Resource{
+				URL:     "/*",
+				Methods: utils.AllHTTPMethods,
+			},
+			Ok: true,
 		},
 		{
-			Option:   "uri=/*|require-any-role=true",
-			Resource: &Resource{URL: "/*", Methods: utils.AllHTTPMethods, RequireAnyRole: true},
+			Option: "uri=/*|groups=admin,test",
+			Resource: &Resource{
+				URL:     "/*",
+				Methods: utils.AllHTTPMethods,
+				Groups:  []string{"admin", "test"},
+			},
+			Ok: true,
+		},
+		{
+			Option: "uri=/*|groups=admin",
+			Resource: &Resource{
+				URL:     "/*",
+				Methods: utils.AllHTTPMethods,
+				Groups:  []string{"admin"},
+			},
+			Ok: true,
+		},
+		{
+			Option: "uri=/*|require-any-role=true",
+			Resource: &Resource{
+				URL:            "/*",
+				Methods:        utils.AllHTTPMethods,
+				RequireAnyRole: true,
+			},
+			Ok: true,
 		},
 	}
 	for i, testCase := range testCases {
 		r, err := NewResource().Parse(testCase.Option)
-		assert.NoError(t, err, "case %d should not have errored with: %s", i, err)
-		assert.Equal(t, r, testCase.Resource, "case %d, expected: %#v, got: %#v", i, testCase.Resource, r)
+
+		if testCase.Ok {
+			assert.NoError(t, err, "case %d should not have errored with: %s", i, err)
+			assert.Equal(t, r, testCase.Resource, "case %d, expected: %#v, got: %#v", i, testCase.Resource, r)
+		} else {
+			assert.Error(t, err)
+		}
 	}
 }
 

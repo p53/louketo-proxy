@@ -896,6 +896,57 @@ func TestDefaultDenialStrict(t *testing.T) {
 	newFakeProxy(config, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
+func TestNoProxy(t *testing.T) {
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
+		{
+			Name: "TestEmptyXForwarded",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDenyStrict = true
+				c.NoRedirects = true
+				c.NoProxy = true
+				c.Resources = []*authorization.Resource{
+					{
+						URL:         "/public/*",
+						Methods:     utils.AllHTTPMethods,
+						WhiteListed: true,
+					},
+					{
+						URL:     "/private",
+						Methods: []string{"GET"},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/public/allowed",
+					ExpectedProxy: false,
+					ExpectedCode:  http.StatusOK,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, body, "")
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				c := newFakeKeycloakConfig()
+				testCase.ProxySettings(c)
+				p := newFakeProxy(c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
+	}
+}
+
 func TestAuthorizationTemplate(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.SignInPage = "templates/sign_in.html.tmpl"

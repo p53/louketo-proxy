@@ -35,6 +35,8 @@ type Resource struct {
 	WhiteListed bool `json:"white-listed" yaml:"white-listed"`
 	// RequireAnyRole indicates that ANY of the roles are required, the default is all
 	RequireAnyRole bool `json:"require-any-role" yaml:"require-any-role"`
+	// Headers required to access this url
+	Headers []string `json:"headers" yaml:"headers"`
 	// Roles the roles required to access this url
 	Roles []string `json:"roles" yaml:"roles"`
 	// Groups is a list of groups the user is in
@@ -63,7 +65,7 @@ func (r *Resource) Parse(resource string) (*Resource, error) {
 			return nil,
 				errors.New(
 					"invalid resource keypair, should be " +
-						"(uri|roles|methods|white-listed)=comma_values",
+						"(uri|roles|headers|methods|white-listed)=comma_values",
 				)
 		}
 
@@ -92,6 +94,12 @@ func (r *Resource) Parse(resource string) (*Resource, error) {
 			r.RequireAnyRole = val
 		case "roles":
 			r.Roles = strings.Split(keyPair[1], ",")
+		case "headers":
+			r.Headers = strings.Split(strings.ToLower(keyPair[1]), ",")
+			colonCount := strings.Count(keyPair[1], ":")
+			if len(r.Headers) != colonCount {
+				return nil, errors.New("headers key and value should be split by colon")
+			}
 		case "groups":
 			r.Groups = strings.Split(keyPair[1], ",")
 		case "white-listed":
@@ -150,9 +158,14 @@ func (r *Resource) Valid() error {
 	return nil
 }
 
-// getRoles returns a list of roles for this resource
+// GetRoles returns a list of roles for this resource
 func (r Resource) GetRoles() string {
 	return strings.Join(r.Roles, ",")
+}
+
+// GetHeaders returns a list of headers for this resource
+func (r Resource) GetHeaders() string {
+	return strings.Join(r.Headers, ",")
 }
 
 // String returns a string representation of the resource

@@ -524,6 +524,21 @@ token would look like this:
 }
 ```
 
+## Headers matching
+
+You can match on the request headers  via the `headers`
+parameter available within the resource. Headers are implicitly
+required, such as `headers=x-some-header:somevalue,x-other-header:othervalue` where the request 
+MUST have headers 'x-some-header' with value 'somevalue' AND 'x-other-header', with value 'othervalue'.
+
+## Forward-auth
+
+Traefik, nginx ingress and other gateways usually have feature called forward-auth.
+This enables them to forward request to external auth/authz service which returns 2xx in case
+auth/authz was successful and otherwise some higher code (usually 401/403). You can use
+gatekeeper as this external auth/authz service by using headers matching feature as describe above
+and enabling `--no-proxy` option (this option will not forward request to upstream).
+
 ## Custom pages
 
 By default, Gatekeeper Proxy will immediately redirect you

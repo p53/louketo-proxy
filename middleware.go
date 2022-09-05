@@ -614,6 +614,7 @@ func (r *oauthProxy) checkClaim(user *userContext, claimName string, match *rege
 }
 
 // admissionMiddleware is responsible for checking the access token against the protected resource
+//nolint:cyclop
 func (r *oauthProxy) admissionMiddleware(resource *authorization.Resource) func(http.Handler) http.Handler {
 	claimMatches := make(map[string]*regexp.Regexp)
 
@@ -650,6 +651,49 @@ func (r *oauthProxy) admissionMiddleware(resource *authorization.Resource) func(
 
 				next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 				return
+			}
+
+			if len(resource.Headers) > 0 {
+				var reqHeaders []string
+
+				for _, resVal := range resource.Headers {
+					resVals := strings.Split(resVal, ":")
+					name := resVals[0]
+					canonName := http.CanonicalHeaderKey(name)
+					values, ok := req.Header[canonName]
+
+					if !ok {
+						scope.Logger.Warn("access denied, invalid headers",
+							zap.String("access", "denied"),
+							zap.String("email", user.email),
+							zap.String("resource", resource.URL),
+							zap.String("headers", resource.GetHeaders()))
+
+						next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
+						return
+					}
+
+					for _, value := range values {
+						headVal := fmt.Sprintf(
+							"%s:%s",
+							strings.ToLower(name),
+							strings.ToLower(value),
+						)
+						reqHeaders = append(reqHeaders, headVal)
+					}
+				}
+
+				// @step: we need to check the headers
+				if !utils.HasAccess(resource.Headers, reqHeaders, true) {
+					scope.Logger.Warn("access denied, invalid headers",
+						zap.String("access", "denied"),
+						zap.String("email", user.email),
+						zap.String("resource", resource.URL),
+						zap.String("headers", resource.GetHeaders()))
+
+					next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
+					return
+				}
 			}
 
 			// @step: check if we have any groups, the groups are there
