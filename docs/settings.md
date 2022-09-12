@@ -85,6 +85,7 @@
 |    --hostnames value                       | list of hostnames the service will respond to | |
 |    --store-url value                       | url for the storage subsystem, e.g redis://127.0.0.1:6379, file:///etc/tokens.file | | PROXY_STORE_URL
 |    --encryption-key value                  | encryption key used to encryption the session state | | PROXY_ENCRYPTION_KEY
+|    --no-proxy value                        | do not proxy requests to upstream, useful for forward-auth usage (with nginx, traefik) | | PROXY_NO_PROXY
 |    --no-redirects                          | do not have back redirects when no authentication is present, 401 them | false | PROXY_NO_REDIRECTS
 |    --skip-token-verification               | TESTING ONLY; bypass token verification, only expiration and roles enforced | false | PROXY_SKIP_TOKEN_VERIFICATION
 |    --skip-access-token-issuer-check        | according RFC issuer should not be checked on access token, this will be default true in future | false | PROXY_SKIP_ACCESS_TOKEN_ISSUER_CHECK
