@@ -539,6 +539,37 @@ auth/authz was successful and otherwise some higher code (usually 401/403). You 
 gatekeeper as this external auth/authz service by using headers matching feature as describe above
 and enabling `--no-proxy` option (this option will not forward request to upstream).
 
+Example:
+
+traefik forward-auth configuration
+
+```yaml
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  labels:
+    app.kubernetes.io/name: dashboard-apis-oauth
+    app.kubernetes.io/part-of: dashboard
+  name: dashboard-apis-oauth
+  namespace: censored
+spec:
+  forwardAuth:
+    address: http://gatekeeper-dns-name:4180
+```
+
+gatekeeper configuration
+
+```yaml
+  - args:
+      - --client-id=dashboard
+      - --no-redirects=true # this option will ensure there will be no redirects
+      - --no-proxy=true # this option will ensure that request will be not forwarded to upstream
+      - --listen=0.0.0.0:4180
+      - --discovery-url=https://keycloak-dns-name/auth/realms/censored
+      - --enable-default-deny=true # this option will ensure protection of all paths /*, according our traefik config, traefik will send it to /
+      - --match-headers=headers=x-some-header:somevalue,x-other-header:othervalue
+```
+
 ## Custom pages
 
 By default, Gatekeeper Proxy will immediately redirect you
