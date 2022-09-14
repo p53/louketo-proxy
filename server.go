@@ -463,7 +463,7 @@ func (r *oauthProxy) createReverseProxy() error {
 		)
 	}
 
-	if r.config.RedirectionURL == "" {
+	if r.config.RedirectionURL == "" && !r.config.NoRedirects {
 		r.log.Warn("no redirection url has been set, will use host headers")
 	}
 
