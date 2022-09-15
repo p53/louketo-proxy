@@ -86,6 +86,7 @@ func newDefaultConfig() *Config {
 		ForwardingGrantType:           GrantTypeUserCreds,
 		PatRetryCount:                 5,
 		PatRetryInterval:              10 * time.Second,
+		OpaTimeout:                    10 * time.Second,
 	}
 }
 
@@ -385,7 +386,7 @@ func (r *Config) isReverseProxySettingsValid() error {
 			r.isNoProxyValid,
 			r.isUpstreamValid,
 			r.isDefaultDenyValid,
-			r.isEnableUmaValid,
+			r.isExternalAuthzValid,
 			r.isTokenVerificationSettingsValid,
 			r.isResourceValid,
 			r.isMatchClaimValid,
@@ -608,7 +609,13 @@ func (r *Config) isMatchClaimValid() error {
 	return nil
 }
 
-func (r *Config) isEnableUmaValid() error {
+func (r *Config) isExternalAuthzValid() error {
+	if r.EnableUma && r.EnableOpa {
+		return errors.New(
+			"only one type of external authz can be enabled at once",
+		)
+	}
+
 	if r.EnableUma {
 		if r.ClientID == "" || r.ClientSecret == "" {
 			return errors.New(
@@ -620,7 +627,16 @@ func (r *Config) isEnableUmaValid() error {
 				"enable-uma requires no-redirects option",
 			)
 		}
+	} else if r.EnableOpa {
+		authzURL, err := url.ParseRequestURI(r.OpaAuthzURI)
+
+		if err != nil {
+			return fmt.Errorf("not valid OPA authz URL, %w", err)
+		}
+
+		r.OpaAuthzURL = authzURL
 	}
+
 	return nil
 }
 

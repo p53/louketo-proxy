@@ -1890,7 +1890,7 @@ func TestIsMatchClaimValid(t *testing.T) {
 	}
 }
 
-func TestEnableUmaValid(t *testing.T) {
+func TestExternalAuthzValid(t *testing.T) {
 	testCases := []struct {
 		Name   string
 		Config *Config
@@ -1924,6 +1924,32 @@ func TestEnableUmaValid(t *testing.T) {
 			},
 			Valid: false,
 		},
+		{
+			Name: "TwoExternalAuthzEnabled",
+			Config: &Config{
+				EnableUma:    true,
+				EnableOpa:    true,
+				ClientID:     "test",
+				ClientSecret: "",
+			},
+			Valid: false,
+		},
+		{
+			Name: "ValidOpa",
+			Config: &Config{
+				EnableOpa:   true,
+				OpaAuthzURI: "http://some/test",
+			},
+			Valid: true,
+		},
+		{
+			Name: "InvalidOpa",
+			Config: &Config{
+				EnableOpa:   true,
+				OpaAuthzURI: "",
+			},
+			Valid: false,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -1931,7 +1957,7 @@ func TestEnableUmaValid(t *testing.T) {
 		t.Run(
 			testCase.Name,
 			func(t *testing.T) {
-				err := testCase.Config.isEnableUmaValid()
+				err := testCase.Config.isExternalAuthzValid()
 				if err != nil && testCase.Valid {
 					t.Fatalf("Expected test not to fail")
 				}

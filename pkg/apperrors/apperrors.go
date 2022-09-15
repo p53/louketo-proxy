@@ -11,6 +11,7 @@ var (
 	ErrNoIDPResourceForPath            = errors.New("could not find resource matching path")
 	ErrResourceIDNotPresent            = errors.New("resource id not present in token permissions")
 	ErrNoAuthzFound                    = errors.New("no authz found")
+	ErrFailedAuthzRequest              = errors.New("unexpected error occured during authz request")
 	ErrSessionNotFound                 = errors.New("authentication session not found")
 	ErrNoSessionStateFound             = errors.New("no session state found")
 	ErrZeroLengthToken                 = errors.New("token has zero length")

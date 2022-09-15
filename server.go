@@ -434,7 +434,7 @@ func (r *oauthProxy) createReverseProxy() error {
 			}
 		}
 
-		if r.config.EnableUma {
+		if r.config.EnableUma || r.config.EnableOpa {
 			middlewares = []func(http.Handler) http.Handler{
 				r.authenticationMiddleware(),
 				r.authorizationMiddleware(),

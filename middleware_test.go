@@ -21,12 +21,14 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -46,6 +48,8 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 
 	"gopkg.in/square/go-jose.v2/jwt"
+
+	opaserver "github.com/open-policy-agent/opa/server"
 )
 
 func TestMetricsMiddleware(t *testing.T) {
@@ -2684,5 +2688,240 @@ func TestLogRealIP(t *testing.T) {
 
 		assert.True(t, rowFound)
 		assert.Equal(t, testCase.ExpectedIP, logRow.ClientIP)
+	}
+}
+
+//nolint:funlen
+func TestEnableOpa(t *testing.T) {
+	requests := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+		AuthzPolicy       string
+		StartOpa          bool
+	}{
+		{
+			Name: "TestEnableOpaOK",
+			ProxySettings: func(conf *Config) {
+				conf.EnableOpa = true
+				conf.EnableDefaultDeny = true
+				conf.OpaTimeout = 60 * time.Second
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/test",
+					ExpectedProxy: true,
+					HasToken:      true,
+					Redirects:     false,
+					ExpectedCode:  http.StatusOK,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Contains(t, body, "test")
+						assert.Contains(t, body, "method")
+					},
+				},
+			},
+			AuthzPolicy: `
+			package authz
+
+			default allow := false
+
+			allow {
+				input.method = "GET"
+				input.path = "/test"
+			}
+			`,
+			StartOpa: true,
+		},
+		{
+			Name: "TestEnableOpaUnAuthorized",
+			ProxySettings: func(conf *Config) {
+				conf.EnableOpa = true
+				conf.EnableDefaultDeny = true
+				conf.OpaTimeout = 60 * time.Second
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/test",
+					ExpectedProxy: false,
+					HasToken:      true,
+					Redirects:     false,
+					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+			AuthzPolicy: `
+			package authz
+
+			default allow := false
+
+			allow {
+				input.method = "GETTT"
+				input.path = "/test"
+			}
+			`,
+			StartOpa: true,
+		},
+		{
+			Name: "TestMissingOpaPolicy",
+			ProxySettings: func(conf *Config) {
+				conf.EnableOpa = true
+				conf.EnableDefaultDeny = true
+				conf.OpaTimeout = 60 * time.Second
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/test",
+					ExpectedProxy: false,
+					HasToken:      true,
+					Redirects:     false,
+					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+			AuthzPolicy: ``,
+			StartOpa:    true,
+		},
+		{
+			Name: "TestOpaStopped",
+			ProxySettings: func(conf *Config) {
+				conf.EnableOpa = true
+				conf.EnableDefaultDeny = true
+				conf.OpaTimeout = 60 * time.Second
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/test",
+					ExpectedProxy: false,
+					HasToken:      true,
+					Redirects:     false,
+					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+			AuthzPolicy: ``,
+			StartOpa:    false,
+		},
+		{
+			Name: "TestOpaLoginRedirect",
+			ProxySettings: func(conf *Config) {
+				conf.EnableOpa = true
+				conf.EnableDefaultDeny = true
+				conf.OpaTimeout = 60 * time.Second
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/test",
+					ExpectedProxy: false,
+					HasToken:      true,
+					Redirects:     true,
+					ExpectedCode:  http.StatusSeeOther,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+			},
+			AuthzPolicy: ``,
+			StartOpa:    true,
+		},
+		{
+			Name: "TestOpaLogin",
+			ProxySettings: func(conf *Config) {
+				conf.EnableOpa = true
+				conf.EnableDefaultDeny = true
+				conf.OpaTimeout = 60 * time.Second
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/test",
+					ExpectedProxy: true,
+					HasLogin:      true,
+					OnResponse:    delay,
+					Redirects:     true,
+					ExpectedCode:  http.StatusOK,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Contains(t, body, "test")
+						assert.Contains(t, body, "method")
+					},
+				},
+				{
+					URI:           "/test",
+					ExpectedProxy: true,
+					HasLogin:      false,
+					Redirects:     false,
+					ExpectedCode:  http.StatusOK,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Contains(t, body, "test")
+						assert.Contains(t, body, "method")
+					},
+				},
+			},
+			AuthzPolicy: `
+			package authz
+
+			default allow := false
+
+			allow {
+				input.method = "GET"
+				input.path = "/test"
+			}
+			`,
+			StartOpa: true,
+		},
+	}
+
+	for _, testCase := range requests {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				cfg := newFakeKeycloakConfig()
+				testCase.ProxySettings(cfg)
+
+				ctx := context.Background()
+				authzPolicy := testCase.AuthzPolicy
+				opaAddress := ""
+				var server *opaserver.Server
+
+				if testCase.StartOpa {
+					server = authorization.StartOpaServer(ctx, t, authzPolicy)
+					addrs := server.Addrs()
+					opaAddress = addrs[0]
+				}
+
+				authzURI := fmt.Sprintf(
+					"http://%s/%s",
+					opaAddress,
+					"v1/data/authz/allow",
+				)
+				authzURL, err := url.ParseRequestURI(authzURI)
+
+				if err != nil {
+					t.Fatalf("problem parsing authzURL")
+				}
+
+				cfg.OpaAuthzURL = authzURL
+
+				p := newFakeProxy(cfg, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
+			},
+		)
 	}
 }

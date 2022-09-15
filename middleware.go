@@ -458,19 +458,29 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 			}
 
 			if !r.useStore() || noAuthz {
-				r.pat.m.Lock()
-				token := r.pat.Token.AccessToken
-				r.pat.m.Unlock()
+				var provider authorization.Provider
 
-				provider := authorization.KeycloakAuthorizationProvider{}
-				decision, err = provider.Authorize(
-					user.permissions,
-					req,
-					r.idpClient,
-					r.config.OpenIDProviderTimeout,
-					token,
-					r.config.Realm,
-				)
+				if r.config.EnableUma {
+					r.pat.m.Lock()
+					token := r.pat.Token.AccessToken
+					r.pat.m.Unlock()
+
+					provider = authorization.NewKeycloakAuthorizationProvider(
+						user.permissions,
+						req,
+						r.idpClient,
+						r.config.OpenIDProviderTimeout,
+						token,
+						r.config.Realm,
+					)
+				} else if r.config.EnableOpa {
+					provider = authorization.NewOpaAuthorizationProvider(
+						r.config.OpaTimeout,
+						*r.config.OpaAuthzURL,
+						req,
+					)
+				}
+				decision, err = provider.Authorize()
 			}
 
 			switch err {
@@ -491,7 +501,10 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 						"Undexpected error during authorization",
 						zap.Error(err),
 					)
-					next.ServeHTTP(wrt, req.WithContext(r.revokeProxy(wrt, req)))
+					next.ServeHTTP(
+						wrt,
+						req.WithContext(r.redirectToAuthorization(wrt, req)),
+					)
 					return
 				}
 			}
