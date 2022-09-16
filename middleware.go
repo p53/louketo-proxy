@@ -519,7 +519,6 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 						zap.Error(err),
 					)
 
-					//nolint:contextcheck
 					r.accessForbidden(wrt, req)
 					return
 				}
@@ -557,7 +556,6 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 					)
 				}
 
-				//nolint:contextcheck
 				r.accessForbidden(wrt, req)
 				return
 			}

@@ -2847,6 +2847,7 @@ func TestEnableOpa(t *testing.T) {
 				conf.OpaTimeout = 60 * time.Second
 				conf.ClientID = validUsername
 				conf.ClientSecret = validPassword
+				//nolint:goconst
 				conf.ForbiddenPage = "templates/forbidden.html.tmpl"
 			},
 			ExecutionSettings: []fakeRequest{
