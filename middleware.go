@@ -461,12 +461,21 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 			var err error
 
 			if r.useStore() {
+				scope.Logger.Debug("checking if authz decision in cache")
 				decision, err = r.GetAuthz(user.rawToken, req.URL)
 				noAuthz = err == apperrors.ErrNoAuthzFound
 			}
 
+			decFromCache := !noAuthz && r.useStore()
+
+			if decFromCache {
+				scope.Logger.Debug("authz decision found in cache")
+			}
+
 			if !r.useStore() || noAuthz {
 				var provider authorization.Provider
+
+				scope.Logger.Debug("query external authz provider for authz")
 
 				if r.config.EnableUma {
 					r.pat.m.Lock()
@@ -511,15 +520,14 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 					)
 
 					//nolint:contextcheck
-					next.ServeHTTP(
-						wrt,
-						req.WithContext(r.redirectToAuthorization(wrt, req)),
-					)
+					r.accessForbidden(wrt, req)
 					return
 				}
 			}
 
 			if noAuthz {
+				scope.Logger.Debug("storing authz decision in cache")
+
 				err := r.StoreAuthz(
 					user.rawToken,
 					req.URL,
@@ -535,8 +543,13 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 				}
 			}
 
+			scope.Logger.Info(
+				"authz decision",
+				zap.String("decision", decision.String()),
+			)
+
 			if decision == authorization.DeniedAuthz {
-				if !noAuthz {
+				if decFromCache {
 					scope.Logger.Debug(
 						"authz denied from cache",
 						zap.String("user", user.name),
@@ -545,7 +558,7 @@ func (r *oauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 				}
 
 				//nolint:contextcheck
-				next.ServeHTTP(wrt, req.WithContext(r.redirectToAuthorization(wrt, req)))
+				r.accessForbidden(wrt, req)
 				return
 			}
 
@@ -930,15 +943,10 @@ func (r *oauthProxy) denyMiddleware(next http.Handler) http.Handler {
 	r.log.Info("enabling the deny middleware")
 
 	return http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
-		if r.config.NoRedirects {
-			wrt.WriteHeader(http.StatusUnauthorized)
-			next.ServeHTTP(wrt, req)
-		} else {
-			//nolint:contextcheck
-			next.ServeHTTP(
-				wrt,
-				req.WithContext(r.redirectToAuthorization(wrt, req)),
-			)
-		}
+		//nolint:contextcheck
+		next.ServeHTTP(
+			wrt,
+			req.WithContext(r.redirectToAuthorization(wrt, req)),
+		)
 	})
 }

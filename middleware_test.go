@@ -2066,7 +2066,7 @@ func TestEnableUma(t *testing.T) {
 				{
 					URI:           "/test",
 					ExpectedProxy: false,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
@@ -2093,7 +2093,7 @@ func TestEnableUma(t *testing.T) {
 					URI:                "/test",
 					ExpectedProxy:      false,
 					HasToken:           true,
-					ExpectedCode:       http.StatusUnauthorized,
+					ExpectedCode:       http.StatusForbidden,
 					TokenAuthorization: &authorization.Permissions{},
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
@@ -2121,7 +2121,7 @@ func TestEnableUma(t *testing.T) {
 					URI:           "/test",
 					ExpectedProxy: false,
 					HasToken:      true,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					TokenAuthorization: &authorization.Permissions{
 						Permissions: []authorization.Permission{
 							{
@@ -2157,7 +2157,7 @@ func TestEnableUma(t *testing.T) {
 					URI:           "/test",
 					ExpectedProxy: false,
 					HasToken:      true,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					TokenAuthorization: &authorization.Permissions{
 						Permissions: []authorization.Permission{
 							{
@@ -2260,7 +2260,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 					URI:           "/test",
 					ExpectedProxy: false,
 					HasToken:      true,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					TokenAuthorization: &authorization.Permissions{
 						Permissions: []authorization.Permission{
 							{
@@ -2283,7 +2283,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 					URI:           "/test",
 					ExpectedProxy: false,
 					HasToken:      true,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					TokenAuthorization: &authorization.Permissions{
 						Permissions: []authorization.Permission{
 							{
@@ -2466,7 +2466,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 				{
 					URI:                "/test",
 					ExpectedProxy:      false,
-					ExpectedCode:       http.StatusUnauthorized,
+					ExpectedCode:       http.StatusForbidden,
 					TokenAuthorization: &authorization.Permissions{},
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
@@ -2480,7 +2480,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 				{
 					URI:                "/test",
 					ExpectedProxy:      false,
-					ExpectedCode:       http.StatusUnauthorized,
+					ExpectedCode:       http.StatusForbidden,
 					TokenAuthorization: &authorization.Permissions{},
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
@@ -2541,7 +2541,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 					URI:           "/test",
 					ExpectedProxy: false,
 					HasToken:      true,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
@@ -2749,7 +2749,7 @@ func TestEnableOpa(t *testing.T) {
 					ExpectedProxy: false,
 					HasToken:      true,
 					Redirects:     false,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
@@ -2782,7 +2782,7 @@ func TestEnableOpa(t *testing.T) {
 					ExpectedProxy: false,
 					HasToken:      true,
 					Redirects:     false,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
@@ -2806,7 +2806,7 @@ func TestEnableOpa(t *testing.T) {
 					ExpectedProxy: false,
 					HasToken:      true,
 					Redirects:     false,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
@@ -2816,7 +2816,7 @@ func TestEnableOpa(t *testing.T) {
 			StartOpa:    false,
 		},
 		{
-			Name: "TestOpaLoginRedirect",
+			Name: "TestOpaLoginForbiddenWithoutTemplate",
 			ProxySettings: func(conf *Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
@@ -2830,9 +2830,34 @@ func TestEnableOpa(t *testing.T) {
 					ExpectedProxy: false,
 					HasToken:      true,
 					Redirects:     true,
-					ExpectedCode:  http.StatusSeeOther,
+					ExpectedCode:  http.StatusForbidden,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
+					},
+				},
+			},
+			AuthzPolicy: ``,
+			StartOpa:    true,
+		},
+		{
+			Name: "TestOpaLoginForbiddenWithTemplate",
+			ProxySettings: func(conf *Config) {
+				conf.EnableOpa = true
+				conf.EnableDefaultDeny = true
+				conf.OpaTimeout = 60 * time.Second
+				conf.ClientID = validUsername
+				conf.ClientSecret = validPassword
+				conf.ForbiddenPage = "templates/forbidden.html.tmpl"
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/test",
+					ExpectedProxy: false,
+					HasToken:      true,
+					Redirects:     true,
+					ExpectedCode:  http.StatusForbidden,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Contains(t, body, "Permission Denied")
 					},
 				},
 			},

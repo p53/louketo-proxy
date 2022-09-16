@@ -359,7 +359,7 @@ func TestUmaForwardingProxy(t *testing.T) {
 					URL:           upstreamProxy.getServiceURL() + "/test",
 					ProxyRequest:  true,
 					ExpectedProxy: false,
-					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedCode:  http.StatusForbidden,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
