@@ -879,6 +879,18 @@ func TestDefaultDenialStrict(t *testing.T) {
 		},
 		{
 			Method:        "GET",
+			URI:           "/not_permited_with_valid_token",
+			HasToken:      true,
+			ProxyRequest:  true,
+			ExpectedProxy: false,
+			Redirects:     true,
+			ExpectedCode:  http.StatusSeeOther,
+			ExpectedContent: func(body string, testNum int) {
+				assert.Equal(t, "", body)
+			},
+		},
+		{
+			Method:        "GET",
 			URI:           "/private",
 			HasToken:      true,
 			ProxyRequest:  true,
