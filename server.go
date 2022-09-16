@@ -249,7 +249,7 @@ func (r *oauthProxy) useDefaultStack(engine chi.Router) {
 }
 
 // createReverseProxy creates a reverse proxy
-//nolint:cyclop,funlen
+//nolint:cyclop
 func (r *oauthProxy) createReverseProxy() error {
 	r.log.Info(
 		"enabled reverse proxy mode, upstream url",
@@ -393,16 +393,6 @@ func (r *oauthProxy) createReverseProxy() error {
 				zap.String("resource", res.URL),
 				zap.String("change", res.URL),
 				zap.String("amended", strings.TrimRight(res.URL, "/")))
-		}
-
-		if res.URL == allPath && (r.config.EnableDefaultDeny || r.config.EnableDefaultDenyStrict) {
-			switch res.WhiteListed {
-			case true:
-				return errors.New("you've asked for a default denial but whitelisted everything")
-			default:
-				enableDefaultDeny = false
-				enableDefaultDenyStrict = false
-			}
 		}
 	}
 
