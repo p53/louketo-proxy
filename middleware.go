@@ -941,10 +941,6 @@ func (r *oauthProxy) denyMiddleware(next http.Handler) http.Handler {
 	r.log.Info("enabling the deny middleware")
 
 	return http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
-		//nolint:contextcheck
-		next.ServeHTTP(
-			wrt,
-			req.WithContext(r.redirectToAuthorization(wrt, req)),
-		)
+		r.accessForbidden(wrt, req)
 	})
 }

@@ -872,7 +872,7 @@ func TestDefaultDenialStrict(t *testing.T) {
 			ProxyRequest:  true,
 			ExpectedProxy: false,
 			Redirects:     false,
-			ExpectedCode:  http.StatusUnauthorized,
+			ExpectedCode:  http.StatusForbidden,
 			ExpectedContent: func(body string, testNum int) {
 				assert.Equal(t, "", body)
 			},
@@ -884,7 +884,7 @@ func TestDefaultDenialStrict(t *testing.T) {
 			ProxyRequest:  true,
 			ExpectedProxy: false,
 			Redirects:     true,
-			ExpectedCode:  http.StatusSeeOther,
+			ExpectedCode:  http.StatusForbidden,
 			ExpectedContent: func(body string, testNum int) {
 				assert.Equal(t, "", body)
 			},
@@ -908,7 +908,7 @@ func TestDefaultDenialStrict(t *testing.T) {
 			ProxyRequest:  true,
 			ExpectedProxy: false,
 			Redirects:     false,
-			ExpectedCode:  http.StatusUnauthorized,
+			ExpectedCode:  http.StatusForbidden,
 			ExpectedContent: func(body string, testNum int) {
 				assert.Equal(t, "", body)
 			},
