@@ -24,7 +24,7 @@ var _ Provider = (*KeycloakAuthorizationProvider)(nil)
 type KeycloakAuthorizationProvider struct {
 	perms      Permissions
 	req        *http.Request
-	idpClient  gocloak.GoCloak
+	idpClient  *gocloak.GoCloak
 	idpTimeout time.Duration
 	pat        string
 	realm      string
@@ -33,7 +33,7 @@ type KeycloakAuthorizationProvider struct {
 func NewKeycloakAuthorizationProvider(
 	perms Permissions,
 	req *http.Request,
-	idpClient gocloak.GoCloak,
+	idpClient *gocloak.GoCloak,
 	idpTimeout time.Duration,
 	PAT string,
 	realm string,

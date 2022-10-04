@@ -67,7 +67,7 @@ type oauthProxy struct {
 	provider       *oidc3.Provider
 	config         *Config
 	endpoint       *url.URL
-	idpClient      gocloak.GoCloak
+	idpClient      *gocloak.GoCloak
 	listener       net.Listener
 	log            *zap.Logger
 	metricsHandler http.Handler
@@ -1037,7 +1037,7 @@ func (r *oauthProxy) createTemplates() error {
 
 // newOpenIDProvider initializes the openID configuration, note: the redirection url is deliberately left blank
 // in order to retrieve it from the host header on request
-func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, gocloak.GoCloak, error) {
+func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *gocloak.GoCloak, error) {
 	host := fmt.Sprintf(
 		"%s://%s",
 		r.config.DiscoveryURI.Scheme,

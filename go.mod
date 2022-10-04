@@ -1,7 +1,7 @@
 module github.com/gogatekeeper/gatekeeper
 
 require (
-	github.com/Nerzal/gocloak/v11 v11.0.2
+	github.com/Nerzal/gocloak/v11 v11.2.1-0.20220804231253-56777ac40646
 	github.com/PuerkitoBio/purell v1.1.2-0.20201208131035-5a810c9252c4
 	github.com/alicebob/miniredis/v2 v2.14.5
 	github.com/armon/go-proxyproto v0.0.0-20200108142055-f0b8253b1507
@@ -10,7 +10,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20210110162100-a92cc753f88e
 	github.com/fsnotify/fsnotify v1.5.4
 	github.com/go-chi/chi/v5 v5.0.4
-	github.com/go-resty/resty/v2 v2.6.0
+	github.com/go-resty/resty/v2 v2.7.0
 	github.com/gofrs/uuid v3.3.0+incompatible
 	github.com/jochasinga/relay v0.0.0-20161125200856-6a088273228f
 	github.com/oleiade/reflections v1.0.1
@@ -23,7 +23,7 @@ require (
 	github.com/urfave/cli v1.22.2
 	go.uber.org/zap v1.13.0
 	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
-	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
+	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 	gopkg.in/redis.v4 v4.2.4
 	gopkg.in/square/go-jose.v2 v2.5.1
@@ -55,7 +55,7 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.1.0 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect

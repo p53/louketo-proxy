@@ -2214,14 +2214,21 @@ spec:
     spec:
       containers:
         - name: keycloak
-          image: jboss/keycloak:16.1.1
+          image: quay.io/keycloak/keycloak:19.0.2
+          command: 
+            - /opt/keycloak/bin/kc.sh
+            - start-dev
+            - --features=preview
+            - --import-realm
           env:
             - name: KEYCLOAK_USER
               value: admin
             - name: KEYCLOAK_PASSWORD
               value: admin
-            - name: KEYCLOAK_IMPORT
-              value: /tmp/test.json
+            - name: KEYCLOAK_ADMIN
+              value: admin
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: admin
             - name: JAVA_OPTS
               value: >-
                 -Dkeycloak.profile.feature.scripts=enabled
@@ -2233,7 +2240,7 @@ spec:
               name: keycloak
           livenessProbe:
             httpGet:
-              path: /auth/realms/test
+              path: /realms/test
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
@@ -2241,7 +2248,7 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /auth/realms/test
+              path: /realms/test
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
@@ -2258,7 +2265,7 @@ spec:
           #     readOnly: true
           volumeMounts:
             - name: keycloak-config
-              mountPath: /tmp/test.json
+              mountPath: /opt/keycloak/data/import/test.json
               subPath: test.json
       volumes:
         - name: keycloak-config

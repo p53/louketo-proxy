@@ -739,11 +739,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 		}
 
 		r.redirectToURL(
-			fmt.Sprintf(
-				"%s?redirect_uri=%s",
-				sendTo,
-				url.QueryEscape(redirectURL),
-			),
+			sendTo,
 			writer,
 			req,
 			http.StatusSeeOther,
