@@ -667,9 +667,12 @@ out. In addition to dropping any session cookies, we also attempt to
 revoke access via revocation URL (config **revocation-url** or
 **--revocation-url**) with the provider. For Keycloak, the URL for this
 would be
-<https://keycloak.example.com/auth/realms/REALM_NAME/protocol/openid-connect/logout>.
+<https://keycloak.example.com/auth/realms/REALM_NAME/protocol/openid-connect/revoke>.
 If the URL is not specified we will attempt to grab the URL from the
 OpenID discovery response.
+
+There is also option `--enable-logout-redirect` which uses keycloak logout mechanism
+and this logout url <https://keycloak.example.com/auth/realms/REALM_NAME/protocol/openid-connect/logout>.
 
 ## Cross-origin resource sharing (CORS)
 
