@@ -2018,14 +2018,14 @@ func TestUpdateDiscoveryURI(t *testing.T) {
 		{
 			Name: "OK",
 			Config: &Config{
-				DiscoveryURL: "http://127.0.0.1:8081/auth/realms/test/.well-known/openid-configuration",
+				DiscoveryURL: "http://127.0.0.1:8081/realms/test/.well-known/openid-configuration",
 			},
 			Valid: true,
 		},
 		{
 			Name: "InValidDiscoveryURL",
 			Config: &Config{
-				DiscoveryURL: "://127.0.0.1:8081/auth/realms/test/.well-known/openid-configuration",
+				DiscoveryURL: "://127.0.0.1:8081/realms/test/.well-known/openid-configuration",
 			},
 			Valid: false,
 		},
@@ -2061,7 +2061,7 @@ func TestUpdateRealm(t *testing.T) {
 				DiscoveryURI: &url.URL{
 					Scheme: "http",
 					Host:   "127.0.0.1",
-					Path:   "/auth/realms/test",
+					Path:   "/realms/test",
 				},
 			},
 			Valid: true,
@@ -2072,7 +2072,7 @@ func TestUpdateRealm(t *testing.T) {
 				DiscoveryURI: &url.URL{
 					Scheme: "http",
 					Host:   "127.0.0.1",
-					Path:   "/auth/realms",
+					Path:   "/realms",
 				},
 			},
 			Valid: false,

@@ -23,7 +23,7 @@ To run Gatekeeper, please refer to our [building and working with the code base]
     docker run -it --rm quay.io/gogatekeeper/gatekeeper:1.8.1 \
       --listen 127.0.0.1:8080 \
       --upstream-url http://127.0.0.1:80 \
-      --discovery-url https://keycloak.example.com/auth/realms/<REALM_NAME> \
+      --discovery-url https://keycloak.example.com/realms/<REALM_NAME> \
       --client-id <CLIENT_ID>
 
 For more details refer to the [Documentation](docs/user-guide.md).

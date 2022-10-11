@@ -108,7 +108,7 @@ Here is an example configuration file.
 client-id: <CLIENT_ID>
 client-secret: <CLIENT_SECRET> # require for access_type: confidential
 # Note the redirection-url is optional, it will default to the X-Forwarded-Proto / X-Forwarded-Host r the URL scheme and host not found
-discovery-url: https://keycloak.example.com/auth/realms/<REALM_NAME>
+discovery-url: https://keycloak.example.com/realms/<REALM_NAME>
 # Indicates we should deny by default all requests and explicitly specify what is permitted, default true
 enable-default-deny: true
 encryption-key: AgXa7xRcoClDEU0ZDSH4X0XhL5Qy2Z2j
@@ -152,7 +152,7 @@ command line options, such as in this example.
 
 ``` bash
 bin/gatekeeper \
-    --discovery-url=https://keycloak.example.com/auth/realms/<REALM_NAME> \
+    --discovery-url=https://keycloak.example.com/realms/<REALM_NAME> \
     --client-id=<CLIENT_ID> \
     --client-secret=<SECRET> \
     --listen=127.0.0.1:3000 \ # unix sockets format unix://path
@@ -263,7 +263,7 @@ in Keycloak, providing granular role controls over issue tokens.
   - --forwarding-domains=projectb.svc.cluster.local
   - --client-id=xxxxxx
   - --client-secret=xxxx
-  - --discovery-url=http://keycloak:8080/auth/realms/master
+  - --discovery-url=http://keycloak:8080/realms/master
   - --tls-ca-certificate=/etc/secrets/ca.pem
   - --tls-ca-key=/etc/secrets/ca-key.pem
   # Note: if you don't specify any forwarding domains, all domains will be signed; Also the code checks is the
@@ -288,7 +288,7 @@ Example setup client credentials grant:
   - --forwarding-domains=projectb.svc.cluster.local
   - --client-id=xxxxxx
   - --client-secret=xxxx
-  - --discovery-url=http://keycloak:8080/auth/realms/master
+  - --discovery-url=http://keycloak:8080/realms/master
   - --tls-ca-certificate=/etc/secrets/ca.pem
   - --tls-ca-key=/etc/secrets/ca-key.pem
   - --forwarding-grant-type=client_credentials
@@ -328,7 +328,7 @@ $ bin/gatekeeper \
   --forwarding-password=PASSWORD \
   --client-id=CLIENT_ID \
   --client-secret=SECRET \
-  --discovery-url=https://keycloak.example.com/auth/realms/test \
+  --discovery-url=https://keycloak.example.com/realms/test \
   --tls-ca-certificate=ca.pem \
   --tls-ca-key=ca-key.pem
 ```
@@ -464,7 +464,7 @@ iss=https://.*'` or via the configuration file, like this:
 ``` yaml
 match-claims:
   aud: openvpn
-  iss: https://keycloak.example.com/auth/realms/commons
+  iss: https://keycloak.example.com/realms/commons
 ```
 
 or via the CLI, like this:
@@ -567,7 +567,7 @@ gatekeeper configuration
       - --no-redirects=true # this option will ensure there will be no redirects
       - --no-proxy=true # this option will ensure that request will be not forwarded to upstream
       - --listen=0.0.0.0:4180
-      - --discovery-url=https://keycloak-dns-name/auth/realms/censored
+      - --discovery-url=https://keycloak-dns-name/realms/censored
       - --enable-default-deny=true # this option will ensure protection of all paths /*, according our traefik config, traefik will send it to /
       - --match-headers=headers=x-some-header:somevalue,x-other-header:othervalue
 ```
@@ -667,7 +667,7 @@ out. In addition to dropping any session cookies, we also attempt to
 revoke access via revocation URL (config **revocation-url** or
 **--revocation-url**) with the provider. For Keycloak, the URL for this
 would be
-<https://keycloak.example.com/auth/realms/REALM_NAME/protocol/openid-connect/revoke>.
+<https://keycloak.example.com/realms/REALM_NAME/protocol/openid-connect/logout>.
 If the URL is not specified we will attempt to grab the URL from the
 OpenID discovery response.
 
@@ -816,7 +816,7 @@ You can do that by performing following steps:
 1. Request token as you would do normally (e.g. in our case using password grant), we will store it in TOKEN variable:
 
     ```
-    curl -X POST -d "username=test&password=test&client_id=test&client_secret=test&gran_type=password" http://examplekeycloak.com/auth/example/admin/protocol/openid-connect/token
+    curl -X POST -d "username=test&password=test&client_id=test&client_secret=test&gran_type=password" http://examplekeycloak.com/realms/example/admin/protocol/openid-connect/token
     ```
 
 2. accessing endpoint protected by gatekeeper which will return 401 with this response and UMA ticket, we will store it in TICKET variable:
@@ -837,7 +837,7 @@ You can do that by performing following steps:
 along with our token to get RPT token, we will store it in RPT variable.
 
     ```
-    curl -X POST -d "ticket=$TICKET" -H "Authorization: Bearer $TOKEN" http://examplekeycloak.com/auth/example/admin/protocol/openid-connect/token
+    curl -X POST -d "ticket=$TICKET" -H "Authorization: Bearer $TOKEN" http://examplekeycloak.com/realms/example/admin/protocol/openid-connect/token
     ```
 
     This will return RPT token which we can use to access endpoint protected by gatekeeper authorization.

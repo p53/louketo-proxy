@@ -1119,17 +1119,17 @@ func newFakeAuthServer(config *fakeAuthConfig) *fakeAuthServer {
 
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
-	router.Get("/auth/realms/hod-test/.well-known/openid-configuration", service.discoveryHandler)
-	router.Get("/auth/realms/hod-test/protocol/openid-connect/certs", service.keysHandler)
-	router.Get("/auth/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
-	router.Get("/auth/realms/hod-test/protocol/openid-connect/auth", service.authHandler)
-	router.Get("/auth/realms/hod-test/protocol/openid-connect/userinfo", service.userInfoHandler)
-	router.Post("/auth/realms/hod-test/protocol/openid-connect/logout", service.logoutHandler)
-	router.Post("/auth/realms/hod-test/protocol/openid-connect/revoke", service.revocationHandler)
-	router.Post("/auth/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
-	router.Get("/auth/realms/hod-test/authz/protection/resource_set", service.ResourcesHandler)
-	router.Get("/auth/realms/hod-test/authz/protection/resource_set/{id}", service.ResourceHandler)
-	router.Post("/auth/realms/hod-test/authz/protection/permission", service.PermissionTicketHandler)
+	router.Get("/realms/hod-test/.well-known/openid-configuration", service.discoveryHandler)
+	router.Get("/realms/hod-test/protocol/openid-connect/certs", service.keysHandler)
+	router.Get("/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
+	router.Get("/realms/hod-test/protocol/openid-connect/auth", service.authHandler)
+	router.Get("/realms/hod-test/protocol/openid-connect/userinfo", service.userInfoHandler)
+	router.Post("/realms/hod-test/protocol/openid-connect/logout", service.logoutHandler)
+	router.Post("/realms/hod-test/protocol/openid-connect/revoke", service.revocationHandler)
+	router.Post("/realms/hod-test/protocol/openid-connect/token", service.tokenHandler)
+	router.Get("/realms/hod-test/authz/protection/resource_set", service.ResourcesHandler)
+	router.Get("/realms/hod-test/authz/protection/resource_set/{id}", service.ResourceHandler)
+	router.Post("/realms/hod-test/authz/protection/permission", service.PermissionTicketHandler)
 
 	if config.EnableTLS {
 		service.server = httptest.NewTLSServer(router)
@@ -1168,11 +1168,11 @@ func (r *fakeAuthServer) getProxyURL() string {
 }
 
 func (r *fakeAuthServer) getLocation() string {
-	return fmt.Sprintf("%s://%s/auth/realms/hod-test", r.location.Scheme, r.location.Host)
+	return fmt.Sprintf("%s://%s/realms/hod-test", r.location.Scheme, r.location.Host)
 }
 
 func (r *fakeAuthServer) getRevocationURL() string {
-	return fmt.Sprintf("%s://%s/auth/realms/hod-test/protocol/openid-connect/revoke", r.location.Scheme, r.location.Host)
+	return fmt.Sprintf("%s://%s/realms/hod-test/protocol/openid-connect/revoke", r.location.Scheme, r.location.Host)
 }
 
 func (r *fakeAuthServer) setTokenExpiration(tm time.Duration) *fakeAuthServer {
@@ -1182,11 +1182,11 @@ func (r *fakeAuthServer) setTokenExpiration(tm time.Duration) *fakeAuthServer {
 
 func (r *fakeAuthServer) discoveryHandler(w http.ResponseWriter, req *http.Request) {
 	renderJSON(http.StatusOK, w, req, fakeOidcDiscoveryResponse{
-		Issuer:      fmt.Sprintf("%s://%s/auth/realms/hod-test", r.location.Scheme, r.location.Host),
-		AuthURL:     fmt.Sprintf("%s://%s/auth/realms/hod-test/protocol/openid-connect/auth", r.location.Scheme, r.location.Host),
-		TokenURL:    fmt.Sprintf("%s://%s/auth/realms/hod-test/protocol/openid-connect/token", r.location.Scheme, r.location.Host),
-		JWKSURL:     fmt.Sprintf("%s://%s/auth/realms/hod-test/protocol/openid-connect/certs", r.location.Scheme, r.location.Host),
-		UserInfoURL: fmt.Sprintf("%s://%s/auth/realms/hod-test/protocol/openid-connect/userinfo", r.location.Scheme, r.location.Host),
+		Issuer:      fmt.Sprintf("%s://%s/realms/hod-test", r.location.Scheme, r.location.Host),
+		AuthURL:     fmt.Sprintf("%s://%s/realms/hod-test/protocol/openid-connect/auth", r.location.Scheme, r.location.Host),
+		TokenURL:    fmt.Sprintf("%s://%s/realms/hod-test/protocol/openid-connect/token", r.location.Scheme, r.location.Host),
+		JWKSURL:     fmt.Sprintf("%s://%s/realms/hod-test/protocol/openid-connect/certs", r.location.Scheme, r.location.Host),
+		UserInfoURL: fmt.Sprintf("%s://%s/realms/hod-test/protocol/openid-connect/userinfo", r.location.Scheme, r.location.Host),
 		Algorithms:  []string{"RS256"},
 	})
 }

@@ -25,7 +25,7 @@ spec:
           imagePullPolicy: Always
           args:
             - --client-id=broker
-            - --discovery-url=https://sso.example.com/auth/realms/hod-test
+            - --discovery-url=https://sso.example.com/realms/hod-test
             - --enable-default-deny=false
             - --enable-json-logging=true
             - --enable-logging=true

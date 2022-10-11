@@ -71,7 +71,7 @@ func TestE2E(t *testing.T) {
 	max := 65000
 	portNum := fmt.Sprintf("%d", rand.Intn(max-min+1)+min)
 
-	os.Setenv("PROXY_DISCOVERY_URL", "http://localhost:8081/auth/realms/"+testRealm)
+	os.Setenv("PROXY_DISCOVERY_URL", "http://localhost:8081/realms/"+testRealm)
 	os.Setenv("PROXY_OPENID_PROVIDER_TIMEOUT", "60s")
 	os.Setenv("PROXY_LISTEN", "0.0.0.0:"+portNum)
 	os.Setenv("PROXY_CLIENT_ID", testClient)
@@ -99,7 +99,7 @@ func TestE2E(t *testing.T) {
 		ClientID:     testClient,
 		ClientSecret: testClientSecret,
 		Scopes:       []string{"email", "openid"},
-		TokenURL:     "http://localhost:8081/auth/realms/" + testRealm + "/protocol/openid-connect/token",
+		TokenURL:     "http://localhost:8081/realms/" + testRealm + "/protocol/openid-connect/token",
 	}
 
 	respToken, err := conf.Token(ctx)

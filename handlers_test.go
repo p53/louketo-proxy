@@ -596,25 +596,9 @@ func TestLogoutHandlerGood(t *testing.T) {
 			},
 		},
 		{
-			Name: "TestLogoutWithEnabledLogoutRedirectAndRedirectionURL",
-			ProxySettings: func(c *Config) {
-				c.RedirectionURL = "http://example.com"
-				c.EnableLogoutRedirect = true
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:              cfg.WithOAuthURI(constant.LogoutURL),
-					HasToken:         true,
-					ExpectedCode:     http.StatusSeeOther,
-					ExpectedLocation: "example.com",
-				},
-			},
-		},
-		{
-			Name: "TestLogoutWithEnabledLogoutRedirectWithHostHeaders",
+			Name: "TestLogoutWithEnabledLogoutRedirect",
 			ProxySettings: func(c *Config) {
 				c.EnableLogoutRedirect = true
-				c.RedirectionURL = ""
 			},
 			ExecutionSettings: []fakeRequest{
 				{
