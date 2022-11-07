@@ -58,6 +58,26 @@ func TestNewKeycloakProxy(t *testing.T) {
 	assert.NoError(t, proxy.Run())
 }
 
+func TestNewKeycloakProxyWithLegacyDiscoveryURI(t *testing.T) {
+	cfg := newFakeKeycloakConfig()
+	authConfig := &fakeAuthConfig{
+		DiscoveryURLPrefix: "/auth",
+	}
+	authConfig.EnableTLS = false
+
+	cfg.DiscoveryURL = newFakeAuthServer(authConfig).getLocation()
+	cfg.Listen = "127.0.0.1:0"
+	cfg.ListenHTTP = ""
+
+	proxy, err := newProxy(cfg)
+	assert.NoError(t, err)
+	assert.NotNil(t, proxy)
+	assert.NotNil(t, proxy.config)
+	assert.NotNil(t, proxy.router)
+	assert.NotNil(t, proxy.endpoint)
+	assert.NoError(t, proxy.Run())
+}
+
 func TestReverseProxyHeaders(t *testing.T) {
 	proxy := newFakeProxy(nil, &fakeAuthConfig{})
 	token := newTestToken(proxy.idp.getLocation())

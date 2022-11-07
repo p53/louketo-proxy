@@ -1043,7 +1043,13 @@ func (r *oauthProxy) newOpenIDProvider() (*oidc3.Provider, *gocloak.GoCloak, err
 		r.config.DiscoveryURI.Scheme,
 		r.config.DiscoveryURI.Host,
 	)
+
 	client := gocloak.NewClient(host)
+
+	if r.config.IsDiscoverURILegacy {
+		gocloak.SetLegacyWildFlySupport()(client)
+	}
+
 	restyClient := client.RestyClient()
 	restyClient.SetDebug(r.config.Verbose)
 	restyClient.SetTimeout(r.config.OpenIDProviderTimeout)
