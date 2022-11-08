@@ -118,6 +118,7 @@ var defTestTokenClaims = DefaultTestTokenClaims{
 
 const (
 	testEncryptionKey = "ZSeCYDUxIlhDrmPpa1Ldc7il384esSF2"
+	randomLocalHost   = "127.0.0.1:0"
 )
 
 type fakeRequest struct {
@@ -729,7 +730,7 @@ func newFakeKeycloakConfig() *Config {
 		CookieAccessName:            "kc-access",
 		CookieRefreshName:           "kc-state",
 		DisableAllLogging:           true,
-		DiscoveryURL:                "127.0.0.1:0",
+		DiscoveryURL:                randomLocalHost,
 		EnableAuthorizationCookies:  true,
 		EnableAuthorizationHeader:   true,
 		EnableLogging:               false,
@@ -737,7 +738,7 @@ func newFakeKeycloakConfig() *Config {
 		EnableTokenHeader:           true,
 		EnableCompression:           false,
 		EnableMetrics:               false,
-		Listen:                      "127.0.0.1:0",
+		Listen:                      randomLocalHost,
 		ListenAdmin:                 "",
 		ListenAdminScheme:           "http",
 		TLSAdminCertificate:         "",

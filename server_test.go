@@ -46,7 +46,7 @@ func TestNewKeycloakProxy(t *testing.T) {
 	authConfig.EnableTLS = false
 
 	cfg.DiscoveryURL = newFakeAuthServer(authConfig).getLocation()
-	cfg.Listen = "127.0.0.1:0"
+	cfg.Listen = randomLocalHost
 	cfg.ListenHTTP = ""
 
 	proxy, err := newProxy(cfg)
@@ -66,7 +66,7 @@ func TestNewKeycloakProxyWithLegacyDiscoveryURI(t *testing.T) {
 	authConfig.EnableTLS = false
 
 	cfg.DiscoveryURL = newFakeAuthServer(authConfig).getLocation()
-	cfg.Listen = "127.0.0.1:0"
+	cfg.Listen = randomLocalHost
 	cfg.ListenHTTP = ""
 
 	proxy, err := newProxy(cfg)
