@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Nerzal/gocloak/v11"
+	"github.com/Nerzal/gocloak/v12"
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
 )
 

@@ -1,7 +1,7 @@
 module github.com/gogatekeeper/gatekeeper
 
 require (
-	github.com/Nerzal/gocloak/v11 v11.2.1-0.20220804231253-56777ac40646
+	github.com/Nerzal/gocloak/v12 v12.0.0
 	github.com/PuerkitoBio/purell v1.1.2-0.20201208131035-5a810c9252c4
 	github.com/alicebob/miniredis/v2 v2.14.5
 	github.com/armon/go-proxyproto v0.0.0-20200108142055-f0b8253b1507
@@ -22,8 +22,8 @@ require (
 	github.com/unrolled/secure v1.0.8
 	github.com/urfave/cli v1.22.2
 	go.uber.org/zap v1.13.0
-	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
-	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
+	golang.org/x/crypto v0.0.0-20221012134737-56aed061732a
+	golang.org/x/net v0.0.0-20221019024206-cb67ada4b0ad
 	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b
 	gopkg.in/redis.v4 v4.2.4
 	gopkg.in/square/go-jose.v2 v2.5.1
@@ -89,11 +89,11 @@ require (
 	go.uber.org/multierr v1.3.0 // indirect
 	go.uber.org/tools v0.0.0-20190618225709-2cfd321de3ee // indirect
 	golang.org/x/lint v0.0.0-20200302205851-738671d3881b // indirect
-	golang.org/x/mod v0.3.0 // indirect
-	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f // indirect
-	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
-	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/tools v0.0.0-20210106214847-113979e3529a // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
+	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
+	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/tools v0.1.12 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368 // indirect

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Nerzal/gocloak/v11"
+	"github.com/Nerzal/gocloak/v12"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"go.uber.org/zap"
 	"gopkg.in/square/go-jose.v2/jwt"
