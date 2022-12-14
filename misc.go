@@ -130,8 +130,7 @@ func (r *oauthProxy) redirectToURL(url string, wrt http.ResponseWriter, req *htt
 }
 
 // redirectToAuthorization redirects the user to authorization handler
-//nolint:cyclop
-func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.Request) context.Context {
+func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.Request) context.Context { //nolint:cyclop
 	if r.config.NoRedirects && !r.config.EnableUma {
 		wrt.WriteHeader(http.StatusUnauthorized)
 		return r.revokeProxy(wrt, req)
