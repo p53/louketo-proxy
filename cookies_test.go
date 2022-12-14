@@ -30,7 +30,7 @@ import (
 
 func TestCookieDomainHostHeader(t *testing.T) {
 	svc := newTestService()
-	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc+"/admin", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
@@ -53,7 +53,7 @@ func TestCookieBasePath(t *testing.T) {
 
 	_, _, svc := newTestProxyService(cfg)
 
-	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc+"/admin", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
@@ -74,7 +74,7 @@ func TestCookieWithoutBasePath(t *testing.T) {
 
 	_, _, svc := newTestProxyService(cfg)
 
-	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc+"/admin", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 
@@ -93,7 +93,7 @@ func TestCookieWithoutBasePath(t *testing.T) {
 func TestCookieDomain(t *testing.T) {
 	p, _, svc := newTestProxyService(nil)
 	p.config.CookieDomain = "domain.com"
-	resp, _, err := makeTestCodeFlowLogin(svc + "/admin")
+	resp, _, err := makeTestCodeFlowLogin(svc+"/admin", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 

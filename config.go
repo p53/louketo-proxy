@@ -432,8 +432,11 @@ func (r *Config) isTokenVerificationSettingsValid() error {
 }
 
 func (r *Config) isNoProxyValid() error {
-	if r.NoProxy && !r.NoRedirects {
-		return errors.New("noproxy option must be used with noredirects")
+	if r.NoProxy && !r.NoRedirects && r.RedirectionURL != "" {
+		return errors.New("when in forward-auth mode - " +
+			"noproxy=true with noredirect=false, redirectionURL " +
+			"should not be set, will be composed from X-FORWARDED-* headers",
+		)
 	}
 	return nil
 }

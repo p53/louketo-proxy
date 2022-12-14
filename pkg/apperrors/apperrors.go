@@ -21,4 +21,5 @@ var (
 	ErrDefaultDenyWhitelistConflict    = errors.New("you've asked for a default denial but whitelisted everything")
 	ErrDefaultDenyUserDefinedConflict  = errors.New("you've enabled default deny and at the same time defined own rules for /*")
 	ErrBadDiscoveryURIFormat           = errors.New("bad discovery url format")
+	ErrForwardAuthMissingHeaders       = errors.New("seems you are using gatekeeper as forward-auth, but you don't forward X-FORWARDED-* headers from front proxy")
 )

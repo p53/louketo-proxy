@@ -129,6 +129,7 @@ type fakeRequest struct {
 	Groups                        []string
 	HasCookieToken                bool
 	HasLogin                      bool
+	LoginXforwarded               bool
 	HasToken                      bool
 	Headers                       map[string]string
 	Method                        string
@@ -278,7 +279,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 
 		// are we performing a oauth login beforehand
 		if reqCfg.HasLogin {
-			if err := f.performUserLogin(reqCfg.URI); err != nil {
+			if err := f.performUserLogin(&reqCfg); err != nil {
 				t.Errorf(
 					"case %d, unable to login to oauth server, error: %s",
 					idx,
@@ -627,8 +628,8 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 	}
 }
 
-func (f *fakeProxy) performUserLogin(uri string) error {
-	resp, flowCookies, err := makeTestCodeFlowLogin(f.getServiceURL() + uri)
+func (f *fakeProxy) performUserLogin(reqCfg *fakeRequest) error {
+	resp, flowCookies, err := makeTestCodeFlowLogin(f.getServiceURL()+reqCfg.URI, reqCfg.LoginXforwarded)
 	if err != nil {
 		return err
 	}
@@ -781,7 +782,7 @@ func newFakeKeycloakConfig() *Config {
 	}
 }
 
-func makeTestCodeFlowLogin(location string) (*http.Response, []*http.Cookie, error) {
+func makeTestCodeFlowLogin(location string, xforwarded bool) (*http.Response, []*http.Cookie, error) {
 	flowCookies := make([]*http.Cookie, 0)
 
 	uri, err := url.Parse(location)
@@ -793,6 +794,11 @@ func makeTestCodeFlowLogin(location string) (*http.Response, []*http.Cookie, err
 	var resp *http.Response
 	for count := 0; count < 4; count++ {
 		req, err := http.NewRequest(http.MethodGet, location, nil)
+
+		if xforwarded {
+			req.Header.Add("X-Forwarded-Host", uri.Host)
+			req.Header.Add("X-Forwarded-Proto", uri.Scheme)
+		}
 
 		if err != nil {
 			return nil, nil, err

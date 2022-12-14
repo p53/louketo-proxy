@@ -1028,6 +1028,40 @@ func TestNoProxy(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, body, "")
 					},
+					Headers: map[string]string{
+						"X-Forwarded-Host":  "thiswillbereplaced",
+						"X-Forwarded-Proto": "https",
+					},
+				},
+			},
+		},
+		{
+			Name: "TestNoProxyWithRedirectsPrivateUnauthenticatedMissingXFORWARDED",
+			ProxySettings: func(c *Config) {
+				c.EnableDefaultDeny = true
+				c.NoRedirects = false
+				c.NoProxy = true
+				c.Resources = []*authorization.Resource{
+					{
+						URL:         "/public/*",
+						Methods:     utils.AllHTTPMethods,
+						WhiteListed: true,
+					},
+					{
+						URL:     "/private",
+						Methods: []string{"GET"},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           "/private",
+					ExpectedProxy: false,
+					Redirects:     true,
+					ExpectedCode:  http.StatusForbidden,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, body, "")
+					},
 				},
 			},
 		},
@@ -1051,11 +1085,12 @@ func TestNoProxy(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           "/private",
-					ExpectedProxy: false,
-					HasLogin:      true,
-					Redirects:     true,
-					ExpectedCode:  http.StatusOK,
+					URI:             "/private",
+					ExpectedProxy:   false,
+					HasLogin:        true,
+					LoginXforwarded: true,
+					Redirects:       true,
+					ExpectedCode:    http.StatusOK,
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, body, "")
 					},

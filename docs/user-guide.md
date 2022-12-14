@@ -665,7 +665,11 @@ the store.
 There are 3 possibilities how to logout:
 
 1. Calling **/oauth/logout** with token and `redirection-url` parameter set in gatekeeper config.
-This is gatekeeper own mechanism, which revokes token and redirects to provided url.
+This is gatekeeper own mechanism, which revokes token and redirects to provided url. 
+**IMPORTANT:** You will want to use `--enable-refresh-tokens=true` for this logout mechanism, this ensures
+that all access-tokens related to this refresh token will be invalidated, in case this option is not
+enabled it will only revoke current access-token, that means that after next request and use of refresh
+token stored in cookie user will retrieve new access token and still will have access.
 
 2. There is also option `--enable-logout-redirect` which uses keycloak logout mechanism
 and this logout url <https://keycloak.example.com/auth/realms/REALM_NAME/protocol/openid-connect/logout>.

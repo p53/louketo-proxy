@@ -142,9 +142,16 @@ func (r *oauthProxy) writeStateParameterCookie(req *http.Request, wrt http.Respo
 		wrt.WriteHeader(http.StatusInternalServerError)
 	}
 
-	requestURI := base64.StdEncoding.EncodeToString([]byte(req.URL.RequestURI()))
+	requestURI := req.URL.RequestURI()
 
-	r.dropCookie(wrt, req.Host, r.config.CookieRequestURIName, requestURI, 0)
+	if r.config.NoProxy && !r.config.NoRedirects {
+		xReqURI := req.Header.Get("X-Forwarded-Uri")
+		requestURI = xReqURI
+	}
+
+	encRequestURI := base64.StdEncoding.EncodeToString([]byte(requestURI))
+
+	r.dropCookie(wrt, req.Host, r.config.CookieRequestURIName, encRequestURI, 0)
 	r.dropCookie(wrt, req.Host, r.config.CookieOAuthStateName, uuid.String(), 0)
 
 	return uuid.String()

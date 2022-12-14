@@ -56,17 +56,23 @@ func (r *oauthProxy) getRedirectionURL(wrt http.ResponseWriter, req *http.Reques
 
 	switch r.config.RedirectionURL {
 	case "":
-		// need to determine the scheme, cx.Request.URL.Scheme doesn't have it, best way is to default
-		// and then check for TLS
-		scheme := constant.UnsecureScheme
-		if req.TLS != nil {
-			scheme = constant.SecureScheme
+		scheme := ""
+		host := ""
+
+		if r.config.NoProxy && !r.config.NoRedirects {
+			scheme = req.Header.Get("X-Forwarded-Proto")
+			host = req.Header.Get("X-Forwarded-Host")
+		} else {
+			// need to determine the scheme, cx.Request.URL.Scheme doesn't have it, best way is to default
+			// and then check for TLS
+			scheme = constant.UnsecureScheme
+			host = req.Host
+			if req.TLS != nil {
+				scheme = constant.SecureScheme
+			}
 		}
 
-		// @QUESTION: should I use the X-Forwarded-<header>?? ..
-		redirect = fmt.Sprintf("%s://%s",
-			utils.DefaultTo(req.Header.Get("X-Forwarded-Proto"), scheme),
-			utils.DefaultTo(req.Header.Get("X-Forwarded-Host"), req.Host))
+		redirect = fmt.Sprintf("%s://%s", scheme, host)
 	default:
 		redirect = r.config.RedirectionURL
 	}

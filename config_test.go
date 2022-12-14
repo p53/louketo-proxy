@@ -1275,10 +1275,19 @@ func TestIsNoProxyValid(t *testing.T) {
 			Valid: true,
 		},
 		{
-			Name: "InValidNoProxy",
+			Name: "ValidNoProxy",
 			Config: &Config{
 				NoProxy:     true,
 				NoRedirects: false,
+			},
+			Valid: true,
+		},
+		{
+			Name: "InValidNoProxy",
+			Config: &Config{
+				NoProxy:        true,
+				NoRedirects:    false,
+				RedirectionURL: "http://some",
 			},
 			Valid: false,
 		},
