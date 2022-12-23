@@ -254,7 +254,7 @@ in Keycloak, providing granular role controls over issue tokens.
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:2.0.0
+  image: quay.io/gogatekeeper/gatekeeper:2.1.0
   args:
   - --enable-forwarding=true
   - --forwarding-username=projecta
@@ -281,7 +281,7 @@ Example setup client credentials grant:
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:2.0.0
+  image: quay.io/gogatekeeper/gatekeeper:2.1.0
   args:
   - --enable-forwarding=true
   - --forwarding-domains=projecta.svc.cluster.local
@@ -537,13 +537,16 @@ MUST have headers 'x-some-header' with value 'somevalue' AND 'x-other-header', w
 
 Traefik, nginx ingress and other gateways usually have feature called forward-auth.
 This enables them to forward request to external auth/authz service which returns 2xx in case
-auth/authz was successful and otherwise some higher code (usually 401/403). You can use
+auth/authz was successful and otherwise some higher code (usually 401/403) or redirects them 
+for authentication to keycloak server. You can use
 gatekeeper as this external auth/authz service by using headers matching feature as describe above
 and enabling `--no-proxy` option (this option will not forward request to upstream).
 
 Example:
 
-traefik forward-auth configuration
+traefik forward-auth configuration when you don't want to redirect user to authentication 
+server by gatekeeper (useful for e.g. API authentication or when you are using redirect
+to keycloak server on front proxy)
 
 ```yaml
 apiVersion: traefik.containo.us/v1alpha1
@@ -565,6 +568,40 @@ gatekeeper configuration
   - args:
       - --client-id=dashboard
       - --no-redirects=true # this option will ensure there will be no redirects
+      - --no-proxy=true # this option will ensure that request will be not forwarded to upstream
+      - --listen=0.0.0.0:4180
+      - --discovery-url=https://keycloak-dns-name/realms/censored
+      - --enable-default-deny=true # this option will ensure protection of all paths /*, according our traefik config, traefik will send it to /
+      - --resources=headers=x-some-header:somevalue,x-other-header:othervalue
+```
+
+traefik forward-auth configuration when you WANT to redirect user to authentication 
+server by gatekeeper (useful for e.g. frontend application authentication). Please be
+aware that in this mode you need to forward headers X-Forwarded-Host, X-Forwarded-Uri, X-Forwarded-Proto, from
+front proxy to gatekeeper. You can find more complete example [here](/e2e/manifest_test_forwardauth.yml). 
+*IMPORTANT*: Please ensure that you are receiving headers only from trusted proxy
+and gatekeeper is not exposed directly to internet, otherwise attacker might misuse this!
+
+```yaml
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  labels:
+    app.kubernetes.io/name: dashboard-apis-oauth
+    app.kubernetes.io/part-of: dashboard
+  name: dashboard-apis-oauth
+  namespace: censored
+spec:
+  forwardAuth:
+    address: http://gatekeeper-dns-name:4180
+```
+
+gatekeeper configuration
+
+```yaml
+  - args:
+      - --client-id=dashboard
+      - --no-redirects=false # this option will ensure there WILL BE redirects to keycloak server
       - --no-proxy=true # this option will ensure that request will be not forwarded to upstream
       - --listen=0.0.0.0:4180
       - --discovery-url=https://keycloak-dns-name/realms/censored
@@ -673,7 +710,7 @@ token stored in cookie user will retrieve new access token and still will have a
 
 2. There is also option `--enable-logout-redirect` which uses keycloak logout mechanism
 and this logout url <https://keycloak.example.com/auth/realms/REALM_NAME/protocol/openid-connect/logout>.
-Please note that from 2.0.0 release due to changes in keycloak 17+ there is no possibility to do
+Please note that from 2.1.0 release due to changes in keycloak 17+ there is no possibility to do
 automatic logout without confirmation.
 
 3. A **/oauth/logout?redirect=url** is provided as a helper to log users

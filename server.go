@@ -368,6 +368,12 @@ func (r *oauthProxy) createReverseProxy() error {
 		r.adminRouter = admin
 	}
 
+	if r.config.NoProxy && !r.config.NoRedirects {
+		r.log.Warn("using noproxy=true and noredirects=false " +
+			", enabling use of X-FORWARDED-* headers, please " +
+			"use only behind trusted proxy!")
+	}
+
 	if r.config.EnableSessionCookies {
 		r.log.Info("using session cookies only for access and refresh tokens")
 	}
