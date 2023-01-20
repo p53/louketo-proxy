@@ -107,7 +107,8 @@ Here is an example configuration file.
 ``` yaml
 client-id: <CLIENT_ID>
 client-secret: <CLIENT_SECRET> # require for access_type: confidential
-# Note the redirection-url is optional, it will default to the X-Forwarded-Proto / X-Forwarded-Host r the URL scheme and host not found
+# Note the redirection-url is optional, it will default to the the URL scheme and host, 
+# only in case of forward auth it will use X-Forwarded-Proto / X-Forwarded-Host, please see forward-auth section
 discovery-url: https://keycloak.example.com/realms/<REALM_NAME>
 # Indicates we should deny by default all requests and explicitly specify what is permitted, default true
 enable-default-deny: true
