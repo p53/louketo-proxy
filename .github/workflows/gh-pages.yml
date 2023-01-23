@@ -16,7 +16,7 @@ permissions:
   discussions: read
   packages: read
   pages: write
-  repository-projects: read
+  repository-projects: write
   security-events: read
   statuses: read
   id-token: write
