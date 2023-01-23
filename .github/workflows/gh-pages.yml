@@ -19,7 +19,7 @@ permissions:
   repository-projects: read
   security-events: read
   statuses: read
-  id-token: read
+  id-token: write
 
 jobs:
   deploy:
