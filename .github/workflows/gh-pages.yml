@@ -6,6 +6,8 @@ on:
       - main  # Set a branch that will trigger a deployment
   pull_request:
 
+permissions: read-all|write-all
+
 jobs:
   deploy:
     runs-on: ubuntu-22.04
@@ -29,7 +31,6 @@ jobs:
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         #if: github.ref == 'refs/heads/main'
-        permissions: read-all|write-all
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs/public
