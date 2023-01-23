@@ -8,7 +8,18 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write  
+  pull-requests: write
+  actions: read
+  checks: read
+  deployments: read
+  issues: read
+  discussions: read
+  packages: read
+  pages: write
+  repository-projects: read
+  security-events: read
+  statuses: read
+  id-token: read
 
 jobs:
   deploy:
