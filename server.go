@@ -251,7 +251,7 @@ func (r *oauthProxy) useDefaultStack(engine chi.Router) {
 
 // createReverseProxy creates a reverse proxy
 //
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (r *oauthProxy) createReverseProxy() error {
 	r.log.Info(
 		"enabled reverse proxy mode, upstream url",
