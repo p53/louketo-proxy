@@ -396,7 +396,12 @@ func (r *oauthProxy) createReverseProxy() error {
 	enableDefaultDenyStrict := r.config.EnableDefaultDenyStrict
 
 	for _, res := range r.config.Resources {
-		if res.URL[len(res.URL)-1:] == "/" {
+		if res.URL == "/" {
+			r.log.Warn("please be aware that '/' is only referring to site-root " +
+				", to specify all path underneath use '/*'")
+		}
+
+		if res.URL[len(res.URL)-1:] == "/" && res.URL != "/" {
 			r.log.Warn("the resource url is not a prefix",
 				zap.String("resource", res.URL),
 				zap.String("change", res.URL),

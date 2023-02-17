@@ -137,11 +137,13 @@ func (r *Resource) Valid() error {
 	}
 
 	if strings.HasSuffix(r.URL, "/") && !r.WhiteListed {
-		return fmt.Errorf(
-			"you need a wildcard on the url resource "+
-				"to cover all request i.e. --resources=uri=%s*",
-			r.URL,
-		)
+		if r.URL != "/" {
+			return fmt.Errorf(
+				"you need a wildcard on the url resource "+
+					"to cover all request i.e. --resources=uri=%s*",
+				r.URL,
+			)
+		}
 	}
 
 	// step: add any of no methods

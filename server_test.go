@@ -757,84 +757,152 @@ func TestAudienceHeader(t *testing.T) {
 }
 
 func TestDefaultDenial(t *testing.T) {
-	config := newFakeKeycloakConfig()
-	config.EnableDefaultDeny = true
-	config.Resources = []*authorization.Resource{
+	cfg := newFakeKeycloakConfig()
+
+	testCases := []struct {
+		Name              string
+		ProxySettings     func(c *Config)
+		ExecutionSettings []fakeRequest
+	}{
 		{
-			URL:         "/public/*",
-			Methods:     utils.AllHTTPMethods,
-			WhiteListed: true,
+			Name: "TestDefaultDenialEnabled",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = true
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:         "/public/*",
+						Methods:     utils.AllHTTPMethods,
+						WhiteListed: true,
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/public/allowed",
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+				{
+					URI:       "/not_permited",
+					Redirects: false,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, body, "")
+					},
+				},
+				// lowercase methods should not be valid
+				{
+					Method:       "get",
+					URI:          "/not_permited",
+					Redirects:    false,
+					ExpectedCode: http.StatusNotImplemented,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+				{
+					Method:       "get",
+					URI:          "/not_permited",
+					Redirects:    true,
+					ExpectedCode: http.StatusNotImplemented,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+				// any "crap" methods should not be valid
+				{
+					Method:       "whAS9023",
+					URI:          "/not_permited",
+					Redirects:    false,
+					ExpectedCode: http.StatusNotImplemented,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+				{
+					Method:        "whAS9023",
+					URI:           "/permited_with_valid_token",
+					HasToken:      true,
+					ProxyRequest:  true,
+					ExpectedProxy: false,
+					Redirects:     false,
+					ExpectedCode:  http.StatusNotImplemented,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Equal(t, "", body)
+					},
+				},
+				{
+					Method:        "GET",
+					URI:           "/permited_with_valid_token",
+					HasToken:      true,
+					ProxyRequest:  true,
+					ExpectedProxy: true,
+					Redirects:     false,
+					ExpectedCode:  http.StatusOK,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Contains(t, body, "gzip")
+					},
+				},
+			},
+		},
+		{
+			Name: "TestDefaultDenialDisabled",
+			ProxySettings: func(conf *Config) {
+				conf.EnableDefaultDeny = false
+				conf.Resources = []*authorization.Resource{
+					{
+						URL:     "/",
+						Methods: []string{"GET"},
+					},
+				}
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:                     "/public/allowed",
+					ExpectedProxy:           true,
+					ExpectedCode:            http.StatusOK,
+					ExpectedContentContains: "gzip",
+				},
+				{
+					Method:        "GET",
+					URI:           "/",
+					HasToken:      false,
+					ProxyRequest:  false,
+					ExpectedProxy: false,
+					Redirects:     false,
+					ExpectedCode:  http.StatusUnauthorized,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Contains(t, body, "")
+					},
+				},
+				{
+					Method:        "GET",
+					URI:           "/",
+					HasToken:      true,
+					ProxyRequest:  true,
+					ExpectedProxy: true,
+					Redirects:     false,
+					ExpectedCode:  http.StatusOK,
+					ExpectedContent: func(body string, testNum int) {
+						assert.Contains(t, body, "gzip")
+					},
+				},
+			},
 		},
 	}
-	requests := []fakeRequest{
-		{
-			URI:                     "/public/allowed",
-			ExpectedProxy:           true,
-			ExpectedCode:            http.StatusOK,
-			ExpectedContentContains: "gzip",
-		},
-		{
-			URI:       "/not_permited",
-			Redirects: false,
-			ExpectedContent: func(body string, testNum int) {
-				assert.Equal(t, body, "")
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		c := *cfg
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				testCase.ProxySettings(&c)
+				p := newFakeProxy(&c, &fakeAuthConfig{})
+				p.RunTests(t, testCase.ExecutionSettings)
 			},
-		},
-		// lowercase methods should not be valid
-		{
-			Method:       "get",
-			URI:          "/not_permited",
-			Redirects:    false,
-			ExpectedCode: http.StatusNotImplemented,
-			ExpectedContent: func(body string, testNum int) {
-				assert.Equal(t, "", body)
-			},
-		},
-		{
-			Method:       "get",
-			URI:          "/not_permited",
-			Redirects:    true,
-			ExpectedCode: http.StatusNotImplemented,
-			ExpectedContent: func(body string, testNum int) {
-				assert.Equal(t, "", body)
-			},
-		},
-		// any "crap" methods should not be valid
-		{
-			Method:       "whAS9023",
-			URI:          "/not_permited",
-			Redirects:    false,
-			ExpectedCode: http.StatusNotImplemented,
-			ExpectedContent: func(body string, testNum int) {
-				assert.Equal(t, "", body)
-			},
-		},
-		{
-			Method:        "whAS9023",
-			URI:           "/permited_with_valid_token",
-			HasToken:      true,
-			ProxyRequest:  true,
-			ExpectedProxy: false,
-			Redirects:     false,
-			ExpectedCode:  http.StatusNotImplemented,
-			ExpectedContent: func(body string, testNum int) {
-				assert.Equal(t, "", body)
-			},
-		},
-		{
-			Method:        "GET",
-			URI:           "/permited_with_valid_token",
-			HasToken:      true,
-			ProxyRequest:  true,
-			ExpectedProxy: true,
-			Redirects:     false,
-			ExpectedCode:  http.StatusOK,
-			ExpectedContent: func(body string, testNum int) {
-				assert.Contains(t, body, "gzip")
-			},
-		},
+		)
 	}
-	newFakeProxy(config, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
 func TestDefaultDenialStrict(t *testing.T) {
@@ -848,6 +916,10 @@ func TestDefaultDenialStrict(t *testing.T) {
 		},
 		{
 			URL:     "/private",
+			Methods: []string{"GET"},
+		},
+		{
+			URL:     "/",
 			Methods: []string{"GET"},
 		},
 	}
@@ -924,6 +996,30 @@ func TestDefaultDenialStrict(t *testing.T) {
 		{
 			Method:        http.MethodPost,
 			URI:           "/private",
+			HasToken:      true,
+			ProxyRequest:  true,
+			ExpectedProxy: false,
+			Redirects:     false,
+			ExpectedCode:  http.StatusForbidden,
+			ExpectedContent: func(body string, testNum int) {
+				assert.Equal(t, "", body)
+			},
+		},
+		{
+			Method:        "GET",
+			URI:           "/",
+			HasToken:      true,
+			ProxyRequest:  true,
+			ExpectedProxy: true,
+			Redirects:     false,
+			ExpectedCode:  http.StatusOK,
+			ExpectedContent: func(body string, testNum int) {
+				assert.Contains(t, body, "gzip")
+			},
+		},
+		{
+			Method:        http.MethodPost,
+			URI:           "/",
 			HasToken:      true,
 			ProxyRequest:  true,
 			ExpectedProxy: false,

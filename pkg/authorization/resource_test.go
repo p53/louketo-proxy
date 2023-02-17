@@ -185,15 +185,13 @@ func TestIsValid(t *testing.T) {
 		},
 		{
 			Resource: &Resource{URL: "/", Methods: utils.AllHTTPMethods},
+			Ok:       true,
 		},
 		{
 			Resource: &Resource{URL: "/admin/", Methods: utils.AllHTTPMethods},
 		},
 		{
 			Resource: &Resource{},
-		},
-		{
-			Resource: &Resource{URL: "/oauth"},
 		},
 		{
 			Resource: &Resource{
@@ -219,8 +217,8 @@ func TestIsValid(t *testing.T) {
 
 		err := testCase.Resource.Valid()
 
-		if err != nil && testCase.Ok {
-			t.Errorf("case %d should not have failed, error: %s", idx, err)
+		if (err != nil && testCase.Ok) || (err == nil && !testCase.Ok) {
+			t.Errorf("case %d expected test result: %t, error was: %s", idx, testCase.Ok, err)
 		}
 	}
 }
