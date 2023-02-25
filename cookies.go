@@ -157,6 +157,11 @@ func (r *oauthProxy) writeStateParameterCookie(req *http.Request, wrt http.Respo
 	return uuid.String()
 }
 
+// writePKCECookie sets a code verifier cookie into the response
+func (r *oauthProxy) writePKCECookie(req *http.Request, wrt http.ResponseWriter, codeVerifier string) {
+	r.dropCookie(wrt, req.Host, r.config.CookiePKCEName, codeVerifier, 0)
+}
+
 // clearAllCookies is just a helper function for the below
 func (r *oauthProxy) clearAllCookies(req *http.Request, w http.ResponseWriter) {
 	r.clearAccessTokenCookie(req, w)

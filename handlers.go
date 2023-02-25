@@ -35,9 +35,11 @@ import (
 
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-chi/chi/v5"
+	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
+	"github.com/grokify/go-pkce"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -112,7 +114,34 @@ func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 		accessType = oauth2.AccessTypeOffline
 	}
 
-	authURL := conf.AuthCodeURL(req.URL.Query().Get("state"), accessType)
+	authCodeOptions := []oauth2.AuthCodeOption{
+		accessType,
+	}
+
+	if r.config.EnablePKCE {
+		codeVerifier, err := pkce.NewCodeVerifierWithLength(96)
+
+		if err != nil {
+			r.log.Error(
+				apperrors.ErrPKCECodeCreation.Error(),
+			)
+			return
+		}
+
+		codeChallenge := pkce.CodeChallengeS256(codeVerifier)
+		authCodeOptions = append(
+			authCodeOptions,
+			oauth2.SetAuthURLParam(pkce.ParamCodeChallenge, codeChallenge),
+			oauth2.SetAuthURLParam(pkce.ParamCodeChallengeMethod, pkce.MethodS256),
+		)
+		r.writePKCECookie(req, wrt, codeVerifier)
+	}
+
+	authURL := conf.AuthCodeURL(
+		req.URL.Query().Get("state"),
+		authCodeOptions...,
+	)
+
 	clientIP := utils.RealIP(req)
 
 	scope.Logger.Debug(
@@ -169,10 +198,23 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 
 	conf := r.newOAuth2Config(r.getRedirectionURL(writer, req))
 
+	var codeVerifier *http.Cookie
+
+	if r.config.EnablePKCE {
+		var err error
+		codeVerifier, err = req.Cookie(r.config.CookiePKCEName)
+		if err != nil {
+			scope.Logger.Error("problem getting pkce cookie", zap.Error(err))
+			r.accessForbidden(writer, req)
+			return
+		}
+	}
+
 	//nolint:contextcheck
 	resp, err := exchangeAuthenticationCode(
 		conf,
 		code,
+		codeVerifier,
 		r.config.SkipOpenIDProviderTLSVerify,
 	)
 

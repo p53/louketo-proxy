@@ -49,6 +49,7 @@ func newDefaultConfig() *Config {
 		CookieRefreshName:             constant.RefreshCookie,
 		CookieOAuthStateName:          constant.RequestStateCookie,
 		CookieRequestURIName:          constant.RequestURICookie,
+		CookiePKCEName:                constant.PKCECookie,
 		EnableAuthorizationCookies:    true,
 		EnableAuthorizationHeader:     true,
 		EnableDefaultDeny:             true,
@@ -391,6 +392,7 @@ func (r *Config) isReverseProxySettingsValid() error {
 			r.isTokenVerificationSettingsValid,
 			r.isResourceValid,
 			r.isMatchClaimValid,
+			r.isPKCEValid,
 		}
 
 		for _, validationFunc := range validationRegistry {
@@ -703,5 +705,12 @@ func (r *Config) extractDiscoveryURIComponents() error {
 	}
 
 	r.Realm = matches[realmIndex]
+	return nil
+}
+
+func (r *Config) isPKCEValid() error {
+	if r.NoRedirects && r.EnablePKCE {
+		return apperrors.ErrPKCEWithCodeOnly
+	}
 	return nil
 }

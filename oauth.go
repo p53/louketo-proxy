@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
+	"github.com/grokify/go-pkce"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 
@@ -161,12 +162,29 @@ func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, oldRefreshToken
 }
 
 // exchangeAuthenticationCode exchanges the authentication code with the oauth server for a access token
-func exchangeAuthenticationCode(client *oauth2.Config, code string, skipOpenIDProviderTLSVerify bool) (*oauth2.Token, error) {
-	return getToken(client, GrantTypeAuthCode, code, skipOpenIDProviderTLSVerify)
+func exchangeAuthenticationCode(
+	client *oauth2.Config,
+	code string,
+	codeVerifierCookie *http.Cookie,
+	skipOpenIDProviderTLSVerify bool,
+) (*oauth2.Token, error) {
+	return getToken(
+		client,
+		GrantTypeAuthCode,
+		code,
+		codeVerifierCookie,
+		skipOpenIDProviderTLSVerify,
+	)
 }
 
 // getToken retrieves a code from the provider, extracts and verified the token
-func getToken(config *oauth2.Config, grantType, code string, skipOpenIDProviderTLSVerify bool) (*oauth2.Token, error) {
+func getToken(
+	config *oauth2.Config,
+	grantType,
+	code string,
+	codeVerifierCookie *http.Cookie,
+	skipOpenIDProviderTLSVerify bool,
+) (*oauth2.Token, error) {
 	ctx := context.Background()
 
 	if skipOpenIDProviderTLSVerify {
@@ -181,7 +199,21 @@ func getToken(config *oauth2.Config, grantType, code string, skipOpenIDProviderT
 	}
 
 	start := time.Now()
-	token, err := config.Exchange(ctx, code)
+
+	authCodeOptions := []oauth2.AuthCodeOption{}
+
+	if codeVerifierCookie != nil {
+		if codeVerifierCookie.Value == "" {
+			return nil, apperrors.ErrPKCECookieEmpty
+		}
+		authCodeOptions = append(
+			authCodeOptions,
+			oauth2.SetAuthURLParam(pkce.ParamCodeVerifier, codeVerifierCookie.Value),
+			oauth2.SetAuthURLParam(pkce.ParamCodeChallengeMethod, pkce.MethodS256),
+		)
+	}
+
+	token, err := config.Exchange(ctx, code, authCodeOptions...)
 
 	if err != nil {
 		return token, err

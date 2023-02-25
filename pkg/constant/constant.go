@@ -31,6 +31,7 @@ const (
 	RefreshCookie      = "kc-state"
 	RequestURICookie   = "request_uri"
 	RequestStateCookie = "OAuth_Token_Request_State"
+	PKCECookie         = "pkce"
 	UnsecureScheme     = "http"
 	SecureScheme       = "https"
 	AnyMethod          = "ANY"

@@ -22,4 +22,7 @@ var (
 	ErrDefaultDenyUserDefinedConflict  = errors.New("you've enabled default deny and at the same time defined own rules for /*")
 	ErrBadDiscoveryURIFormat           = errors.New("bad discovery url format")
 	ErrForwardAuthMissingHeaders       = errors.New("seems you are using gatekeeper as forward-auth, but you don't forward X-FORWARDED-* headers from front proxy")
+	ErrPKCEWithCodeOnly                = errors.New("pkce can be enabled only with no-redirect=false")
+	ErrPKCECodeCreation                = errors.New("creation of code verifier failed")
+	ErrPKCECookieEmpty                 = errors.New("seems that pkce code verifier cookie value is empty string")
 )

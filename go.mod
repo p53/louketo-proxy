@@ -69,6 +69,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/grokify/go-pkce v0.2.0 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/kr/pretty v0.2.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
