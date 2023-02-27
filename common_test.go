@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
+	"github.com/grokify/go-pkce"
 	"github.com/jochasinga/relay"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/websocket"
@@ -782,6 +783,7 @@ func newFakeKeycloakConfig() *Config {
 	}
 }
 
+//nolint:cyclop
 func makeTestCodeFlowLogin(location string, xforwarded bool) (*http.Response, []*http.Cookie, error) {
 	flowCookies := make([]*http.Cookie, 0)
 
@@ -794,6 +796,10 @@ func makeTestCodeFlowLogin(location string, xforwarded bool) (*http.Response, []
 	var resp *http.Response
 	for count := 0; count < 4; count++ {
 		req, err := http.NewRequest(http.MethodGet, location, nil)
+
+		for _, cookie := range flowCookies {
+			req.AddCookie(cookie)
+		}
 
 		if xforwarded {
 			req.Header.Add("X-Forwarded-Host", uri.Host)
@@ -1001,6 +1007,7 @@ type fakeAuthServer struct {
 	expiration                time.Duration
 	resourceSetHandlerFailure bool
 	fakeAuthConfig            *fakeAuthConfig
+	pkceChallenge             string
 }
 
 const fakePrivateKey = `
@@ -1094,6 +1101,7 @@ type fakeOidcDiscoveryResponse struct {
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 type fakeAuthConfig struct {
+	EnablePKCE                bool
 	EnableTLS                 bool
 	EnableProxy               bool
 	Expiration                time.Duration
@@ -1227,10 +1235,24 @@ func (r *fakeAuthServer) keysHandler(w http.ResponseWriter, req *http.Request) {
 func (r *fakeAuthServer) authHandler(wrt http.ResponseWriter, req *http.Request) {
 	state := req.URL.Query().Get("state")
 	redirect := req.URL.Query().Get("redirect_uri")
+
 	if redirect == "" {
 		wrt.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	if r.fakeAuthConfig.EnablePKCE {
+		codeChallenge := req.URL.Query().Get("code_challenge")
+		codeChallengeMethod := req.URL.Query().Get("code_challenge_method")
+
+		if codeChallenge == "" || codeChallengeMethod != "S256" {
+			wrt.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		r.pkceChallenge = codeChallenge
+	}
+
 	if state == "" {
 		state = "/"
 	}
@@ -1303,6 +1325,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 	token.setExpiration(expires)
 	refreshToken := newTestToken(r.getLocation())
 	refreshToken.setExpiration(refreshExpires)
+	codeVerifier := ""
 
 	if req.FormValue("grant_type") == GrantTypeUmaTicket {
 		token.claims.Authorization = authorization.Permissions{
@@ -1313,6 +1336,14 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 					ResourceName: "some",
 				},
 			},
+		}
+	}
+
+	if r.fakeAuthConfig.EnablePKCE {
+		codeVerifier = req.FormValue("code_verifier")
+		if codeVerifier == "" {
+			writer.WriteHeader(http.StatusBadRequest)
+			return
 		}
 	}
 
@@ -1428,6 +1459,14 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			ExpiresIn:   float64(expires.Second()),
 		})
 	case GrantTypeAuthCode:
+		if r.fakeAuthConfig.EnablePKCE {
+			codeChallenge := pkce.CodeChallengeS256(codeVerifier)
+			if codeChallenge != r.pkceChallenge {
+				writer.WriteHeader(http.StatusBadRequest)
+				return
+			}
+		}
+
 		renderJSON(http.StatusOK, writer, req, tokenResponse{
 			IDToken:      jwtAccess,
 			AccessToken:  jwtAccess,

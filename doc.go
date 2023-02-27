@@ -178,8 +178,8 @@ type Config struct {
 	LocalhostMetrics bool `json:"localhost-metrics" yaml:"localhost-metrics" usage:"enforces the metrics page can only been requested from 127.0.0.1" env:"LOCALHOST_METRICS"`
 	// EnableCompression enables gzip compression for response
 	EnableCompression bool `json:"enable-compression" yaml:"enable-compression" usage:"enable gzip compression for response" env:"ENABLE_COMPRESSION"`
-	// EnablePKCE, only SHA256 code challenge method is supported
-	EnablePKCE bool `json:"enable-pkce" yaml:"enable-pkce" usage:"enable pkce for auth code flow, only SHA256 code challenge supported" env:"ENABLE_PKCE"`
+	// EnablePKCE, only S256 code challenge method is supported
+	EnablePKCE bool `json:"enable-pkce" yaml:"enable-pkce" usage:"enable pkce for auth code flow, only S256 code challenge supported" env:"ENABLE_PKCE"`
 
 	EnableUma   bool          `json:"enable-uma" yaml:"enable-uma" usage:"enable uma authorization, please don't use it in production, we would like to receive feedback" env:"ENABLE_UMA"`
 	EnableOpa   bool          `json:"enable-opa" yaml:"enable-opa" usage:"enable authorization with external Open policy agent" env:"ENABLE_OPA"`

@@ -177,7 +177,7 @@ func exchangeAuthenticationCode(
 	)
 }
 
-// getToken retrieves a code from the provider, extracts and verified the token
+// getToken retrieves a code from the provider
 func getToken(
 	config *oauth2.Config,
 	grantType,
@@ -199,18 +199,18 @@ func getToken(
 	}
 
 	start := time.Now()
-
 	authCodeOptions := []oauth2.AuthCodeOption{}
 
-	if codeVerifierCookie != nil {
-		if codeVerifierCookie.Value == "" {
-			return nil, apperrors.ErrPKCECookieEmpty
+	if grantType == GrantTypeAuthCode {
+		if codeVerifierCookie != nil {
+			if codeVerifierCookie.Value == "" {
+				return nil, apperrors.ErrPKCECookieEmpty
+			}
+			authCodeOptions = append(
+				authCodeOptions,
+				oauth2.SetAuthURLParam(pkce.ParamCodeVerifier, codeVerifierCookie.Value),
+			)
 		}
-		authCodeOptions = append(
-			authCodeOptions,
-			oauth2.SetAuthURLParam(pkce.ParamCodeVerifier, codeVerifierCookie.Value),
-			oauth2.SetAuthURLParam(pkce.ParamCodeChallengeMethod, pkce.MethodS256),
-		)
 	}
 
 	token, err := config.Exchange(ctx, code, authCodeOptions...)
