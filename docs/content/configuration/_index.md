@@ -57,6 +57,7 @@ weight: 2
 |    --content-security-policy value         | specify the content security policy | | PROXY_CONTENT_SECURITY_POLICY
 |    --localhost-metrics                     | enforces the metrics page can only been requested from 127.0.0.1 | false | PROXY_LOCALHOST_METRICS
 |    --enable-compression                    | enable gzip compression for response | false | PROXY_ENABLE_COMPRESSION
+|    --enable-pkce                           | enable pkce for auth code flow, only S256 code challenge supported | false | ENABLE_PKCE
 |    --enable-uma                            | enable UMA authorization, please don't use in production as it is new feature, we would like to receive feedback first             | false | PROXY_ENABLE_UMA
 |	 --enable-opa                            | enable authorization with external Open policy agent  | false | PROXY_ENABLE_OPA
 |	 --opa-timeout                           | timeout for connection to OPA                         |   10s | PROXY_OPA_TIMEOUT
@@ -69,6 +70,7 @@ weight: 2
 |    --cookie-refresh-name value             | name of the cookie used to hold the encrypted refresh token | kc-state | PROXY_COOKIE_REFRESH_NAME
 |    --cookie-oauth-state-name value         | name of the cookie used to hold the Oauth request state | OAuth_Token_Request_State | COOKIE_OAUTH_STATE_NAME
 |    --cookie-request-uri-name value             | name of the cookie used to hold the request uri | request_uri | COOKIE_REQUEST_URI_NAME
+|    --cookie-pkce-name value                | name of the cookie used to hold PKCE code verifier | pkce | COOKIE_PKCE_NAME
 |    --secure-cookie                         | enforces the cookie to be secure | true | PROXY_SECURE_COOKIE
 |    --http-only-cookie                      | enforces the cookie is in http only mode | true | PROXY_HTTP_ONLY_COOKIE
 |    --same-site-cookie value                | enforces cookies to be send only to same site requests according to the policy (can be \| Strict\|Lax\|None) | Lax | PROXY_SAME_SITE_COOKIE

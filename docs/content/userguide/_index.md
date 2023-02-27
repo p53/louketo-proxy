@@ -65,7 +65,8 @@ no-redirects: false
 # additional scopes to add to the default (openid+email+profile)
 scopes:
 - vpn-user
-# a collection of resource i.e. URLs that you wish to protect
+# a collection of resource i.e. URLs that you wish to protect, this are simple gatekeeper authorization rules,
+# to get more complex authorization you can look at external authorization section in our documentation
 resources:
 - uri: /admin/test
   # the methods on this URL that should be protected, if missing, we assuming all
@@ -121,6 +122,8 @@ encryption-key: AgXa7xRcoClDEU0ZDSH4X0XhL5Qy2Z2j
 listen: :3000
 redirection-url: http://127.0.0.1:3000
 upstream-url: http://127.0.0.1:80
+# a collection of resource i.e. URLs that you wish to protect, this are simple gatekeeper authorization rules,
+# to get more complex authorization you can look at external authorization section in our documentation
 resources:
 - uri: /admin*
   methods:
@@ -672,6 +675,11 @@ Or on the command line
   --resources "uri=/*"  # requires authentication on the rest
   --resources "uri=/admin*|roles=admin,superuser|methods=POST,DELETE"
 ```
+
+## PKCE (Proof Key for Code Exchange)
+
+Gatekeeper supports PKCE with S256 code challenge method. It stores code verifier in cookie.
+You can set custom cookie name with `--cookie-pkce-name`.
 
 ## Mutual TLS
 
