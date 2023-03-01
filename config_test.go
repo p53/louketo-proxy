@@ -2222,3 +2222,45 @@ func TestDefaultDenyValid(t *testing.T) {
 		)
 	}
 }
+
+func TestIsPKCEValid(t *testing.T) {
+	testCases := []struct {
+		Name   string
+		Config *Config
+		Valid  bool
+	}{
+		{
+			Name: "ValidEnablePKCE",
+			Config: &Config{
+				EnablePKCE:  true,
+				NoRedirects: false,
+			},
+			Valid: true,
+		},
+		{
+			Name: "InvalidEnablePKCE",
+			Config: &Config{
+				EnablePKCE:  true,
+				NoRedirects: true,
+			},
+			Valid: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(
+			testCase.Name,
+			func(t *testing.T) {
+				err := testCase.Config.isPKCEValid()
+				if err != nil && testCase.Valid {
+					t.Fatalf("Expected test not to fail")
+				}
+
+				if err == nil && !testCase.Valid {
+					t.Fatalf("Expected test to fail")
+				}
+			},
+		)
+	}
+}
