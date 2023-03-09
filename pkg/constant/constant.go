@@ -32,6 +32,7 @@ const (
 	RequestURICookie   = "request_uri"
 	RequestStateCookie = "OAuth_Token_Request_State"
 	PKCECookie         = "pkce"
+	IDTokenCookie      = "id_token"
 	UnsecureScheme     = "http"
 	SecureScheme       = "https"
 	AnyMethod          = "ANY"

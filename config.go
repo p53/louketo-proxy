@@ -46,6 +46,7 @@ func newDefaultConfig() *Config {
 	return &Config{
 		AccessTokenDuration:           time.Duration(720) * time.Hour,
 		CookieAccessName:              constant.AccessCookie,
+		CookieIDTokenName:             constant.IDTokenCookie,
 		CookieRefreshName:             constant.RefreshCookie,
 		CookieOAuthStateName:          constant.RequestStateCookie,
 		CookieRequestURIName:          constant.RequestURICookie,

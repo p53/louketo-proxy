@@ -134,6 +134,11 @@ func (r *oauthProxy) dropRefreshTokenCookie(req *http.Request, w http.ResponseWr
 	r.dropCookieWithChunks(req, w, r.config.CookieRefreshName, value, duration)
 }
 
+// dropIdTokenCookie drops a id token cookie from the response
+func (r *oauthProxy) dropIDTokenCookie(req *http.Request, w http.ResponseWriter, value string, duration time.Duration) {
+	r.dropCookieWithChunks(req, w, r.config.CookieIDTokenName, value, duration)
+}
+
 // writeStateParameterCookie sets a state parameter cookie into the response
 func (r *oauthProxy) writeStateParameterCookie(req *http.Request, wrt http.ResponseWriter) string {
 	uuid, err := uuid.NewV4()

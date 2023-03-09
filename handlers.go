@@ -316,11 +316,17 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	}
 
 	accessToken := rawToken
+	identityToken := rawIDToken
 
 	// step: are we encrypting the access token?
 	if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie {
 		if accessToken, err = encryption.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
 			scope.Logger.Error("unable to encode the access token", zap.Error(err))
+			writer.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if identityToken, err = encryption.EncodeText(identityToken, r.config.EncryptionKey); err != nil {
+			scope.Logger.Error("unable to encode the id token", zap.Error(err))
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -370,6 +376,13 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 			r.getAccessCookieExpiration(resp.RefreshToken),
 		)
 
+		r.dropIDTokenCookie(
+			req,
+			writer,
+			identityToken,
+			r.getAccessCookieExpiration(resp.RefreshToken),
+		)
+
 		var expiration time.Duration
 		// notes: not all idp refresh tokens are readable, google for example, so we attempt to decode into
 		// a jwt and if possible extract the expiration, else we default to 10 days
@@ -416,6 +429,12 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 			req,
 			writer,
 			accessToken,
+			time.Until(stdClaims.Expiry.Time()),
+		)
+		r.dropIDTokenCookie(
+			req,
+			writer,
+			identityToken,
 			time.Until(stdClaims.Expiry.Time()),
 		)
 	}
@@ -710,16 +729,21 @@ func emptyHandler(w http.ResponseWriter, req *http.Request) {}
 func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request) {
 	// @check if the redirection is there
 	var redirectURL string
-	for k := range req.URL.Query() {
-		if k == "redirect" {
-			redirectURL = req.URL.Query().Get("redirect")
 
-			if redirectURL == "" {
-				// then we can default to redirection url
-				redirectURL = strings.TrimSuffix(
-					r.config.RedirectionURL,
-					"/oauth/callback",
-				)
+	if r.config.PostLogoutRedirectURI != "" {
+		redirectURL = r.config.PostLogoutRedirectURI
+	} else {
+		for k := range req.URL.Query() {
+			if k == "redirect" {
+				redirectURL = req.URL.Query().Get("redirect")
+
+				if redirectURL == "" {
+					// then we can default to redirection url
+					redirectURL = strings.TrimSuffix(
+						r.config.RedirectionURL,
+						"/oauth/callback",
+					)
+				}
 			}
 		}
 	}
@@ -768,12 +792,22 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 
 	// @check if we should redirect to the provider
 	if r.config.EnableLogoutRedirect {
+		postLogoutParams := ""
+		if r.config.PostLogoutRedirectURI != "" {
+			postLogoutParams = fmt.Sprintf(
+				"?id_token_hint=%s&post_logout_redirect_uri=%s",
+				user.rawToken,
+				url.QueryEscape(redirectURL),
+			)
+		}
+
 		sendTo := fmt.Sprintf(
-			"%s/protocol/openid-connect/logout",
+			"%s/protocol/openid-connect/logout%s",
 			strings.TrimSuffix(
 				r.config.DiscoveryURL,
 				"/.well-known/openid-configuration",
 			),
+			postLogoutParams,
 		)
 
 		r.redirectToURL(

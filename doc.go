@@ -90,6 +90,8 @@ type Config struct {
 	ClientSecret string `json:"client-secret" yaml:"client-secret" usage:"client secret used to authenticate to the oauth service" env:"CLIENT_SECRET"`
 	// RedirectionURL the redirection url
 	RedirectionURL string `json:"redirection-url" yaml:"redirection-url" usage:"redirection url for the oauth callback url, defaults to host header if absent" env:"REDIRECTION_URL"`
+	// PostLogoutRedirectUri the url to which is redirected after logout
+	PostLogoutRedirectURI string `json:"post-logout-redirect-uri" yaml:"post-logout-redirect-uri" usage:"url to which client is redirected after successful logout" env:"POST_LOGOUT_REDIRECT_URI"`
 	// RevocationEndpoint is the token revocation endpoint to revoke refresh tokens
 	RevocationEndpoint string `json:"revocation-url" yaml:"revocation-url" usage:"url for the revocation endpoint to revoke refresh token" env:"REVOCATION_URL"`
 	// SkipOpenIDProviderTLSVerify skips the tls verification for openid provider communication
@@ -194,7 +196,9 @@ type Config struct {
 	// CookieDomain is a list of domains the cookie is available to
 	CookieDomain string `json:"cookie-domain" yaml:"cookie-domain" usage:"domain the access cookie is available to, defaults host header" env:"COOKIE_DOMAIN"`
 	// CookieAccessName is the name of the access cookie holding the access token
-	CookieAccessName string `json:"cookie-access-name" yaml:"cookie-access-name" usage:"name of the cookie use to hold the access token" env:"COOKIE_ACCESS_NAME"`
+	CookieAccessName string `json:"cookie-access-name" yaml:"cookie-access-name" usage:"name of the cookie used to hold the access token" env:"COOKIE_ACCESS_NAME"`
+	// CookieIdName is the name of the id token cookie holding the id token
+	CookieIDTokenName string `json:"cookie-id-token-name" yaml:"cookie-id-token-name" usage:"name of the cookie used to hold id token" env:"COOKIE_ID_TOKEN_NAME"`
 	// CookieRefreshName is the name of the refresh cookie
 	CookieRefreshName string `json:"cookie-refresh-name" yaml:"cookie-refresh-name" usage:"name of the cookie used to hold the encrypted refresh token" env:"COOKIE_REFRESH_NAME"`
 	// CookieOAuthStateName is the name of the Oauth Token request state
