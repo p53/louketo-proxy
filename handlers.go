@@ -773,6 +773,15 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	if refresh, _, err := r.retrieveRefreshToken(req, user); err == nil {
 		identityToken = refresh
 	}
+
+	idToken, _, err := r.retrieveIDToken(req, user)
+
+	// we are doing it so that in case with no-redirects=true, we can pass
+	// id token in authorization header
+	if err != nil {
+		idToken = user.rawToken
+	}
+
 	r.clearAllCookies(req, writer)
 
 	// @metric increment the logout counter
@@ -796,7 +805,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 		if r.config.PostLogoutRedirectURI != "" {
 			postLogoutParams = fmt.Sprintf(
 				"?id_token_hint=%s&post_logout_redirect_uri=%s",
-				user.rawToken,
+				idToken,
 				url.QueryEscape(redirectURL),
 			)
 		}
@@ -1034,6 +1043,22 @@ func (r *oauthProxy) retrieveRefreshToken(req *http.Request, user *userContext) 
 	default:
 		token, err = utils.GetRefreshTokenFromCookie(req, r.config.CookieRefreshName)
 	}
+
+	if err != nil {
+		return token, "", err
+	}
+
+	encrypted := token // returns encrypted, avoids encoding twice
+	token, err = encryption.DecodeText(token, r.config.EncryptionKey)
+	return token, encrypted, err
+}
+
+// retrieveIDToken retrieves the id token from cookie
+func (r *oauthProxy) retrieveIDToken(req *http.Request, user *userContext) (string, string, error) {
+	var token string
+	var err error
+
+	token, err = utils.GetTokenInCookie(req, r.config.CookieIDTokenName)
 
 	if err != nil {
 		return token, "", err

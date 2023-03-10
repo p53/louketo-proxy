@@ -335,7 +335,7 @@ func RealIP(req *http.Request) string {
 	return rAddr
 }
 
-// getRefreshTokenFromCookie returns the refresh token from the cookie if any
+// GetRefreshTokenFromCookie returns the refresh token from the cookie if any
 func GetRefreshTokenFromCookie(req *http.Request, cookieName string) (string, error) {
 	token, err := GetTokenInCookie(req, cookieName)
 	if err != nil {
