@@ -292,6 +292,7 @@ func TestCustomCookieNames(t *testing.T) {
 	customAccessName := "customAccess"
 	customRefreshName := "customRefresh"
 	customPKCEName := "customPKCE"
+	customIDTokenName := "customID"
 
 	testCases := []struct {
 		Name              string
@@ -413,6 +414,32 @@ func TestCustomCookieNames(t *testing.T) {
 					ExpectedCode:  http.StatusOK,
 					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
 						customPKCEName: func(t *testing.T, c *Config, value string) bool {
+							return assert.NotEqual(t, "", value)
+						},
+					},
+				},
+			},
+		},
+		{
+			Name: "TestCustomIDTokenCookiePresent",
+			ProxySettings: func(cfg *Config) {
+				cfg.Verbose = true
+				cfg.EnableLogging = true
+				cfg.CookieOAuthStateName = customStateName
+				cfg.CookieRequestURIName = customRedirectName
+				cfg.CookieIDTokenName = customIDTokenName
+				cfg.CookieAccessName = customAccessName
+			},
+			ExecutionSettings: []fakeRequest{
+				{
+					URI:           fakeAuthAllURL,
+					HasLogin:      true,
+					Redirects:     true,
+					OnResponse:    delay,
+					ExpectedProxy: true,
+					ExpectedCode:  http.StatusOK,
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+						customIDTokenName: func(t *testing.T, c *Config, value string) bool {
 							return assert.NotEqual(t, "", value)
 						},
 					},

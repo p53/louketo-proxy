@@ -630,12 +630,17 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 }
 
 func (f *fakeProxy) performUserLogin(reqCfg *fakeRequest) error {
+	userCookies := map[string]bool{
+		f.config.CookieAccessName:  true,
+		f.config.CookieRefreshName: true,
+		f.config.CookieIDTokenName: true,
+	}
 	resp, flowCookies, err := makeTestCodeFlowLogin(f.getServiceURL()+reqCfg.URI, reqCfg.LoginXforwarded)
 	if err != nil {
 		return err
 	}
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == f.config.CookieAccessName || cookie.Name == f.config.CookieRefreshName {
+		if _, ok := userCookies[cookie.Name]; ok {
 			f.cookies[cookie.Name] = &http.Cookie{
 				Name:   cookie.Name,
 				Path:   "/",
