@@ -854,12 +854,6 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 			},
 		}
 
-		if err != nil {
-			scope.Logger.Error("unable to retrieve the openid client", zap.Error(err))
-			writer.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
 		// step: add the authentication headers
 		encodedID := url.QueryEscape(r.config.ClientID)
 		encodedSecret := url.QueryEscape(r.config.ClientSecret)
@@ -1060,6 +1054,7 @@ func (r *oauthProxy) retrieveRefreshToken(req *http.Request, user *userContext) 
 func (r *oauthProxy) retrieveIDToken(req *http.Request, user *userContext) (string, string, error) {
 	var token string
 	var err error
+	var encrypted string
 
 	token, err = utils.GetTokenInCookie(req, r.config.CookieIDTokenName)
 
@@ -1067,8 +1062,11 @@ func (r *oauthProxy) retrieveIDToken(req *http.Request, user *userContext) (stri
 		return token, "", err
 	}
 
-	encrypted := token // returns encrypted, avoids encoding twice
-	token, err = encryption.DecodeText(token, r.config.EncryptionKey)
+	if r.config.EnableEncryptedToken {
+		encrypted = token
+		token, err = encryption.DecodeText(token, r.config.EncryptionKey)
+	}
+
 	return token, encrypted, err
 }
 

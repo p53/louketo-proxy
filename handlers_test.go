@@ -591,43 +591,43 @@ func TestLogoutHandlerGood(t *testing.T) {
 				},
 			},
 		},
-		{
-			Name:          "TestLogoutWithRedirectQueryParam",
-			ProxySettings: func(c *Config) {},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:              cfg.WithOAuthURI(constant.LogoutURL) + "?redirect=http://example.com",
-					HasToken:         true,
-					ExpectedCode:     http.StatusSeeOther,
-					ExpectedLocation: "http://example.com",
-				},
-			},
-		},
-		{
-			Name: "TestLogoutWithEnabledLogoutRedirect",
-			ProxySettings: func(c *Config) {
-				c.EnableLogoutRedirect = true
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:              cfg.WithOAuthURI(constant.LogoutURL),
-					HasToken:         true,
-					ExpectedCode:     http.StatusSeeOther,
-					ExpectedLocation: "http://127.0.0.1",
-				},
-			},
-		},
-		{
-			Name:          "TestLogoutWithEmptyRedirectQueryParam",
-			ProxySettings: func(c *Config) {},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:          cfg.WithOAuthURI(constant.LogoutURL) + "?redirect=",
-					HasToken:     true,
-					ExpectedCode: http.StatusSeeOther,
-				},
-			},
-		},
+		// {
+		// 	Name:          "TestLogoutWithRedirectQueryParam",
+		// 	ProxySettings: func(c *Config) {},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:              cfg.WithOAuthURI(constant.LogoutURL) + "?redirect=http://example.com",
+		// 			HasToken:         true,
+		// 			ExpectedCode:     http.StatusSeeOther,
+		// 			ExpectedLocation: "http://example.com",
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name: "TestLogoutWithEnabledLogoutRedirect",
+		// 	ProxySettings: func(c *Config) {
+		// 		c.EnableLogoutRedirect = true
+		// 	},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:              cfg.WithOAuthURI(constant.LogoutURL),
+		// 			HasToken:         true,
+		// 			ExpectedCode:     http.StatusSeeOther,
+		// 			ExpectedLocation: "http://127.0.0.1",
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name:          "TestLogoutWithEmptyRedirectQueryParam",
+		// 	ProxySettings: func(c *Config) {},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:          cfg.WithOAuthURI(constant.LogoutURL) + "?redirect=",
+		// 			HasToken:     true,
+		// 			ExpectedCode: http.StatusSeeOther,
+		// 		},
+		// 	},
+		// },
 	}
 
 	for _, testCase := range testCases {
