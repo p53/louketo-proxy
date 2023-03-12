@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
+	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/grokify/go-pkce"
 	"github.com/jochasinga/relay"
@@ -734,8 +735,9 @@ func newFakeKeycloakConfig() *Config {
 	return &Config{
 		ClientID:                    fakeClientID,
 		ClientSecret:                fakeSecret,
-		CookieAccessName:            "kc-access",
-		CookieRefreshName:           "kc-state",
+		CookieAccessName:            constant.AccessCookie,
+		CookieRefreshName:           constant.RefreshCookie,
+		CookieIDTokenName:           constant.IDTokenCookie,
 		DisableAllLogging:           true,
 		DiscoveryURL:                randomLocalHost,
 		EnableAuthorizationCookies:  true,

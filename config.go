@@ -545,7 +545,7 @@ func (r *Config) isTokenEncryptionValid() error {
 
 	if r.EnableRefreshTokens && r.EncryptionKey == "" {
 		return errors.New(
-			"you have not specified an encryption key for encoding the session state",
+			"enable refresh tokens requires encryption key to be defined",
 		)
 	}
 

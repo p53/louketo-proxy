@@ -305,16 +305,20 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{
+						cfg.CookieAccessName:  "",
+						cfg.CookieIDTokenName: "",
+					},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						cfg.CookieAccessName: checkAccessTokenEncryption,
+						cfg.CookieAccessName:  checkAccessTokenEncryption,
+						cfg.CookieIDTokenName: checkAccessTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
 						resp := tokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.True(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
-						assert.True(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
+						assert.True(t, checkAccessTokenEncryption(t, cfg, resp.IDToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -417,7 +421,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
-						assert.False(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
+						assert.True(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
@@ -488,7 +492,10 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"password": "test",
 						"username": "test",
 					},
-					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
+					ExpectedCookies: map[string]string{
+						cfg.CookieAccessName:  "",
+						cfg.CookieIDTokenName: "",
+					},
 					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
 						cfg.CookieAccessName: func(t *testing.T, config *Config, rawToken string) bool {
 							token, err := jwt.ParseSigned(rawToken)
@@ -511,7 +518,8 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
-						assert.False(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
+						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.IDToken))
+						assert.True(t, checkRefreshTokenEncryption(t, cfg, resp.RefreshToken))
 					},
 					ExpectedCode: http.StatusOK,
 				},
