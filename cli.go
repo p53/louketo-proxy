@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/urfave/cli"
@@ -31,7 +32,7 @@ import (
 
 // newOauthProxyApp creates a new cli application and runs it
 func newOauthProxyApp() *cli.App {
-	config := newDefaultConfig()
+	defaultConfig := config.NewDefaultConfig()
 	app := cli.NewApp()
 	app.Name = constant.Prog
 	app.Usage = constant.Description
@@ -52,7 +53,7 @@ func newOauthProxyApp() *cli.App {
 		configFile := cliCx.String("config")
 		// step: do we have a configuration file?
 		if configFile != "" {
-			if err := ReadConfigFile(configFile, config); err != nil {
+			if err := config.ReadConfigFile(configFile, defaultConfig); err != nil {
 				return utils.PrintError(
 					"unable to read the configuration file: %s, error: %s",
 					configFile,
@@ -62,17 +63,17 @@ func newOauthProxyApp() *cli.App {
 		}
 
 		// step: parse the command line options
-		if err := parseCLIOptions(cliCx, config); err != nil {
+		if err := parseCLIOptions(cliCx, defaultConfig); err != nil {
 			return utils.PrintError(err.Error())
 		}
 
 		// step: validate the configuration
-		if err := config.isValid(); err != nil {
+		if err := defaultConfig.IsValid(); err != nil {
 			return utils.PrintError(err.Error())
 		}
 
 		// step: create the proxy
-		proxy, err := newProxy(config)
+		proxy, err := newProxy(defaultConfig)
 		if err != nil {
 			return utils.PrintError(err.Error())
 		}
@@ -99,12 +100,12 @@ func newOauthProxyApp() *cli.App {
 */
 //nolint:cyclop
 func getCommandLineOptions() []cli.Flag {
-	defaults := newDefaultConfig()
+	defaults := config.NewDefaultConfig()
 	var flags []cli.Flag
-	count := reflect.TypeOf(Config{}).NumField()
+	count := reflect.TypeOf(config.Config{}).NumField()
 
 	for i := 0; i < count; i++ {
-		field := reflect.TypeOf(Config{}).Field(i)
+		field := reflect.TypeOf(config.Config{}).Field(i)
 		usage, found := field.Tag.Lookup("usage")
 
 		if !found {
@@ -179,7 +180,7 @@ func getCommandLineOptions() []cli.Flag {
 	and constructs a config object
 */
 //nolint:cyclop
-func parseCLIOptions(cliCtx *cli.Context, config *Config) error {
+func parseCLIOptions(cliCtx *cli.Context, config *config.Config) error {
 	// step: we can ignore these options in the Config struct
 	ignoredOptions := []string{"tag-data", "match-claims", "resources", "headers"}
 	// step: iterate the Config and grab command line options via reflection

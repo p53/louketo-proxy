@@ -48,8 +48,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/gogatekeeper/gatekeeper/pkg/storage"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
@@ -65,7 +67,7 @@ type PAT struct {
 
 type oauthProxy struct {
 	provider       *oidc3.Provider
-	config         *Config
+	config         *config.Config
 	endpoint       *url.URL
 	idpClient      *gocloak.GoCloak
 	listener       net.Listener
@@ -90,12 +92,10 @@ func init() {
 	prometheus.MustRegister(statusMetric)
 }
 
-const allPath = "/*"
-
 // newProxy create's a new proxy from configuration
 //
 //nolint:cyclop
-func newProxy(config *Config) (*oauthProxy, error) {
+func newProxy(config *config.Config) (*oauthProxy, error) {
 	// create the service logger
 	log, err := createLogger(config)
 
@@ -103,7 +103,7 @@ func newProxy(config *Config) (*oauthProxy, error) {
 		return nil, err
 	}
 
-	err = config.update()
+	err = config.Update()
 
 	if err != nil {
 		return nil, err
@@ -185,7 +185,7 @@ func newProxy(config *Config) (*oauthProxy, error) {
 }
 
 // createLogger is responsible for creating the service logger
-func createLogger(config *Config) (*zap.Logger, error) {
+func createLogger(config *config.Config) (*zap.Logger, error) {
 	httplog.SetOutput(ioutil.Discard) // disable the http logger
 
 	if config.DisableAllLogging {
@@ -414,7 +414,7 @@ func (r *oauthProxy) createReverseProxy() error {
 
 		r.config.Resources = append(
 			r.config.Resources,
-			&authorization.Resource{URL: allPath, Methods: utils.AllHTTPMethods},
+			&authorization.Resource{URL: constant.AllPath, Methods: utils.AllHTTPMethods},
 		)
 	}
 
@@ -430,7 +430,7 @@ func (r *oauthProxy) createReverseProxy() error {
 			r.identityHeadersMiddleware(r.config.AddClaims),
 		}
 
-		if res.URL == allPath && !res.WhiteListed && enableDefaultDenyStrict {
+		if res.URL == constant.AllPath && !res.WhiteListed && enableDefaultDenyStrict {
 			middlewares = []func(http.Handler) http.Handler{
 				r.denyMiddleware,
 				r.proxyDenyMiddleware,
@@ -714,7 +714,7 @@ type listenerConfig struct {
 }
 
 // makeListenerConfig extracts a listener configuration from a proxy Config
-func makeListenerConfig(config *Config) listenerConfig {
+func makeListenerConfig(config *config.Config) listenerConfig {
 	var minTLSVersion uint16
 	switch strings.ToLower(config.TLSMinVersion) {
 	case "":
@@ -1108,10 +1108,10 @@ func (r *oauthProxy) getPAT(done chan bool) {
 	timeout := config.OpenIDProviderTimeout
 	patRetryCount := config.PatRetryCount
 	patRetryInterval := config.PatRetryInterval
-	grantType := GrantTypeClientCreds
+	grantType := proxy.GrantTypeClientCreds
 
-	if config.EnableForwarding && config.ForwardingGrantType == GrantTypeUserCreds {
-		grantType = GrantTypeUserCreds
+	if config.EnableForwarding && config.ForwardingGrantType == proxy.GrantTypeUserCreds {
+		grantType = proxy.GrantTypeUserCreds
 	}
 
 	for {
@@ -1131,14 +1131,14 @@ func (r *oauthProxy) getPAT(done chan bool) {
 		var err error
 
 		switch grantType {
-		case GrantTypeClientCreds:
+		case proxy.GrantTypeClientCreds:
 			token, err = r.idpClient.LoginClient(
 				ctx,
 				clientID,
 				clientSecret,
 				realm,
 			)
-		case GrantTypeUserCreds:
+		case proxy.GrantTypeUserCreds:
 			token, err = r.idpClient.Login(
 				ctx,
 				clientID,

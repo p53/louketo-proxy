@@ -84,7 +84,7 @@ func (r *oauthProxy) revokeProxy(w http.ResponseWriter, req *http.Request) conte
 func (r *oauthProxy) accessForbidden(wrt http.ResponseWriter, req *http.Request) context.Context {
 	wrt.WriteHeader(http.StatusForbidden)
 	// are we using a custom http template for 403?
-	if r.config.hasCustomForbiddenPage() {
+	if r.config.HasCustomForbiddenPage() {
 		name := path.Base(r.config.ForbiddenPage)
 
 		if err := r.Render(wrt, name, r.config.Tags); err != nil {
@@ -103,7 +103,7 @@ func (r *oauthProxy) accessForbidden(wrt http.ResponseWriter, req *http.Request)
 func (r *oauthProxy) accessError(wrt http.ResponseWriter, req *http.Request) context.Context {
 	wrt.WriteHeader(http.StatusBadRequest)
 	// are we using a custom http template for 400?
-	if r.config.hasCustomErrorPage() {
+	if r.config.HasCustomErrorPage() {
 		name := path.Base(r.config.ErrorPage)
 
 		if err := r.Render(wrt, name, r.config.Tags); err != nil {

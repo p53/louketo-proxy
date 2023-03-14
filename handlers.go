@@ -153,7 +153,7 @@ func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 	)
 
 	// step: if we have a custom sign in page, lets display that
-	if r.config.hasCustomSignInPage() {
+	if r.config.HasCustomSignInPage() {
 		model := make(map[string]string)
 		model["redirect"] = authURL
 

@@ -19,7 +19,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
+	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/grokify/go-pkce"
 	"github.com/jochasinga/relay"
@@ -37,21 +40,6 @@ import (
 	uuid "github.com/gofrs/uuid"
 	"github.com/oleiade/reflections"
 	strcase "github.com/stoewer/go-strcase"
-)
-
-const (
-	fakeAdminRole          = "role:admin"
-	fakeAdminRoleURL       = "/admin*"
-	fakeAuthAllURL         = "/auth_all/*"
-	fakeClientID           = "test"
-	fakeSecret             = "test"
-	fakeTestAdminRolesURL  = "/test_admin_roles"
-	fakeTestRole           = "role:test"
-	fakeTestRoleURL        = "/test_role"
-	fakeTestWhitelistedURL = "/auth_all/white_listed*"
-	testProxyAccepted      = "Proxy-Accepted"
-	validUsername          = "test"
-	validPassword          = "test"
 )
 
 type RoleClaim struct {
@@ -163,19 +151,19 @@ type fakeRequest struct {
 	ExpectedNoProxyHeaders        []string
 	ExpectedProxy                 bool
 	ExpectedProxyHeaders          map[string]string
-	ExpectedProxyHeadersValidator map[string]func(*testing.T, *Config, string)
-	ExpectedCookiesValidator      map[string]func(*testing.T, *Config, string) bool
-	ExpectedLoginCookiesValidator map[string]func(*testing.T, *Config, string) bool
+	ExpectedProxyHeadersValidator map[string]func(*testing.T, *config.Config, string)
+	ExpectedCookiesValidator      map[string]func(*testing.T, *config.Config, string) bool
+	ExpectedLoginCookiesValidator map[string]func(*testing.T, *config.Config, string) bool
 }
 
 type fakeProxy struct {
-	config  *Config
+	config  *config.Config
 	idp     *fakeAuthServer
 	proxy   *oauthProxy
 	cookies map[string]*http.Cookie
 }
 
-func newFakeProxy(cfg *Config, authConfig *fakeAuthConfig) *fakeProxy {
+func newFakeProxy(cfg *config.Config, authConfig *fakeAuthConfig) *fakeProxy {
 	log.SetOutput(ioutil.Discard)
 
 	if cfg == nil {
@@ -191,7 +179,7 @@ func newFakeProxy(cfg *Config, authConfig *fakeAuthConfig) *fakeProxy {
 	cfg.DiscoveryURL = auth.getLocation()
 	// c.Verbose = true
 	cfg.DisableAllLogging = true
-	err := cfg.update()
+	err := cfg.Update()
 
 	if err != nil {
 		panic("failed to create fake proxy service, error: " + err.Error())
@@ -460,14 +448,14 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 		if reqCfg.ExpectedProxy {
 			assert.NotEmpty(
 				t,
-				resp.Header().Get(testProxyAccepted),
+				resp.Header().Get(testsuite.TestProxyAccepted),
 				"case %d, did not proxy request",
 				idx,
 			)
 		} else {
 			assert.Empty(
 				t,
-				resp.Header().Get(testProxyAccepted),
+				resp.Header().Get(testsuite.TestProxyAccepted),
 				"case %d, should NOT proxy request",
 				idx,
 			)
@@ -660,7 +648,7 @@ func (f *fakeProxy) performUserLogin(reqCfg *fakeRequest) error {
 	return nil
 }
 
-func setRequestAuthentication(cfg *Config, client *resty.Client, request *resty.Request, c *fakeRequest, token string) {
+func setRequestAuthentication(cfg *config.Config, client *resty.Client, request *resty.Request, c *fakeRequest, token string) {
 	switch c.HasCookieToken {
 	case true:
 		client.SetCookie(&http.Cookie{
@@ -678,7 +666,7 @@ func newTestService() string {
 	return u
 }
 
-func newTestProxyService(config *Config) (*oauthProxy, *fakeAuthServer, string) {
+func newTestProxyService(config *config.Config) (*oauthProxy, *fakeAuthServer, string) {
 	if config == nil {
 		config = newFakeKeycloakConfig()
 	}
@@ -694,7 +682,7 @@ func newTestProxyService(config *Config) (*oauthProxy, *fakeAuthServer, string) 
 	config.RevocationEndpoint = auth.getRevocationURL()
 	config.Verbose = false
 	config.EnableLogging = false
-	err := config.update()
+	err := config.Update()
 
 	if err != nil {
 		panic("failed to create proxy service, error: " + err.Error())
@@ -731,10 +719,10 @@ func newFakeHTTPRequest(method, path string) *http.Request {
 	}
 }
 
-func newFakeKeycloakConfig() *Config {
-	return &Config{
-		ClientID:                    fakeClientID,
-		ClientSecret:                fakeSecret,
+func newFakeKeycloakConfig() *config.Config {
+	return &config.Config{
+		ClientID:                    testsuite.FakeClientID,
+		ClientSecret:                testsuite.FakeSecret,
 		CookieAccessName:            constant.AccessCookie,
 		CookieRefreshName:           constant.RefreshCookie,
 		CookieIDTokenName:           constant.IDTokenCookie,
@@ -761,27 +749,27 @@ func newFakeKeycloakConfig() *Config {
 		Verbose:                     false,
 		Resources: []*authorization.Resource{
 			{
-				URL:     fakeAdminRoleURL,
+				URL:     testsuite.FakeAdminRoleURL,
 				Methods: []string{"GET"},
-				Roles:   []string{fakeAdminRole},
+				Roles:   []string{testsuite.FakeAdminRole},
 			},
 			{
-				URL:     fakeTestRoleURL,
+				URL:     testsuite.FakeTestRoleURL,
 				Methods: []string{"GET"},
-				Roles:   []string{fakeTestRole},
+				Roles:   []string{testsuite.FakeTestRole},
 			},
 			{
-				URL:     fakeTestAdminRolesURL,
+				URL:     testsuite.FakeTestAdminRolesURL,
 				Methods: []string{"GET"},
-				Roles:   []string{fakeAdminRole, fakeTestRole},
+				Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 			},
 			{
-				URL:     fakeAuthAllURL,
+				URL:     testsuite.FakeAuthAllURL,
 				Methods: utils.AllHTTPMethods,
 				Roles:   []string{},
 			},
 			{
-				URL:         fakeTestWhitelistedURL,
+				URL:         testsuite.FakeTestWhitelistedURL,
 				WhiteListed: true,
 				Methods:     utils.AllHTTPMethods,
 				Roles:       []string{},
@@ -861,7 +849,7 @@ type fakeUpstreamResponse struct {
 type fakeUpstreamService struct{}
 
 func (f *fakeUpstreamService) ServeHTTP(wrt http.ResponseWriter, req *http.Request) {
-	wrt.Header().Set(testProxyAccepted, "true")
+	wrt.Header().Set(testsuite.TestProxyAccepted, "true")
 
 	upgrade := strings.ToLower(req.Header.Get("Upgrade"))
 	if upgrade == "websocket" {
@@ -1334,7 +1322,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 	refreshToken.setExpiration(refreshExpires)
 	codeVerifier := ""
 
-	if req.FormValue("grant_type") == GrantTypeUmaTicket {
+	if req.FormValue("grant_type") == proxy.GrantTypeUmaTicket {
 		token.claims.Authorization = authorization.Permissions{
 			Permissions: []authorization.Permission{
 				{
@@ -1369,7 +1357,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 	}
 
 	switch req.FormValue("grant_type") {
-	case GrantTypeUserCreds:
+	case proxy.GrantTypeUserCreds:
 		username := req.FormValue("username")
 		password := req.FormValue("password")
 
@@ -1378,7 +1366,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			return
 		}
 
-		if username == validUsername && password == validPassword {
+		if username == testsuite.ValidUsername && password == testsuite.ValidPassword {
 			renderJSON(http.StatusOK, writer, req, tokenResponse{
 				IDToken:      jwtAccess,
 				AccessToken:  jwtAccess,
@@ -1392,7 +1380,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			"error":             "invalid_grant",
 			"error_description": "invalid user credentials",
 		})
-	case GrantTypeClientCreds:
+	case proxy.GrantTypeClientCreds:
 		clientID := req.FormValue("client_id")
 		clientSecret := req.FormValue("client_secret")
 
@@ -1407,7 +1395,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			}
 		}
 
-		if clientID == validUsername && clientSecret == validPassword {
+		if clientID == testsuite.ValidUsername && clientSecret == testsuite.ValidPassword {
 			renderJSON(http.StatusOK, writer, req, tokenResponse{
 				IDToken:      jwtAccess,
 				AccessToken:  jwtAccess,
@@ -1421,7 +1409,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			"error":             "invalid_grant",
 			"error_description": "invalid client credentials",
 		})
-	case GrantTypeRefreshToken:
+	case proxy.GrantTypeRefreshToken:
 		oldRefreshToken, err := jwt.ParseSigned(req.FormValue("refresh_token"))
 
 		if err != nil {
@@ -1465,7 +1453,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			AccessToken: jwtAccess,
 			ExpiresIn:   float64(expires.Second()),
 		})
-	case GrantTypeAuthCode:
+	case proxy.GrantTypeAuthCode:
 		if r.fakeAuthConfig.EnablePKCE {
 			codeChallenge := pkce.CodeChallengeS256(codeVerifier)
 			if codeChallenge != r.pkceChallenge {
@@ -1480,7 +1468,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			RefreshToken: jwtRefresh,
 			ExpiresIn:    float64(expires.Second()),
 		})
-	case GrantTypeUmaTicket:
+	case proxy.GrantTypeUmaTicket:
 		renderJSON(http.StatusOK, writer, req, tokenResponse{
 			IDToken:      jwtAccess,
 			AccessToken:  jwtAccess,

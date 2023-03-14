@@ -21,6 +21,7 @@ package main
 import (
 	"testing"
 
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/urfave/cli"
 )
@@ -40,7 +41,7 @@ func TestReadOptions(t *testing.T) {
 	capp := cli.NewApp()
 	capp.Flags = getCommandLineOptions()
 	capp.Action = func(cx *cli.Context) error {
-		ero := parseCLIOptions(cx, &Config{})
+		ero := parseCLIOptions(cx, &config.Config{})
 		assert.NoError(t, ero)
 		return nil
 	}

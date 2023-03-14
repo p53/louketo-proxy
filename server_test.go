@@ -34,7 +34,10 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
+	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -81,7 +84,7 @@ func TestNewKeycloakProxyWithLegacyDiscoveryURI(t *testing.T) {
 func TestReverseProxyHeaders(t *testing.T) {
 	proxy := newFakeProxy(nil, &fakeAuthConfig{})
 	token := newTestToken(proxy.idp.getLocation())
-	token.addRealmRoles([]string{fakeAdminRole})
+	token.addRealmRoles([]string{testsuite.FakeAdminRole})
 	jwt, _ := token.getToken()
 	uri := "/auth_all/test"
 	requests := []fakeRequest{
@@ -96,8 +99,8 @@ func TestReverseProxyHeaders(t *testing.T) {
 				"X-Auth-Userid":   "rjayawardene",
 				"X-Auth-Username": "rjayawardene",
 			},
-			ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-				"X-Auth-Token": func(t *testing.T, c *Config, value string) {
+			ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+				"X-Auth-Token": func(t *testing.T, c *config.Config, value string) {
 					assert.Equal(t, jwt, value)
 					assert.False(t, checkAccessTokenEncryption(t, c, value))
 				},
@@ -114,26 +117,26 @@ func TestAuthTokenHeader(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestClearTextWithEnableEncryptedToken",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableRefreshTokens = true
 				c.EnableEncryptedToken = true
 				c.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"X-Auth-Token": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"X-Auth-Token": func(t *testing.T, c *config.Config, value string) {
 							_, err := jwt.ParseSigned(value)
 							assert.Nil(t, err, "Problem parsing X-Auth-Token")
 							assert.False(t, checkAccessTokenEncryption(t, c, value))
@@ -141,10 +144,10 @@ func TestAuthTokenHeader(t *testing.T) {
 					},
 				},
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					ExpectedProxy: true,
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"X-Auth-Token": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"X-Auth-Token": func(t *testing.T, c *config.Config, value string) {
 							_, err := jwt.ParseSigned(value)
 							assert.Nil(t, err, "Problem parsing X-Auth-Token")
 							assert.False(t, checkAccessTokenEncryption(t, c, value))
@@ -156,21 +159,21 @@ func TestAuthTokenHeader(t *testing.T) {
 		},
 		{
 			Name: "TestClearTextWithForceEncryptedCookie",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableEncryptedToken = false
 				c.ForceEncryptedCookie = true
 				c.EncryptionKey = testEncryptionKey
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"X-Auth-Token": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"X-Auth-Token": func(t *testing.T, c *config.Config, value string) {
 							_, err := jwt.ParseSigned(value)
 							assert.Nil(t, err, "Problem parsing X-Auth-Token")
 							assert.False(t, checkAccessTokenEncryption(t, c, value))
@@ -178,10 +181,10 @@ func TestAuthTokenHeader(t *testing.T) {
 					},
 				},
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					ExpectedProxy: true,
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"X-Auth-Token": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"X-Auth-Token": func(t *testing.T, c *config.Config, value string) {
 							_, err := jwt.ParseSigned(value)
 							assert.Nil(t, err, "Problem parsing X-Auth-Token")
 							assert.False(t, checkAccessTokenEncryption(t, c, value))
@@ -214,17 +217,17 @@ func TestForwardingProxy(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestPasswordGrant",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = validUsername
-				conf.ForwardingPassword = validPassword
-				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.ForwardingUsername = testsuite.ValidUsername
+				conf.ForwardingPassword = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.OpenIDProviderTimeout = 30 * time.Second
@@ -241,12 +244,12 @@ func TestForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestPasswordGrantWithRefreshing",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = validUsername
-				conf.ForwardingPassword = validPassword
-				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.ForwardingUsername = testsuite.ValidUsername
+				conf.ForwardingPassword = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -270,12 +273,12 @@ func TestForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestClientCredentialsGrant",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
-				conf.ForwardingGrantType = GrantTypeClientCreds
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeClientCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -291,12 +294,12 @@ func TestForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestClientCredentialsGrantWithRefreshing",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
-				conf.ForwardingGrantType = GrantTypeClientCreds
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeClientCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -341,8 +344,8 @@ func TestUmaForwardingProxy(t *testing.T) {
 	upstreamConfig := newFakeKeycloakConfig()
 	upstreamConfig.EnableUma = true
 	upstreamConfig.EnableDefaultDeny = true
-	upstreamConfig.ClientID = validUsername
-	upstreamConfig.ClientSecret = validPassword
+	upstreamConfig.ClientID = testsuite.ValidUsername
+	upstreamConfig.ClientSecret = testsuite.ValidPassword
 	upstreamConfig.PatRetryCount = 5
 	upstreamConfig.PatRetryInterval = 2 * time.Second
 	upstreamConfig.Upstream = fakeUpstream.URL
@@ -359,17 +362,17 @@ func TestUmaForwardingProxy(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(conf *Config)
+		ProxySettings     func(conf *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestFailureOnDisabledUmaOnForwardingProxy",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = validUsername
-				conf.ForwardingPassword = validPassword
-				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.ForwardingUsername = testsuite.ValidUsername
+				conf.ForwardingPassword = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.OpenIDProviderTimeout = 30 * time.Second
@@ -388,13 +391,13 @@ func TestUmaForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestPasswordGrant",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.EnableUma = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = validUsername
-				conf.ForwardingPassword = validPassword
-				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.ForwardingUsername = testsuite.ValidUsername
+				conf.ForwardingPassword = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.OpenIDProviderTimeout = 30 * time.Second
@@ -411,13 +414,13 @@ func TestUmaForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestPasswordGrantWithRefreshing",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.EnableUma = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = validUsername
-				conf.ForwardingPassword = validPassword
-				conf.ForwardingGrantType = GrantTypeUserCreds
+				conf.ForwardingUsername = testsuite.ValidUsername
+				conf.ForwardingPassword = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -441,13 +444,13 @@ func TestUmaForwardingProxy(t *testing.T) {
 		},
 		{
 			Name: "TestClientCredentialsGrant",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.EnableUma = true
 				conf.ForwardingDomains = []string{}
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
-				conf.ForwardingGrantType = GrantTypeClientCreds
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
+				conf.ForwardingGrantType = proxy.GrantTypeClientCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -491,8 +494,8 @@ func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
 	cfg.PatRetryInterval = 2 * time.Second
 	cfg.OpenIDProviderTimeout = 30 * time.Second
 	cfg.ForwardingDomains = []string{}
-	cfg.ForwardingUsername = validUsername
-	cfg.ForwardingPassword = validPassword
+	cfg.ForwardingUsername = testsuite.ValidUsername
+	cfg.ForwardingPassword = testsuite.ValidPassword
 	cfg.SkipOpenIDProviderTLSVerify = true
 	cfg.ForwardingGrantType = "password"
 	s := httptest.NewServer(&fakeUpstreamService{})
@@ -539,7 +542,7 @@ func TestForbiddenTemplate(t *testing.T) {
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{fakeAdminRole},
+			Roles:   []string{testsuite.FakeAdminRole},
 		},
 	}
 	requests := []fakeRequest{
@@ -559,12 +562,12 @@ func TestErrorTemplate(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestErrorTemplateDisplayed",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.ErrorPage = "templates/error.html.tmpl"
 			},
 			ExecutionSettings: []fakeRequest{
@@ -578,7 +581,7 @@ func TestErrorTemplate(t *testing.T) {
 		},
 		{
 			Name: "TestWithBadErrorTemplate",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.ErrorPage = "templates/error-bad-formatted.html.tmpl"
 			},
 			ExecutionSettings: []fakeRequest{
@@ -592,7 +595,7 @@ func TestErrorTemplate(t *testing.T) {
 		},
 		{
 			Name: "TestWithEmptyErrorTemplate",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.ErrorPage = ""
 			},
 			ExecutionSettings: []fakeRequest{
@@ -761,12 +764,12 @@ func TestDefaultDenial(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestDefaultDenialEnabled",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.Resources = []*authorization.Resource{
 					{
@@ -847,7 +850,7 @@ func TestDefaultDenial(t *testing.T) {
 		},
 		{
 			Name: "TestDefaultDenialDisabled",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = false
 				conf.Resources = []*authorization.Resource{
 					{
@@ -1036,12 +1039,12 @@ func TestDefaultDenialStrict(t *testing.T) {
 func TestNoProxy(t *testing.T) {
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestNoProxyWithNoRedirectsWhiteListed",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDenyStrict = true
 				c.NoRedirects = true
 				c.NoProxy = true
@@ -1070,7 +1073,7 @@ func TestNoProxy(t *testing.T) {
 		},
 		{
 			Name: "TestNoProxyWithNoRedirectsPrivateUnauthenticated",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDenyStrict = true
 				c.NoRedirects = true
 				c.NoProxy = true
@@ -1099,7 +1102,7 @@ func TestNoProxy(t *testing.T) {
 		},
 		{
 			Name: "TestNoProxyWithRedirectsPrivateUnauthenticated",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.NoRedirects = false
 				c.NoProxy = true
@@ -1133,7 +1136,7 @@ func TestNoProxy(t *testing.T) {
 		},
 		{
 			Name: "TestNoProxyWithRedirectsPrivateUnauthenticatedMissingXFORWARDED",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.NoRedirects = false
 				c.NoProxy = true
@@ -1163,7 +1166,7 @@ func TestNoProxy(t *testing.T) {
 		},
 		{
 			Name: "TestNoProxyWithRedirectsPrivateAuthenticated",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.NoRedirects = false
 				c.NoProxy = true
@@ -1216,7 +1219,7 @@ func TestAuthorizationTemplate(t *testing.T) {
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{fakeAdminRole},
+			Roles:   []string{testsuite.FakeAdminRole},
 		},
 	}
 	requests := []fakeRequest{
@@ -1235,7 +1238,7 @@ func TestProxyProtocol(t *testing.T) {
 	cfg.EnableProxyProtocol = true
 	requests := []fakeRequest{
 		{
-			URI:           fakeAuthAllURL + "/test",
+			URI:           testsuite.FakeAuthAllURL + "/test",
 			HasToken:      true,
 			ExpectedProxy: true,
 			ExpectedProxyHeaders: map[string]string{
@@ -1244,7 +1247,7 @@ func TestProxyProtocol(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 		{
-			URI:           fakeAuthAllURL + "/test",
+			URI:           testsuite.FakeAuthAllURL + "/test",
 			HasToken:      true,
 			ProxyProtocol: "189.10.10.1",
 			ExpectedProxy: true,
@@ -1260,16 +1263,16 @@ func TestProxyProtocol(t *testing.T) {
 func TestXForwarded(t *testing.T) {
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestEmptyXForwarded",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL + "/test",
+					URI:           testsuite.FakeAuthAllURL + "/test",
 					HasToken:      true,
 					ExpectedProxy: true,
 					ExpectedProxyHeaders: map[string]string{
@@ -1282,11 +1285,11 @@ func TestXForwarded(t *testing.T) {
 		},
 		{
 			Name: "TestXForwardedPresent",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL + "/test",
+					URI:           testsuite.FakeAuthAllURL + "/test",
 					HasToken:      true,
 					ExpectedProxy: true,
 					Headers: map[string]string{
@@ -1302,11 +1305,11 @@ func TestXForwarded(t *testing.T) {
 		},
 		{
 			Name: "TestXRealIP",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL + "/test",
+					URI:           testsuite.FakeAuthAllURL + "/test",
 					HasToken:      true,
 					ExpectedProxy: true,
 					Headers: map[string]string{
@@ -1522,12 +1525,12 @@ func TestTLS(t *testing.T) {
 	testProxyAddr := "127.0.0.1:14302"
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(conf *Config)
+		ProxySettings     func(conf *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestProxyTLS",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
 				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
@@ -1544,7 +1547,7 @@ func TestTLS(t *testing.T) {
 		},
 		{
 			Name: "TestProxyTLSMatch",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
 				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
@@ -1563,7 +1566,7 @@ func TestTLS(t *testing.T) {
 		},
 		{
 			Name: "TestProxyTLSDiffer",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
 				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
@@ -1582,7 +1585,7 @@ func TestTLS(t *testing.T) {
 		},
 		{
 			Name: "TestProxyTLSMinNotFullfilled",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.TLSCertificate = fmt.Sprintf(os.TempDir()+"/gateadmin_crt_%d", rand.Intn(10000))
 				conf.TLSPrivateKey = fmt.Sprintf(os.TempDir()+"/gateadmin_priv_%d", rand.Intn(10000))
@@ -1665,12 +1668,12 @@ func TestTLS(t *testing.T) {
 func TestCustomHTTPMethod(t *testing.T) {
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestPublicAllow",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
 				c.Resources = []*authorization.Resource{
@@ -1692,7 +1695,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 		},
 		{
 			Name: "TestPublicAllowOnCustomHTTPMethod",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
 				c.Resources = []*authorization.Resource{
@@ -1715,7 +1718,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 		},
 		{
 			Name: "TestDefaultDenialProtectionOnCustomHTTP",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
 			},
@@ -1733,7 +1736,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 		},
 		{
 			Name: "TestDefaultDenialPassOnCustomHTTP",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
 				c.Resources = []*authorization.Resource{
@@ -1757,7 +1760,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 		},
 		{
 			Name: "TestPassOnCustomHTTP",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
 				c.Resources = []*authorization.Resource{
@@ -1781,7 +1784,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 		},
 		{
 			Name: "TestProtectionOnCustomHTTP",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
 				c.Resources = []*authorization.Resource{
@@ -1805,7 +1808,7 @@ func TestCustomHTTPMethod(t *testing.T) {
 		},
 		{
 			Name: "TestProtectionOnCustomHTTPWithUnvalidRequestMethod",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 				c.CustomHTTPMethods = []string{"PROPFIND"} // WebDav method
 				c.Resources = []*authorization.Resource{
@@ -1863,18 +1866,18 @@ func TestStoreAuthz(t *testing.T) {
 
 	tests := []struct {
 		Name            string
-		ProxySettings   func(c *Config)
+		ProxySettings   func(c *config.Config)
 		ExpectedFailure bool
 	}{
 		{
 			Name: "TestEntryInRedis",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
 			},
 		},
 		{
 			Name: "TestFailedRedis",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.StoreURL = fmt.Sprintf("redis://%s", "failed:65000")
 			},
 			ExpectedFailure: true,
@@ -1943,13 +1946,13 @@ func TestGetAuthz(t *testing.T) {
 
 	tests := []struct {
 		Name            string
-		ProxySettings   func(c *Config)
+		ProxySettings   func(c *config.Config)
 		JWT             string
 		ExpectedFailure bool
 	}{
 		{
 			Name: "TestEntryInStore",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -1962,7 +1965,7 @@ func TestGetAuthz(t *testing.T) {
 		},
 		{
 			Name: "TestZeroLengthToken",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -1976,7 +1979,7 @@ func TestGetAuthz(t *testing.T) {
 		},
 		{
 			Name: "TestEmptyResponse",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -1990,7 +1993,7 @@ func TestGetAuthz(t *testing.T) {
 		},
 		{
 			Name: "TestFailedStore",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				_, err := miniredis.Run()
 
 				if err != nil {

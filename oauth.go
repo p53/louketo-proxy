@@ -22,19 +22,13 @@ import (
 	"time"
 
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/grokify/go-pkce"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 
 	"gopkg.in/square/go-jose.v2/jwt"
-)
-
-const (
-	GrantTypeAuthCode     = "authorization_code"
-	GrantTypeUserCreds    = "password"
-	GrantTypeRefreshToken = "refresh_token"
-	GrantTypeClientCreds  = "client_credentials"
-	GrantTypeUmaTicket    = "urn:ietf:params:oauth:grant-type:uma-ticket"
 )
 
 // newOAuth2Config returns a oauth2 config
@@ -61,7 +55,7 @@ func (r *oauthProxy) newOAuth2Config(redirectionURL string) *oauth2.Config {
 // NOTE: we may be able to extract the specific (non-standard) claim refresh_expires_in and refresh_expires
 // from response.RawBody.
 // When not available, keycloak provides us with the same (for now) expiry value for ID token.
-func getRefreshedToken(conf *oauth2.Config, proxyConfig *Config, oldRefreshToken string) (jwt.JSONWebToken, string, string, time.Time, time.Duration, error) {
+func getRefreshedToken(conf *oauth2.Config, proxyConfig *config.Config, oldRefreshToken string) (jwt.JSONWebToken, string, string, time.Time, time.Duration, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		proxyConfig.OpenIDProviderTimeout,
@@ -170,7 +164,7 @@ func exchangeAuthenticationCode(
 ) (*oauth2.Token, error) {
 	return getToken(
 		client,
-		GrantTypeAuthCode,
+		proxy.GrantTypeAuthCode,
 		code,
 		codeVerifierCookie,
 		skipOpenIDProviderTLSVerify,
@@ -201,7 +195,7 @@ func getToken(
 	start := time.Now()
 	authCodeOptions := []oauth2.AuthCodeOption{}
 
-	if grantType == GrantTypeAuthCode {
+	if grantType == proxy.GrantTypeAuthCode {
 		if codeVerifierCookie != nil {
 			if codeVerifierCookie.Value == "" {
 				return nil, apperrors.ErrPKCECookieEmpty
@@ -222,10 +216,10 @@ func getToken(
 	taken := time.Since(start).Seconds()
 
 	switch grantType {
-	case GrantTypeAuthCode:
+	case proxy.GrantTypeAuthCode:
 		oauthTokensMetric.WithLabelValues("exchange").Inc()
 		oauthLatencyMetric.WithLabelValues("exchange").Observe(taken)
-	case GrantTypeRefreshToken:
+	case proxy.GrantTypeRefreshToken:
 		oauthTokensMetric.WithLabelValues("renew").Inc()
 		oauthLatencyMetric.WithLabelValues("renew").Observe(taken)
 	}

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -111,12 +112,12 @@ func TestLoginHandler(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name:          "TestFailLoginWithoutCredentials",
-			ProxySettings: func(c *Config) {},
+			ProxySettings: func(c *config.Config) {},
 			ExecutionSettings: []fakeRequest{
 				{
 					URI:          uri,
@@ -127,7 +128,7 @@ func TestLoginHandler(t *testing.T) {
 		},
 		{
 			Name:          "TestFailLoginWithoutPassword",
-			ProxySettings: func(c *Config) {},
+			ProxySettings: func(c *config.Config) {},
 			ExecutionSettings: []fakeRequest{
 				{
 					URI:          uri,
@@ -139,7 +140,7 @@ func TestLoginHandler(t *testing.T) {
 		},
 		{
 			Name:          "TestFailLoginWithoutUsername",
-			ProxySettings: func(c *Config) {},
+			ProxySettings: func(c *config.Config) {},
 			ExecutionSettings: []fakeRequest{
 				{
 					URI:          uri,
@@ -151,7 +152,7 @@ func TestLoginHandler(t *testing.T) {
 		},
 		{
 			Name:          "TestLoginWithGoodCredentials",
-			ProxySettings: func(c *Config) {},
+			ProxySettings: func(c *config.Config) {},
 			ExecutionSettings: []fakeRequest{
 				{
 					URI:    uri,
@@ -166,7 +167,7 @@ func TestLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestLoginWithSkipTokenVerification",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipTokenVerification = true
 			},
 			ExecutionSettings: []fakeRequest{
@@ -183,7 +184,7 @@ func TestLoginHandler(t *testing.T) {
 		},
 		{
 			Name:          "TestFailLoginWithBadPassword",
-			ProxySettings: func(c *Config) {},
+			ProxySettings: func(c *config.Config) {},
 			ExecutionSettings: []fakeRequest{
 				{
 					URI:    uri,
@@ -284,12 +285,12 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestEncryptedTokenEnabled",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableEncryptedToken = true
 				conf.ForceEncryptedCookie = false
 				conf.EnableLoginHandler = true
@@ -309,7 +310,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						cfg.CookieAccessName:  "",
 						cfg.CookieIDTokenName: "",
 					},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
 						cfg.CookieAccessName:  checkAccessTokenEncryption,
 						cfg.CookieIDTokenName: checkAccessTokenEncryption,
 					},
@@ -326,7 +327,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestEncryptedTokenWithRefreshTokenEnabled",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableEncryptedToken = true
 				conf.ForceEncryptedCookie = false
 				conf.EnableLoginHandler = true
@@ -344,7 +345,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"username": "test",
 					},
 					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
 						cfg.CookieAccessName:  checkAccessTokenEncryption,
 						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
@@ -361,7 +362,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestForceEncryptedCookie",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableEncryptedToken = false
 				conf.ForceEncryptedCookie = true
 				conf.EnableLoginHandler = true
@@ -378,7 +379,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"username": "test",
 					},
 					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
 						cfg.CookieAccessName: checkAccessTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
@@ -394,7 +395,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestForceEncryptedCookieWithRefreshToken",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableEncryptedToken = false
 				conf.ForceEncryptedCookie = true
 				conf.EnableLoginHandler = true
@@ -412,7 +413,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"username": "test",
 					},
 					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
 						cfg.CookieAccessName:  checkAccessTokenEncryption,
 						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
@@ -429,7 +430,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestEncryptionDisabled",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableEncryptedToken = false
 				conf.ForceEncryptedCookie = false
 				conf.EnableLoginHandler = true
@@ -446,8 +447,8 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						"username": "test",
 					},
 					ExpectedCookies: map[string]string{cfg.CookieAccessName: ""},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						cfg.CookieAccessName: func(t *testing.T, config *Config, rawToken string) bool {
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						cfg.CookieAccessName: func(t *testing.T, config *config.Config, rawToken string) bool {
 							token, err := jwt.ParseSigned(rawToken)
 							if err != nil {
 								return false
@@ -475,7 +476,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 		},
 		{
 			Name: "TestEncryptionDisabledWithRefreshToken",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableEncryptedToken = false
 				conf.ForceEncryptedCookie = false
 				conf.EnableLoginHandler = true
@@ -496,8 +497,8 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						cfg.CookieAccessName:  "",
 						cfg.CookieIDTokenName: "",
 					},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						cfg.CookieAccessName: func(t *testing.T, config *Config, rawToken string) bool {
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						cfg.CookieAccessName: func(t *testing.T, config *config.Config, rawToken string) bool {
 							token, err := jwt.ParseSigned(rawToken)
 							if err != nil {
 								return false
@@ -577,12 +578,12 @@ func TestLogoutHandlerGood(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name:          "TestLogoutWithoutRedirect",
-			ProxySettings: func(c *Config) {},
+			ProxySettings: func(c *config.Config) {},
 			ExecutionSettings: []fakeRequest{
 				{
 					URI:          cfg.WithOAuthURI(constant.LogoutURL),
@@ -593,7 +594,7 @@ func TestLogoutHandlerGood(t *testing.T) {
 		},
 		// {
 		// 	Name:          "TestLogoutWithRedirectQueryParam",
-		// 	ProxySettings: func(c *Config) {},
+		// 	ProxySettings: func(c *config.Config) {},
 		// 	ExecutionSettings: []fakeRequest{
 		// 		{
 		// 			URI:              cfg.WithOAuthURI(constant.LogoutURL) + "?redirect=http://example.com",
@@ -605,7 +606,7 @@ func TestLogoutHandlerGood(t *testing.T) {
 		// },
 		// {
 		// 	Name: "TestLogoutWithEnabledLogoutRedirect",
-		// 	ProxySettings: func(c *Config) {
+		// 	ProxySettings: func(c *config.Config) {
 		// 		c.EnableLogoutRedirect = true
 		// 	},
 		// 	ExecutionSettings: []fakeRequest{
@@ -619,7 +620,7 @@ func TestLogoutHandlerGood(t *testing.T) {
 		// },
 		// {
 		// 	Name:          "TestLogoutWithEmptyRedirectQueryParam",
-		// 	ProxySettings: func(c *Config) {},
+		// 	ProxySettings: func(c *config.Config) {},
 		// 	ExecutionSettings: []fakeRequest{
 		// 		{
 		// 			URI:          cfg.WithOAuthURI(constant.LogoutURL) + "?redirect=",
@@ -892,12 +893,12 @@ func TestHealthHandler(t *testing.T) {
 func TestDiscoveryURL(t *testing.T) {
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name:          "TestDiscoveryOK",
-			ProxySettings: func(c *Config) {},
+			ProxySettings: func(c *config.Config) {},
 			ExecutionSettings: []fakeRequest{
 				{
 					URI:                     "/oauth/discovery",
@@ -909,7 +910,7 @@ func TestDiscoveryURL(t *testing.T) {
 		},
 		{
 			Name: "TestWithDefaultDenyDiscoveryOK",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 			},
 			ExecutionSettings: []fakeRequest{
@@ -923,7 +924,7 @@ func TestDiscoveryURL(t *testing.T) {
 		},
 		{
 			Name: "TestWithDefaultDenyStrictDiscoveryOK",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDenyStrict = true
 			},
 			ExecutionSettings: []fakeRequest{
@@ -937,7 +938,7 @@ func TestDiscoveryURL(t *testing.T) {
 		},
 		{
 			Name: "TestEndpointPathCorrectWithDefaultDenyDiscoveryOK",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableDefaultDeny = true
 			},
 			ExecutionSettings: []fakeRequest{

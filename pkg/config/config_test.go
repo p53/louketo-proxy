@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package config
 
 import (
 	"fmt"
@@ -29,10 +29,12 @@ import (
 
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
+	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
 )
 
 func TestNewDefaultConfig(t *testing.T) {
-	if config := newDefaultConfig(); config == nil {
+	if config := NewDefaultConfig(); config == nil {
 		t.Error("we should have received a config")
 	}
 }
@@ -249,7 +251,7 @@ func TestIsConfig(t *testing.T) {
 	}
 
 	for i, c := range tests {
-		if err := c.Config.isValid(); err != nil && c.Ok {
+		if err := c.Config.IsValid(); err != nil && c.Ok {
 			t.Errorf("test case %d, the config should not have errored, error: %s", i, err)
 		}
 	}
@@ -997,7 +999,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "some-client",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   GrantTypeUserCreds,
+				ForwardingGrantType:   proxy.GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 			},
@@ -1019,7 +1021,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   GrantTypeUserCreds,
+				ForwardingGrantType:   proxy.GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 			},
@@ -1034,7 +1036,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "some-client",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   GrantTypeUserCreds,
+				ForwardingGrantType:   proxy.GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 				TLSCertificate:        "/sometest",
@@ -1050,7 +1052,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "some-client",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   GrantTypeUserCreds,
+				ForwardingGrantType:   proxy.GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 				TLSPrivateKey:         "/sometest",
@@ -1456,7 +1458,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "ValidForwardingGrantTypeUserCreds",
 			Config: &Config{
-				ForwardingGrantType: GrantTypeUserCreds,
+				ForwardingGrantType: proxy.GrantTypeUserCreds,
 				ForwardingUsername:  "someuser",
 				ForwardingPassword:  "somepass",
 			},
@@ -1465,7 +1467,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeUserCredsMissingUsername",
 			Config: &Config{
-				ForwardingGrantType: GrantTypeUserCreds,
+				ForwardingGrantType: proxy.GrantTypeUserCreds,
 				ForwardingUsername:  "",
 				ForwardingPassword:  "somepass",
 			},
@@ -1474,7 +1476,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeUserCredsMissingPassword",
 			Config: &Config{
-				ForwardingGrantType: GrantTypeUserCreds,
+				ForwardingGrantType: proxy.GrantTypeUserCreds,
 				ForwardingUsername:  "",
 				ForwardingPassword:  "somepass",
 			},
@@ -1483,7 +1485,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeUserCredsBoth",
 			Config: &Config{
-				ForwardingGrantType: GrantTypeUserCreds,
+				ForwardingGrantType: proxy.GrantTypeUserCreds,
 				ForwardingUsername:  "",
 				ForwardingPassword:  "",
 			},
@@ -1492,7 +1494,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "ValidForwardingGrantTypeClientCreds",
 			Config: &Config{
-				ForwardingGrantType: GrantTypeClientCreds,
+				ForwardingGrantType: proxy.GrantTypeClientCreds,
 				ClientSecret:        "somesecret",
 			},
 			Valid: true,
@@ -1500,7 +1502,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeClientCreds",
 			Config: &Config{
-				ForwardingGrantType: GrantTypeClientCreds,
+				ForwardingGrantType: proxy.GrantTypeClientCreds,
 				ClientSecret:        "",
 			},
 			Valid: false,
@@ -1767,14 +1769,14 @@ func TestIsResourceValid(t *testing.T) {
 			Config: &Config{
 				Resources: []*authorization.Resource{
 					{
-						URL:     fakeAdminRoleURL,
+						URL:     testsuite.FakeAdminRoleURL,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole},
+						Roles:   []string{testsuite.FakeAdminRole},
 					},
 					{
-						URL:     fakeTestAdminRolesURL,
+						URL:     testsuite.FakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole, fakeTestRole},
+						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 					},
 				},
 			},
@@ -1786,14 +1788,14 @@ func TestIsResourceValid(t *testing.T) {
 				CustomHTTPMethods: []string{"SOME"},
 				Resources: []*authorization.Resource{
 					{
-						URL:     fakeAdminRoleURL,
+						URL:     testsuite.FakeAdminRoleURL,
 						Methods: []string{"SOME"},
-						Roles:   []string{fakeAdminRole},
+						Roles:   []string{testsuite.FakeAdminRole},
 					},
 					{
-						URL:     fakeTestAdminRolesURL,
+						URL:     testsuite.FakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole, fakeTestRole},
+						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 					},
 				},
 			},
@@ -1804,14 +1806,14 @@ func TestIsResourceValid(t *testing.T) {
 			Config: &Config{
 				Resources: []*authorization.Resource{
 					{
-						URL:     fakeAdminRoleURL,
+						URL:     testsuite.FakeAdminRoleURL,
 						Methods: []string{"SOMER"},
-						Roles:   []string{fakeAdminRole},
+						Roles:   []string{testsuite.FakeAdminRole},
 					},
 					{
-						URL:     fakeTestAdminRolesURL,
+						URL:     testsuite.FakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole, fakeTestRole},
+						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 					},
 				},
 			},
@@ -1824,12 +1826,12 @@ func TestIsResourceValid(t *testing.T) {
 					{
 						URL:     "",
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole},
+						Roles:   []string{testsuite.FakeAdminRole},
 					},
 					{
-						URL:     fakeTestAdminRolesURL,
+						URL:     testsuite.FakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole, fakeTestRole},
+						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 					},
 				},
 			},
@@ -1841,15 +1843,15 @@ func TestIsResourceValid(t *testing.T) {
 				EnableDefaultDeny: true,
 				Resources: []*authorization.Resource{
 					{
-						URL:     fakeAdminRoleURL,
+						URL:     testsuite.FakeAdminRoleURL,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole},
+						Roles:   []string{testsuite.FakeAdminRole},
 					},
 					{
-						URL:         allPath,
+						URL:         constant.AllPath,
 						WhiteListed: true,
 						Methods:     []string{"GET"},
-						Roles:       []string{fakeAdminRole, fakeTestRole},
+						Roles:       []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 					},
 				},
 			},
@@ -1861,14 +1863,14 @@ func TestIsResourceValid(t *testing.T) {
 				EnableDefaultDeny: true,
 				Resources: []*authorization.Resource{
 					{
-						URL:     fakeAdminRoleURL,
+						URL:     testsuite.FakeAdminRoleURL,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole},
+						Roles:   []string{testsuite.FakeAdminRole},
 					},
 					{
-						URL:     allPath,
+						URL:     constant.AllPath,
 						Methods: []string{"GET"},
-						Roles:   []string{fakeAdminRole, fakeTestRole},
+						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 					},
 				},
 			},

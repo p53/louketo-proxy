@@ -24,7 +24,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -296,26 +298,26 @@ func TestCustomCookieNames(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(cfg *Config)
+		ProxySettings     func(cfg *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestCustomStateCookiePresent",
-			ProxySettings: func(cfg *Config) {
+			ProxySettings: func(cfg *config.Config) {
 				cfg.Verbose = true
 				cfg.EnableLogging = true
 				cfg.CookieOAuthStateName = customStateName
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						customStateName: func(t *testing.T, c *Config, value string) bool {
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						customStateName: func(t *testing.T, c *config.Config, value string) bool {
 							return assert.NotEqual(t, "", value)
 						},
 					},
@@ -324,21 +326,21 @@ func TestCustomCookieNames(t *testing.T) {
 		},
 		{
 			Name: "TestCustomAccessCookiePresent",
-			ProxySettings: func(cfg *Config) {
+			ProxySettings: func(cfg *config.Config) {
 				cfg.Verbose = true
 				cfg.EnableLogging = true
 				cfg.CookieAccessName = customAccessName
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						customAccessName: func(t *testing.T, c *Config, value string) bool {
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						customAccessName: func(t *testing.T, c *config.Config, value string) bool {
 							return assert.NotEqual(t, "", value)
 						},
 					},
@@ -347,7 +349,7 @@ func TestCustomCookieNames(t *testing.T) {
 		},
 		{
 			Name: "TestCustomRefreshCookiePresent",
-			ProxySettings: func(cfg *Config) {
+			ProxySettings: func(cfg *config.Config) {
 				cfg.Verbose = true
 				cfg.EnableLogging = true
 				cfg.EnableRefreshTokens = true
@@ -356,14 +358,14 @@ func TestCustomCookieNames(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						customRefreshName: func(t *testing.T, c *Config, value string) bool {
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						customRefreshName: func(t *testing.T, c *config.Config, value string) bool {
 							return assert.NotEqual(t, "", value)
 						},
 					},
@@ -372,7 +374,7 @@ func TestCustomCookieNames(t *testing.T) {
 		},
 		{
 			Name: "TestCustomRedirectUriCookiePresent",
-			ProxySettings: func(cfg *Config) {
+			ProxySettings: func(cfg *config.Config) {
 				cfg.Verbose = true
 				cfg.EnableLogging = true
 				cfg.CookieOAuthStateName = customStateName
@@ -380,14 +382,14 @@ func TestCustomCookieNames(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						customRedirectName: func(t *testing.T, c *Config, value string) bool {
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						customRedirectName: func(t *testing.T, c *config.Config, value string) bool {
 							return assert.NotEqual(t, "", value)
 						},
 					},
@@ -396,7 +398,7 @@ func TestCustomCookieNames(t *testing.T) {
 		},
 		{
 			Name: "TestCustomPKCECookiePresent",
-			ProxySettings: func(cfg *Config) {
+			ProxySettings: func(cfg *config.Config) {
 				cfg.Verbose = true
 				cfg.EnableLogging = true
 				cfg.EnablePKCE = true
@@ -406,14 +408,14 @@ func TestCustomCookieNames(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						customPKCEName: func(t *testing.T, c *Config, value string) bool {
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						customPKCEName: func(t *testing.T, c *config.Config, value string) bool {
 							return assert.NotEqual(t, "", value)
 						},
 					},
@@ -422,7 +424,7 @@ func TestCustomCookieNames(t *testing.T) {
 		},
 		{
 			Name: "TestCustomIDTokenCookiePresent",
-			ProxySettings: func(cfg *Config) {
+			ProxySettings: func(cfg *config.Config) {
 				cfg.Verbose = true
 				cfg.EnableLogging = true
 				cfg.CookieOAuthStateName = customStateName
@@ -432,14 +434,14 @@ func TestCustomCookieNames(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
 					ExpectedProxy: true,
 					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{
-						customIDTokenName: func(t *testing.T, c *Config, value string) bool {
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+						customIDTokenName: func(t *testing.T, c *config.Config, value string) bool {
 							return assert.NotEqual(t, "", value)
 						},
 					},

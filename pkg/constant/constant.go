@@ -48,4 +48,6 @@ const (
 	SameSiteStrict = "Strict"
 	SameSiteLax    = "Lax"
 	SameSiteNone   = "None"
+
+	AllPath = "/*"
 )

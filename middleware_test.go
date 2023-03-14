@@ -42,9 +42,11 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/storage"
+	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -61,7 +63,7 @@ func TestMetricsMiddleware(t *testing.T) {
 	cfg.EncryptionKey = testEncryptionKey
 	requests := []fakeRequest{
 		{
-			URI:       fakeAuthAllURL,
+			URI:       testsuite.FakeAuthAllURL,
 			HasLogin:  true,
 			Redirects: true,
 			OnResponse: func(int, *resty.Request, *resty.Response) {
@@ -71,7 +73,7 @@ func TestMetricsMiddleware(t *testing.T) {
 			ExpectedCode:  http.StatusOK,
 		},
 		{
-			URI:           fakeAuthAllURL,
+			URI:           testsuite.FakeAuthAllURL,
 			Redirects:     false,
 			ExpectedProxy: true,
 			ExpectedCode:  http.StatusOK,
@@ -136,12 +138,12 @@ func TestOauthRequests(t *testing.T) {
 func TestAdminListener(t *testing.T) {
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(conf *Config)
+		ProxySettings     func(conf *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestAdminOnSameListener",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableMetrics = true
 			},
 			ExecutionSettings: []fakeRequest{
@@ -160,7 +162,7 @@ func TestAdminListener(t *testing.T) {
 		},
 		{
 			Name: "TestAdminOnDifferentListener",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableMetrics = true
 				conf.ListenAdmin = "127.0.0.1:12300"
 			},
@@ -190,7 +192,7 @@ func TestAdminListener(t *testing.T) {
 		},
 		{
 			Name: "TestAdminOnDifferentListenerWithHTTPS",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableMetrics = true
 				conf.ListenAdmin = "127.0.0.1:12301"
 				conf.ListenAdminScheme = constant.SecureScheme
@@ -216,7 +218,7 @@ func TestAdminListener(t *testing.T) {
 		},
 		{
 			Name: "TestAdminOnDifferentListenerWithHTTPSandCommonCreds",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableMetrics = true
 				conf.ListenAdmin = "127.0.0.1:12302"
 				conf.ListenAdminScheme = constant.SecureScheme
@@ -586,7 +588,7 @@ func TestStrangeAdminRequests(t *testing.T) {
 		{
 			URL:     "/admin*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{fakeAdminRole},
+			Roles:   []string{testsuite.FakeAdminRole},
 		},
 	}
 	requests := []fakeRequest{
@@ -629,7 +631,7 @@ func TestStrangeAdminRequests(t *testing.T) {
 		{ // check for it works
 			URI:           "/" + testAdminURI,
 			HasToken:      true,
-			Roles:         []string{fakeAdminRole},
+			Roles:         []string{testsuite.FakeAdminRole},
 			ExpectedProxy: true,
 			ExpectedCode:  http.StatusOK,
 		},
@@ -654,7 +656,7 @@ func TestWhiteListedRequests(t *testing.T) {
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{fakeTestRole},
+			Roles:   []string{testsuite.FakeTestRole},
 		},
 		{
 			URL:         "/whitelist*",
@@ -687,7 +689,7 @@ func TestWhiteListedRequests(t *testing.T) {
 			URI:           "/",
 			HasToken:      true,
 			ExpectedProxy: true,
-			Roles:         []string{fakeTestRole},
+			Roles:         []string{testsuite.FakeTestRole},
 			ExpectedCode:  http.StatusOK,
 		},
 	}
@@ -732,12 +734,12 @@ func TestHeaderPermissionsMiddleware(t *testing.T) {
 
 	requests := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestMissingHeadersCodeFlow",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.Resources = []*authorization.Resource{
 					{
@@ -764,7 +766,7 @@ func TestHeaderPermissionsMiddleware(t *testing.T) {
 		},
 		{
 			Name: "TestHeadersCodeFlow",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.Resources = []*authorization.Resource{
 					{
@@ -793,7 +795,7 @@ func TestHeaderPermissionsMiddleware(t *testing.T) {
 		},
 		{
 			Name: "TestMissingHeadersNoRedirects",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.NoRedirects = true
 				conf.Resources = []*authorization.Resource{
@@ -821,7 +823,7 @@ func TestHeaderPermissionsMiddleware(t *testing.T) {
 		},
 		{
 			Name: "TestOnlyOneHeaderNoRedirects",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.NoRedirects = true
 				conf.Resources = []*authorization.Resource{
@@ -852,7 +854,7 @@ func TestHeaderPermissionsMiddleware(t *testing.T) {
 		},
 		{
 			Name: "TestHeadersNoRedirects",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.NoRedirects = true
 				conf.Resources = []*authorization.Resource{
@@ -882,7 +884,7 @@ func TestHeaderPermissionsMiddleware(t *testing.T) {
 		},
 		{
 			Name: "TestMissingHeadersNoProxyNoRedirects",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.NoRedirects = true
 				conf.NoProxy = true
@@ -911,7 +913,7 @@ func TestHeaderPermissionsMiddleware(t *testing.T) {
 		},
 		{
 			Name: "TestHeadersNoProxyNoRedirects",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableDefaultDeny = true
 				conf.NoRedirects = true
 				conf.NoProxy = true
@@ -1076,22 +1078,22 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 		{
 			URL:     "/admin*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{fakeAdminRole},
+			Roles:   []string{testsuite.FakeAdminRole},
 		},
 		{
 			URL:     "/test*",
 			Methods: []string{"GET"},
-			Roles:   []string{fakeTestRole},
+			Roles:   []string{testsuite.FakeTestRole},
 		},
 		{
 			URL:     "/test_admin_role*",
 			Methods: []string{"GET"},
-			Roles:   []string{fakeAdminRole, fakeTestRole},
+			Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 		},
 		{
 			URL:     "/section/*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{fakeAdminRole},
+			Roles:   []string{testsuite.FakeAdminRole},
 		},
 		{
 			URL:     "/section/one",
@@ -1106,7 +1108,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{fakeTestRole},
+			Roles:   []string{testsuite.FakeTestRole},
 		},
 	}
 	requests := []fakeRequest{
@@ -1144,7 +1146,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			Method:        http.MethodPost,
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeTestRole},
+			Roles:         []string{testsuite.FakeTestRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1152,7 +1154,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			URI:           "/test",
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeTestRole},
+			Roles:         []string{testsuite.FakeTestRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1160,7 +1162,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			URI:           "/",
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeTestRole},
+			Roles:         []string{testsuite.FakeTestRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1169,7 +1171,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			Redirects:    false,
 			HasToken:     true,
 			NotSigned:    true,
-			Roles:        []string{fakeTestRole},
+			Roles:        []string{testsuite.FakeTestRole},
 			ExpectedCode: http.StatusUnauthorized,
 		},
 		{ // check with correct token, signed
@@ -1177,21 +1179,21 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			Method:       http.MethodPost,
 			Redirects:    false,
 			HasToken:     true,
-			Roles:        []string{fakeTestRole},
+			Roles:        []string{testsuite.FakeTestRole},
 			ExpectedCode: http.StatusForbidden,
 		},
 		{ // check with correct token, signed, wrong roles (10)
 			URI:          "/admin/page",
 			Redirects:    false,
 			HasToken:     true,
-			Roles:        []string{fakeTestRole},
+			Roles:        []string{testsuite.FakeTestRole},
 			ExpectedCode: http.StatusForbidden,
 		},
 		{ // check with correct token, signed, wrong roles
 			URI:           "/admin/page",
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeTestRole, fakeAdminRole},
+			Roles:         []string{testsuite.FakeTestRole, testsuite.FakeAdminRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1217,7 +1219,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			URI:           "/test/../admin",
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeAdminRole},
+			Roles:         []string{testsuite.FakeAdminRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1225,7 +1227,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			URI:           "/test/../admin",
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeAdminRole},
+			Roles:         []string{testsuite.FakeAdminRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1233,7 +1235,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			URI:          "/test/../admin",
 			Redirects:    false,
 			HasToken:     true,
-			Roles:        []string{fakeTestRole},
+			Roles:        []string{testsuite.FakeTestRole},
 			ExpectedCode: http.StatusForbidden,
 		},
 		{ // check with a token admin test role
@@ -1247,13 +1249,13 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			Redirects:    false,
 			HasToken:     true,
 			ExpectedCode: http.StatusForbidden,
-			Roles:        []string{fakeAdminRole},
+			Roles:        []string{testsuite.FakeAdminRole},
 		},
 		{ // check with a token with both roles (20)
 			URI:           "/test_admin_role",
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeAdminRole, fakeTestRole},
+			Roles:         []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1268,7 +1270,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			URI:           "/section/test",
 			Redirects:     false,
 			HasToken:      true,
-			Roles:         []string{fakeTestRole, fakeAdminRole},
+			Roles:         []string{testsuite.FakeTestRole, testsuite.FakeAdminRole},
 			ExpectedCode:  http.StatusOK,
 			ExpectedProxy: true,
 		},
@@ -1276,7 +1278,7 @@ func TestRolePermissionsMiddleware(t *testing.T) {
 			URI:          "/section/one",
 			Redirects:    false,
 			HasToken:     true,
-			Roles:        []string{fakeTestRole, fakeAdminRole},
+			Roles:        []string{testsuite.FakeTestRole, testsuite.FakeAdminRole},
 			ExpectedCode: http.StatusForbidden,
 		},
 		{
@@ -1301,7 +1303,7 @@ func TestCrossSiteHandler(t *testing.T) {
 				AllowedOrigins: []string{"*"},
 			},
 			Request: fakeRequest{
-				URI: fakeAuthAllURL,
+				URI: testsuite.FakeAuthAllURL,
 				Headers: map[string]string{
 					"Origin": "127.0.0.1",
 				},
@@ -1315,7 +1317,7 @@ func TestCrossSiteHandler(t *testing.T) {
 				AllowedOrigins: []string{"*", "https://examples.com"},
 			},
 			Request: fakeRequest{
-				URI: fakeAuthAllURL,
+				URI: testsuite.FakeAuthAllURL,
 				Headers: map[string]string{
 					"Origin": "127.0.0.1",
 				},
@@ -1330,7 +1332,7 @@ func TestCrossSiteHandler(t *testing.T) {
 				AllowedMethods: []string{"GET", "POST"},
 			},
 			Request: fakeRequest{
-				URI:    fakeAuthAllURL,
+				URI:    testsuite.FakeAuthAllURL,
 				Method: http.MethodOptions,
 				Headers: map[string]string{
 					"Origin":                        "127.0.0.1",
@@ -1362,12 +1364,12 @@ func TestRefreshToken(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestRefreshTokenEncryption",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableRefreshTokens = true
 				c.EnableEncryptedToken = true
 				c.Verbose = true
@@ -1376,16 +1378,16 @@ func TestRefreshToken(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:                           fakeAuthAllURL,
+					URI:                           testsuite.FakeAuthAllURL,
 					HasLogin:                      true,
 					Redirects:                     true,
 					OnResponse:                    delay,
 					ExpectedProxy:                 true,
 					ExpectedCode:                  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
 				},
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					Redirects:     false,
 					HasLogin:      false,
 					ExpectedProxy: true,
@@ -1395,7 +1397,7 @@ func TestRefreshToken(t *testing.T) {
 		},
 		{
 			Name: "TestRefreshTokenExpiration",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableRefreshTokens = true
 				c.EnableEncryptedToken = true
 				c.Verbose = true
@@ -1404,7 +1406,7 @@ func TestRefreshToken(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:       fakeAuthAllURL,
+					URI:       testsuite.FakeAuthAllURL,
 					HasLogin:  true,
 					Redirects: true,
 					OnResponse: func(int, *resty.Request, *resty.Response) {
@@ -1412,10 +1414,10 @@ func TestRefreshToken(t *testing.T) {
 					},
 					ExpectedProxy:                 true,
 					ExpectedCode:                  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieRefreshName: checkRefreshTokenEncryption},
 				},
 				{
-					URI:           fakeAuthAllURL,
+					URI:           testsuite.FakeAuthAllURL,
 					Redirects:     false,
 					HasLogin:      false,
 					ExpectedProxy: false,
@@ -1446,7 +1448,7 @@ func delay(no int, req *resty.Request, resp *resty.Response) {
 	}
 }
 
-func checkAccessTokenEncryption(t *testing.T, cfg *Config, value string) bool {
+func checkAccessTokenEncryption(t *testing.T, cfg *config.Config, value string) bool {
 	rawToken, err := encryption.DecodeText(value, cfg.EncryptionKey)
 
 	if err != nil {
@@ -1468,7 +1470,7 @@ func checkAccessTokenEncryption(t *testing.T, cfg *Config, value string) bool {
 	return assert.Contains(t, user.claims, "aud") && assert.Contains(t, user.claims, "email")
 }
 
-func checkRefreshTokenEncryption(t *testing.T, cfg *Config, value string) bool {
+func checkRefreshTokenEncryption(t *testing.T, cfg *config.Config, value string) bool {
 	rawToken, err := encryption.DecodeText(value, cfg.EncryptionKey)
 
 	if err != nil {
@@ -1492,12 +1494,12 @@ func TestAccessTokenEncryption(t *testing.T) {
 
 	testCases := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestEnableEncryptedTokenWithRedis",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableRefreshTokens = true
 				conf.EnableEncryptedToken = true
 				conf.Verbose = true
@@ -1507,7 +1509,7 @@ func TestAccessTokenEncryption(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:       fakeAuthAllURL,
+					URI:       testsuite.FakeAuthAllURL,
 					HasLogin:  true,
 					Redirects: true,
 					OnResponse: func(int, *resty.Request, *resty.Response) {
@@ -1515,21 +1517,21 @@ func TestAccessTokenEncryption(t *testing.T) {
 					},
 					ExpectedProxy:                 true,
 					ExpectedCode:                  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
 				},
 				{
-					URI:                      fakeAuthAllURL,
+					URI:                      testsuite.FakeAuthAllURL,
 					Redirects:                false,
 					ExpectedProxy:            true,
 					ExpectedCode:             http.StatusOK,
 					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
 				},
 			},
 		},
 		{
 			Name: "TestEnableEncryptedToken",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableRefreshTokens = true
 				conf.EnableEncryptedToken = true
 				conf.Verbose = true
@@ -1538,7 +1540,7 @@ func TestAccessTokenEncryption(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:       fakeAuthAllURL,
+					URI:       testsuite.FakeAuthAllURL,
 					HasLogin:  true,
 					Redirects: true,
 					OnResponse: func(int, *resty.Request, *resty.Response) {
@@ -1546,21 +1548,21 @@ func TestAccessTokenEncryption(t *testing.T) {
 					},
 					ExpectedProxy:                 true,
 					ExpectedCode:                  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
 				},
 				{
-					URI:                      fakeAuthAllURL,
+					URI:                      testsuite.FakeAuthAllURL,
 					Redirects:                false,
 					ExpectedProxy:            true,
 					ExpectedCode:             http.StatusOK,
 					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
 				},
 			},
 		},
 		{
 			Name: "ForceEncryptedCookie",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableRefreshTokens = true
 				conf.EnableEncryptedToken = false
 				conf.ForceEncryptedCookie = true
@@ -1570,7 +1572,7 @@ func TestAccessTokenEncryption(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:       fakeAuthAllURL,
+					URI:       testsuite.FakeAuthAllURL,
 					HasLogin:  true,
 					Redirects: true,
 					OnResponse: func(int, *resty.Request, *resty.Response) {
@@ -1578,15 +1580,15 @@ func TestAccessTokenEncryption(t *testing.T) {
 					},
 					ExpectedProxy:                 true,
 					ExpectedCode:                  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
 				},
 				{
-					URI:                      fakeAuthAllURL,
+					URI:                      testsuite.FakeAuthAllURL,
 					Redirects:                false,
 					ExpectedProxy:            true,
 					ExpectedCode:             http.StatusOK,
 					ExpectedCookies:          map[string]string{cfg.CookieAccessName: ""},
-					ExpectedCookiesValidator: map[string]func(*testing.T, *Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
+					ExpectedCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{cfg.CookieAccessName: checkAccessTokenEncryption},
 				},
 			},
 		},
@@ -1615,7 +1617,7 @@ func TestCustomHeadersHandler(t *testing.T) {
 		{
 			Match: []string{"subject", "userid", "email", "username"},
 			Request: fakeRequest{
-				URI:      fakeAuthAllURL,
+				URI:      testsuite.FakeAuthAllURL,
 				HasToken: true,
 				TokenClaims: map[string]interface{}{
 					"sub":                "test-subject",
@@ -1636,7 +1638,7 @@ func TestCustomHeadersHandler(t *testing.T) {
 		{
 			Match: []string{"given_name", "family_name", "preferred_username|Custom-Header"},
 			Request: fakeRequest{
-				URI:      fakeAuthAllURL,
+				URI:      testsuite.FakeAuthAllURL,
 				HasToken: true,
 				TokenClaims: map[string]interface{}{
 					"email":              "gambol99@gmail.com",
@@ -1931,12 +1933,12 @@ func TestGzipCompression(t *testing.T) {
 
 	requests := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestCompressionWithCustomURI",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableCompression = true
 				c.EnableLogging = false
 			},
@@ -1955,7 +1957,7 @@ func TestGzipCompression(t *testing.T) {
 		},
 		{
 			Name: "TestCompressionWithAdminURI",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableCompression = true
 				c.EnableLogging = false
 			},
@@ -1972,7 +1974,7 @@ func TestGzipCompression(t *testing.T) {
 		},
 		{
 			Name: "TestCompressionWithLogging",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableCompression = true
 				c.EnableLogging = true
 			},
@@ -1994,7 +1996,7 @@ func TestGzipCompression(t *testing.T) {
 		},
 		{
 			Name: "TestWithoutCompressionCustomURI",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableCompression = false
 				c.EnableLogging = false
 			},
@@ -2011,7 +2013,7 @@ func TestGzipCompression(t *testing.T) {
 		},
 		{
 			Name: "TestWithoutCompressionWithAdminURI",
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.EnableCompression = false
 				c.EnableLogging = false
 			},
@@ -2049,16 +2051,16 @@ func TestEnableUma(t *testing.T) {
 
 	requests := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 	}{
 		{
 			Name: "TestUmaNoTokenNoRedirects",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -2070,8 +2072,8 @@ func TestEnableUma(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2080,11 +2082,11 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaTokenWithoutAuthz",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -2098,8 +2100,8 @@ func TestEnableUma(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2108,11 +2110,11 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaTokenWithoutResourceId",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -2134,8 +2136,8 @@ func TestEnableUma(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2144,11 +2146,11 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaTokenWithoutScope",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -2170,8 +2172,8 @@ func TestEnableUma(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2180,11 +2182,11 @@ func TestEnableUma(t *testing.T) {
 		},
 		{
 			Name: "TestUmaOK",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -2233,14 +2235,14 @@ func TestEnableUmaWithCache(t *testing.T) {
 	requests := []struct {
 		Name                 string
 		PreRequestSettings   func(p *fakeProxy, reqs []fakeRequest) ([]fakeRequest, error)
-		ProxySettings        func(c *Config)
+		ProxySettings        func(c *config.Config)
 		ExecutionSettings    []fakeRequest
 		ExpectedCacheEntries int
 		ExpectedCacheValues  authorization.AuthzDecision
 	}{
 		{
 			Name: "TestUmaTokenWithoutAuthzWithDifferentTokens",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -2249,8 +2251,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
@@ -2273,8 +2275,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2296,8 +2298,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2308,7 +2310,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 		},
 		{
 			Name: "TestUmaOKWithDifferentTokens",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -2317,8 +2319,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
@@ -2392,7 +2394,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				return reqs, nil
 			},
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -2401,8 +2403,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
@@ -2447,7 +2449,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				return reqs, nil
 			},
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -2456,8 +2458,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
@@ -2471,8 +2473,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2485,8 +2487,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 					ExpectedContent: func(body string, testNum int) {
 						assert.Equal(t, "", body)
 					},
-					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *Config, string){
-						"WWW-Authenticate": func(t *testing.T, c *Config, value string) {
+					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
+						"WWW-Authenticate": func(t *testing.T, c *config.Config, value string) {
 							assert.Contains(t, "ticket", value)
 						},
 					},
@@ -2521,7 +2523,7 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				return reqs, nil
 			},
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				redisServer, err := miniredis.Run()
 
 				if err != nil {
@@ -2530,8 +2532,8 @@ func TestEnableUmaWithCache(t *testing.T) {
 
 				conf.EnableUma = true
 				conf.EnableDefaultDeny = true
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.StoreURL = fmt.Sprintf("redis://%s", redisServer.Addr())
@@ -2659,7 +2661,7 @@ func TestLogRealIP(t *testing.T) {
 
 		auth := newFakeAuthServer(&fakeAuthConfig{})
 		cfg.DiscoveryURL = auth.getLocation()
-		_ = cfg.update()
+		_ = cfg.Update()
 
 		proxy, _ := newProxy(cfg)
 		proxy.upstream = &fakeUpstreamService{}
@@ -2695,19 +2697,19 @@ func TestLogRealIP(t *testing.T) {
 func TestEnableOpa(t *testing.T) {
 	requests := []struct {
 		Name              string
-		ProxySettings     func(c *Config)
+		ProxySettings     func(c *config.Config)
 		ExecutionSettings []fakeRequest
 		AuthzPolicy       string
 		StartOpa          bool
 	}{
 		{
 			Name: "TestEnableOpaOK",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
 				conf.OpaTimeout = 60 * time.Second
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2736,12 +2738,12 @@ func TestEnableOpa(t *testing.T) {
 		},
 		{
 			Name: "TestEnableOpaUnAuthorized",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
 				conf.OpaTimeout = 60 * time.Second
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2769,12 +2771,12 @@ func TestEnableOpa(t *testing.T) {
 		},
 		{
 			Name: "TestMissingOpaPolicy",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
 				conf.OpaTimeout = 60 * time.Second
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2793,12 +2795,12 @@ func TestEnableOpa(t *testing.T) {
 		},
 		{
 			Name: "TestOpaStopped",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
 				conf.OpaTimeout = 60 * time.Second
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2817,12 +2819,12 @@ func TestEnableOpa(t *testing.T) {
 		},
 		{
 			Name: "TestOpaLoginForbiddenWithoutTemplate",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
 				conf.OpaTimeout = 60 * time.Second
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -2841,12 +2843,12 @@ func TestEnableOpa(t *testing.T) {
 		},
 		{
 			Name: "TestOpaLoginForbiddenWithTemplate",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
 				conf.OpaTimeout = 60 * time.Second
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 				//nolint:goconst
 				conf.ForbiddenPage = "templates/forbidden.html.tmpl"
 			},
@@ -2867,12 +2869,12 @@ func TestEnableOpa(t *testing.T) {
 		},
 		{
 			Name: "TestOpaLogin",
-			ProxySettings: func(conf *Config) {
+			ProxySettings: func(conf *config.Config) {
 				conf.EnableOpa = true
 				conf.EnableDefaultDeny = true
 				conf.OpaTimeout = 60 * time.Second
-				conf.ClientID = validUsername
-				conf.ClientSecret = validPassword
+				conf.ClientID = testsuite.ValidUsername
+				conf.ClientSecret = testsuite.ValidPassword
 			},
 			ExecutionSettings: []fakeRequest{
 				{

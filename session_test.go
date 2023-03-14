@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func TestGetIndentity(t *testing.T) {
 	testCases := []struct {
 		Request       func(token string) *http.Request
 		Ok            bool
-		ProxySettings func(c *Config)
+		ProxySettings func(c *config.Config)
 	}{
 		{
 			Request: func(token string) *http.Request {
@@ -46,7 +47,7 @@ func TestGetIndentity(t *testing.T) {
 				}
 			},
 			Ok: true,
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipAuthorizationHeaderIdentity = false
 			},
 		},
@@ -59,7 +60,7 @@ func TestGetIndentity(t *testing.T) {
 				}
 			},
 			Ok: false,
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipAuthorizationHeaderIdentity = false
 			},
 		},
@@ -72,7 +73,7 @@ func TestGetIndentity(t *testing.T) {
 				}
 			},
 			Ok: false,
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipAuthorizationHeaderIdentity = false
 			},
 		},
@@ -83,7 +84,7 @@ func TestGetIndentity(t *testing.T) {
 				}
 			},
 			Ok: false,
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipAuthorizationHeaderIdentity = false
 			},
 		},
@@ -94,7 +95,7 @@ func TestGetIndentity(t *testing.T) {
 				}
 			},
 			Ok: false,
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipAuthorizationHeaderIdentity = true
 			},
 		},
@@ -107,7 +108,7 @@ func TestGetIndentity(t *testing.T) {
 				}
 			},
 			Ok: false,
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipAuthorizationHeaderIdentity = true
 			},
 		},
@@ -120,7 +121,7 @@ func TestGetIndentity(t *testing.T) {
 				}
 			},
 			Ok: false,
-			ProxySettings: func(c *Config) {
+			ProxySettings: func(c *config.Config) {
 				c.SkipAuthorizationHeaderIdentity = true
 			},
 		},
@@ -158,7 +159,7 @@ func TestGetIndentity(t *testing.T) {
 }
 
 func TestGetTokenInRequest(t *testing.T) {
-	defaultName := newDefaultConfig().CookieAccessName
+	defaultName := config.NewDefaultConfig().CookieAccessName
 	token, err := newTestToken("test").getToken()
 	assert.NoError(t, err)
 	testCases := []struct {

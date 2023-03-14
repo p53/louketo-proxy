@@ -89,7 +89,7 @@ func DecodeKeyPairs(list []string) (map[string]string, error) {
 	return keyPairs, nil
 }
 
-// isValidHTTPMethod ensure this is a valid http method type
+// IsValidHTTPMethod ensure this is a valid http method type
 func IsValidHTTPMethod(method string) bool {
 	for _, x := range AllHTTPMethods {
 		if method == x {
