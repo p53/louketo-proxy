@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package proxy
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func filterCookies(req *http.Request, filter []string) error {
 }
 
 // revokeProxy is responsible to stopping the middleware from proxying the request
-func (r *oauthProxy) revokeProxy(w http.ResponseWriter, req *http.Request) context.Context {
+func (r *OauthProxy) revokeProxy(w http.ResponseWriter, req *http.Request) context.Context {
 	var scope *RequestScope
 	ctxVal := req.Context().Value(constant.ContextScopeName)
 
@@ -70,7 +70,7 @@ func (r *oauthProxy) revokeProxy(w http.ResponseWriter, req *http.Request) conte
 		scope, assertOk = ctxVal.(*RequestScope)
 
 		if !assertOk {
-			r.log.Error("assertion failed")
+			r.Log.Error("assertion failed")
 			scope = &RequestScope{AccessDenied: true}
 		}
 	}
@@ -81,14 +81,14 @@ func (r *oauthProxy) revokeProxy(w http.ResponseWriter, req *http.Request) conte
 }
 
 // accessForbidden redirects the user to the forbidden page
-func (r *oauthProxy) accessForbidden(wrt http.ResponseWriter, req *http.Request) context.Context {
+func (r *OauthProxy) accessForbidden(wrt http.ResponseWriter, req *http.Request) context.Context {
 	wrt.WriteHeader(http.StatusForbidden)
 	// are we using a custom http template for 403?
-	if r.config.HasCustomForbiddenPage() {
-		name := path.Base(r.config.ForbiddenPage)
+	if r.Config.HasCustomForbiddenPage() {
+		name := path.Base(r.Config.ForbiddenPage)
 
-		if err := r.Render(wrt, name, r.config.Tags); err != nil {
-			r.log.Error(
+		if err := r.Render(wrt, name, r.Config.Tags); err != nil {
+			r.Log.Error(
 				"failed to render the template",
 				zap.Error(err),
 				zap.String("template", name),
@@ -100,14 +100,14 @@ func (r *oauthProxy) accessForbidden(wrt http.ResponseWriter, req *http.Request)
 }
 
 // accessError redirects the user to the error page
-func (r *oauthProxy) accessError(wrt http.ResponseWriter, req *http.Request) context.Context {
+func (r *OauthProxy) accessError(wrt http.ResponseWriter, req *http.Request) context.Context {
 	wrt.WriteHeader(http.StatusBadRequest)
 	// are we using a custom http template for 400?
-	if r.config.HasCustomErrorPage() {
-		name := path.Base(r.config.ErrorPage)
+	if r.Config.HasCustomErrorPage() {
+		name := path.Base(r.Config.ErrorPage)
 
-		if err := r.Render(wrt, name, r.config.Tags); err != nil {
-			r.log.Error(
+		if err := r.Render(wrt, name, r.Config.Tags); err != nil {
+			r.Log.Error(
 				"failed to render the template",
 				zap.Error(err),
 				zap.String("template", name),
@@ -119,7 +119,7 @@ func (r *oauthProxy) accessError(wrt http.ResponseWriter, req *http.Request) con
 }
 
 // redirectToURL redirects the user and aborts the context
-func (r *oauthProxy) redirectToURL(url string, wrt http.ResponseWriter, req *http.Request, statusCode int) context.Context {
+func (r *OauthProxy) redirectToURL(url string, wrt http.ResponseWriter, req *http.Request, statusCode int) context.Context {
 	wrt.Header().Add(
 		"Cache-Control",
 		"no-cache, no-store, must-revalidate, max-age=0",
@@ -130,16 +130,16 @@ func (r *oauthProxy) redirectToURL(url string, wrt http.ResponseWriter, req *htt
 }
 
 // redirectToAuthorization redirects the user to authorization handler
-func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.Request) context.Context { //nolint:cyclop
-	if r.config.NoRedirects && !r.config.EnableUma {
+func (r *OauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.Request) context.Context { //nolint:cyclop
+	if r.Config.NoRedirects && !r.Config.EnableUma {
 		wrt.WriteHeader(http.StatusUnauthorized)
 		return r.revokeProxy(wrt, req)
 	}
 
-	if r.config.EnableUma {
+	if r.Config.EnableUma {
 		ctx, cancel := context.WithTimeout(
 			context.Background(),
-			r.config.OpenIDProviderTimeout,
+			r.Config.OpenIDProviderTimeout,
 		)
 
 		defer cancel()
@@ -155,15 +155,15 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 		token := r.pat.Token.AccessToken
 		r.pat.m.Unlock()
 
-		resources, err := r.idpClient.GetResourcesClient(
+		resources, err := r.IdpClient.GetResourcesClient(
 			ctx,
 			token,
-			r.config.Realm,
+			r.Config.Realm,
 			resourceParam,
 		)
 
 		if err != nil {
-			r.log.Error(
+			r.Log.Error(
 				"problem getting resources for path",
 				zap.String("path", req.URL.Path),
 				zap.Error(err),
@@ -173,7 +173,7 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 		}
 
 		if len(resources) == 0 {
-			r.log.Info(
+			r.Log.Info(
 				"no resources for path",
 				zap.String("path", req.URL.Path),
 			)
@@ -185,7 +185,7 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 		resourceScopes := make([]string, 0)
 
 		if len(*resources[0].ResourceScopes) == 0 {
-			r.log.Error(
+			r.Log.Error(
 				"missingg scopes for resource in IDP provider",
 				zap.String("resourceID", *resourceID),
 			)
@@ -204,15 +204,15 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 			},
 		}
 
-		permTicket, err := r.idpClient.CreatePermissionTicket(
+		permTicket, err := r.IdpClient.CreatePermissionTicket(
 			ctx,
 			token,
-			r.config.Realm,
+			r.Config.Realm,
 			permissions,
 		)
 
 		if err != nil {
-			r.log.Error(
+			r.Log.Error(
 				"problem getting permission ticket for resourceId",
 				zap.String("resourceID", *resourceID),
 				zap.Error(err),
@@ -223,8 +223,8 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 
 		permHeader := fmt.Sprintf(
 			`realm="%s", as_uri="%s", ticket="%s"`,
-			r.config.Realm,
-			r.config.DiscoveryURI.Host,
+			r.Config.Realm,
+			r.Config.DiscoveryURI.Host,
 			*permTicket.Ticket,
 		)
 
@@ -241,8 +241,8 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 	authQuery := fmt.Sprintf("?state=%s", uuid)
 
 	// step: if verification is switched off, we can't authorization
-	if r.config.SkipTokenVerification {
-		r.log.Error(
+	if r.Config.SkipTokenVerification {
+		r.Log.Error(
 			"refusing to redirection to authorization endpoint, " +
 				"skip token verification switched on",
 		)
@@ -251,14 +251,14 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 		return r.revokeProxy(wrt, req)
 	}
 
-	url := r.config.WithOAuthURI(constant.AuthorizationURL + authQuery)
+	url := r.Config.WithOAuthURI(constant.AuthorizationURL + authQuery)
 
-	if r.config.NoProxy && !r.config.NoRedirects {
+	if r.Config.NoProxy && !r.Config.NoRedirects {
 		xForwardedHost := req.Header.Get("X-Forwarded-Host")
 		xProto := req.Header.Get("X-Forwarded-Proto")
 
 		if xForwardedHost == "" || xProto == "" {
-			r.log.Error(apperrors.ErrForwardAuthMissingHeaders.Error())
+			r.Log.Error(apperrors.ErrForwardAuthMissingHeaders.Error())
 
 			wrt.WriteHeader(http.StatusForbidden)
 			return r.revokeProxy(wrt, req)
@@ -282,32 +282,32 @@ func (r *oauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 	return r.revokeProxy(wrt, req)
 }
 
-// getAccessCookieExpiration calculates the expiration of the access token cookie
-func (r *oauthProxy) getAccessCookieExpiration(refresh string) time.Duration {
+// GetAccessCookieExpiration calculates the expiration of the access token cookie
+func (r *OauthProxy) GetAccessCookieExpiration(refresh string) time.Duration {
 	// notes: by default the duration of the access token will be the configuration option, if
 	// however we can decode the refresh token, we will set the duration to the duration of the
 	// refresh token
-	duration := r.config.AccessTokenDuration
+	duration := r.Config.AccessTokenDuration
 
 	webToken, err := jwt.ParseSigned(refresh)
 
 	if err != nil {
-		r.log.Error("unable to parse token")
+		r.Log.Error("unable to parse token")
 	}
 
-	if ident, err := extractIdentity(webToken); err == nil {
-		delta := time.Until(ident.expiresAt)
+	if ident, err := ExtractIdentity(webToken); err == nil {
+		delta := time.Until(ident.ExpiresAt)
 
 		if delta > 0 {
 			duration = delta
 		}
 
-		r.log.Debug(
+		r.Log.Debug(
 			"parsed refresh token with new duration",
 			zap.Duration("new duration", delta),
 		)
 	} else {
-		r.log.Debug("refresh token is opaque and cannot be used to extend calculated duration")
+		r.Log.Debug("refresh token is opaque and cannot be used to extend calculated duration")
 	}
 
 	return duration

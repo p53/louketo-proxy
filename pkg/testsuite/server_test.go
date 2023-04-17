@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package testsuite
 
 import (
 	"crypto/tls"
@@ -37,7 +37,6 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
-	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -52,12 +51,12 @@ func TestNewKeycloakProxy(t *testing.T) {
 	cfg.Listen = randomLocalHost
 	cfg.ListenHTTP = ""
 
-	proxy, err := newProxy(cfg)
+	proxy, err := proxy.NewProxy(cfg)
 	assert.NoError(t, err)
 	assert.NotNil(t, proxy)
-	assert.NotNil(t, proxy.config)
-	assert.NotNil(t, proxy.router)
-	assert.NotNil(t, proxy.endpoint)
+	assert.NotNil(t, proxy.Config)
+	assert.NotNil(t, proxy.Router)
+	assert.NotNil(t, proxy.Endpoint)
 	assert.NoError(t, proxy.Run())
 }
 
@@ -72,19 +71,19 @@ func TestNewKeycloakProxyWithLegacyDiscoveryURI(t *testing.T) {
 	cfg.Listen = randomLocalHost
 	cfg.ListenHTTP = ""
 
-	proxy, err := newProxy(cfg)
+	proxy, err := proxy.NewProxy(cfg)
 	assert.NoError(t, err)
 	assert.NotNil(t, proxy)
-	assert.NotNil(t, proxy.config)
-	assert.NotNil(t, proxy.router)
-	assert.NotNil(t, proxy.endpoint)
+	assert.NotNil(t, proxy.Config)
+	assert.NotNil(t, proxy.Router)
+	assert.NotNil(t, proxy.Endpoint)
 	assert.NoError(t, proxy.Run())
 }
 
 func TestReverseProxyHeaders(t *testing.T) {
 	proxy := newFakeProxy(nil, &fakeAuthConfig{})
 	token := newTestToken(proxy.idp.getLocation())
-	token.addRealmRoles([]string{testsuite.FakeAdminRole})
+	token.addRealmRoles([]string{FakeAdminRole})
 	jwt, _ := token.getToken()
 	uri := "/auth_all/test"
 	requests := []fakeRequest{
@@ -129,7 +128,7 @@ func TestAuthTokenHeader(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           testsuite.FakeAuthAllURL,
+					URI:           FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
@@ -144,7 +143,7 @@ func TestAuthTokenHeader(t *testing.T) {
 					},
 				},
 				{
-					URI:           testsuite.FakeAuthAllURL,
+					URI:           FakeAuthAllURL,
 					ExpectedProxy: true,
 					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
 						"X-Auth-Token": func(t *testing.T, c *config.Config, value string) {
@@ -166,7 +165,7 @@ func TestAuthTokenHeader(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           testsuite.FakeAuthAllURL,
+					URI:           FakeAuthAllURL,
 					HasLogin:      true,
 					Redirects:     true,
 					OnResponse:    delay,
@@ -181,7 +180,7 @@ func TestAuthTokenHeader(t *testing.T) {
 					},
 				},
 				{
-					URI:           testsuite.FakeAuthAllURL,
+					URI:           FakeAuthAllURL,
 					ExpectedProxy: true,
 					ExpectedProxyHeadersValidator: map[string]func(*testing.T, *config.Config, string){
 						"X-Auth-Token": func(t *testing.T, c *config.Config, value string) {
@@ -213,7 +212,7 @@ func TestAuthTokenHeader(t *testing.T) {
 }
 
 func TestForwardingProxy(t *testing.T) {
-	server := httptest.NewServer(&fakeUpstreamService{})
+	server := httptest.NewServer(&FakeUpstreamService{})
 
 	testCases := []struct {
 		Name              string
@@ -225,9 +224,9 @@ func TestForwardingProxy(t *testing.T) {
 			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = testsuite.ValidUsername
-				conf.ForwardingPassword = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
+				conf.ForwardingUsername = ValidUsername
+				conf.ForwardingPassword = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.OpenIDProviderTimeout = 30 * time.Second
@@ -247,9 +246,9 @@ func TestForwardingProxy(t *testing.T) {
 			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = testsuite.ValidUsername
-				conf.ForwardingPassword = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
+				conf.ForwardingUsername = ValidUsername
+				conf.ForwardingPassword = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -276,9 +275,9 @@ func TestForwardingProxy(t *testing.T) {
 			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ClientID = testsuite.ValidUsername
-				conf.ClientSecret = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeClientCreds
+				conf.ClientID = ValidUsername
+				conf.ClientSecret = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeClientCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -297,9 +296,9 @@ func TestForwardingProxy(t *testing.T) {
 			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ClientID = testsuite.ValidUsername
-				conf.ClientSecret = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeClientCreds
+				conf.ClientID = ValidUsername
+				conf.ClientSecret = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeClientCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -340,12 +339,12 @@ func TestForwardingProxy(t *testing.T) {
 }
 
 func TestUmaForwardingProxy(t *testing.T) {
-	fakeUpstream := httptest.NewServer(&fakeUpstreamService{})
+	fakeUpstream := httptest.NewServer(&FakeUpstreamService{})
 	upstreamConfig := newFakeKeycloakConfig()
 	upstreamConfig.EnableUma = true
 	upstreamConfig.EnableDefaultDeny = true
-	upstreamConfig.ClientID = testsuite.ValidUsername
-	upstreamConfig.ClientSecret = testsuite.ValidPassword
+	upstreamConfig.ClientID = ValidUsername
+	upstreamConfig.ClientSecret = ValidPassword
 	upstreamConfig.PatRetryCount = 5
 	upstreamConfig.PatRetryInterval = 2 * time.Second
 	upstreamConfig.Upstream = fakeUpstream.URL
@@ -370,9 +369,9 @@ func TestUmaForwardingProxy(t *testing.T) {
 			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = testsuite.ValidUsername
-				conf.ForwardingPassword = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
+				conf.ForwardingUsername = ValidUsername
+				conf.ForwardingPassword = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.OpenIDProviderTimeout = 30 * time.Second
@@ -395,9 +394,9 @@ func TestUmaForwardingProxy(t *testing.T) {
 				conf.EnableForwarding = true
 				conf.EnableUma = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = testsuite.ValidUsername
-				conf.ForwardingPassword = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
+				conf.ForwardingUsername = ValidUsername
+				conf.ForwardingPassword = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 				conf.OpenIDProviderTimeout = 30 * time.Second
@@ -418,9 +417,9 @@ func TestUmaForwardingProxy(t *testing.T) {
 				conf.EnableForwarding = true
 				conf.EnableUma = true
 				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = testsuite.ValidUsername
-				conf.ForwardingPassword = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeUserCreds
+				conf.ForwardingUsername = ValidUsername
+				conf.ForwardingPassword = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeUserCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -448,9 +447,9 @@ func TestUmaForwardingProxy(t *testing.T) {
 				conf.EnableForwarding = true
 				conf.EnableUma = true
 				conf.ForwardingDomains = []string{}
-				conf.ClientID = testsuite.ValidUsername
-				conf.ClientSecret = testsuite.ValidPassword
-				conf.ForwardingGrantType = proxy.GrantTypeClientCreds
+				conf.ClientID = ValidUsername
+				conf.ClientSecret = ValidPassword
+				conf.ForwardingGrantType = config.GrantTypeClientCreds
 				conf.PatRetryCount = 5
 				conf.PatRetryInterval = 2 * time.Second
 			},
@@ -494,11 +493,11 @@ func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
 	cfg.PatRetryInterval = 2 * time.Second
 	cfg.OpenIDProviderTimeout = 30 * time.Second
 	cfg.ForwardingDomains = []string{}
-	cfg.ForwardingUsername = testsuite.ValidUsername
-	cfg.ForwardingPassword = testsuite.ValidPassword
+	cfg.ForwardingUsername = ValidUsername
+	cfg.ForwardingPassword = ValidPassword
 	cfg.SkipOpenIDProviderTLSVerify = true
 	cfg.ForwardingGrantType = "password"
-	s := httptest.NewServer(&fakeUpstreamService{})
+	s := httptest.NewServer(&FakeUpstreamService{})
 	requests := []fakeRequest{
 		{
 			URL:                     s.URL + "/test",
@@ -537,12 +536,12 @@ func TestSkipOpenIDProviderTLSVerifyForwardingProxy(t *testing.T) {
 
 func TestForbiddenTemplate(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.ForbiddenPage = "templates/forbidden.html.tmpl"
+	cfg.ForbiddenPage = "../../templates/forbidden.html.tmpl"
 	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{testsuite.FakeAdminRole},
+			Roles:   []string{FakeAdminRole},
 		},
 	}
 	requests := []fakeRequest{
@@ -568,7 +567,7 @@ func TestErrorTemplate(t *testing.T) {
 		{
 			Name: "TestErrorTemplateDisplayed",
 			ProxySettings: func(c *config.Config) {
-				c.ErrorPage = "templates/error.html.tmpl"
+				c.ErrorPage = "../../templates/error.html.tmpl"
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -582,7 +581,7 @@ func TestErrorTemplate(t *testing.T) {
 		{
 			Name: "TestWithBadErrorTemplate",
 			ProxySettings: func(c *config.Config) {
-				c.ErrorPage = "templates/error-bad-formatted.html.tmpl"
+				c.ErrorPage = "../../templates/error-bad-formatted.html.tmpl"
 			},
 			ExecutionSettings: []fakeRequest{
 				{
@@ -1214,12 +1213,12 @@ func TestNoProxy(t *testing.T) {
 
 func TestAuthorizationTemplate(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
-	cfg.SignInPage = "templates/sign_in.html.tmpl"
+	cfg.SignInPage = "../../templates/sign_in.html.tmpl"
 	cfg.Resources = []*authorization.Resource{
 		{
 			URL:     "/*",
 			Methods: utils.AllHTTPMethods,
-			Roles:   []string{testsuite.FakeAdminRole},
+			Roles:   []string{FakeAdminRole},
 		},
 	}
 	requests := []fakeRequest{
@@ -1238,7 +1237,7 @@ func TestProxyProtocol(t *testing.T) {
 	cfg.EnableProxyProtocol = true
 	requests := []fakeRequest{
 		{
-			URI:           testsuite.FakeAuthAllURL + "/test",
+			URI:           FakeAuthAllURL + "/test",
 			HasToken:      true,
 			ExpectedProxy: true,
 			ExpectedProxyHeaders: map[string]string{
@@ -1247,7 +1246,7 @@ func TestProxyProtocol(t *testing.T) {
 			ExpectedCode: http.StatusOK,
 		},
 		{
-			URI:           testsuite.FakeAuthAllURL + "/test",
+			URI:           FakeAuthAllURL + "/test",
 			HasToken:      true,
 			ProxyProtocol: "189.10.10.1",
 			ExpectedProxy: true,
@@ -1272,7 +1271,7 @@ func TestXForwarded(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           testsuite.FakeAuthAllURL + "/test",
+					URI:           FakeAuthAllURL + "/test",
 					HasToken:      true,
 					ExpectedProxy: true,
 					ExpectedProxyHeaders: map[string]string{
@@ -1289,7 +1288,7 @@ func TestXForwarded(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           testsuite.FakeAuthAllURL + "/test",
+					URI:           FakeAuthAllURL + "/test",
 					HasToken:      true,
 					ExpectedProxy: true,
 					Headers: map[string]string{
@@ -1309,7 +1308,7 @@ func TestXForwarded(t *testing.T) {
 			},
 			ExecutionSettings: []fakeRequest{
 				{
-					URI:           testsuite.FakeAuthAllURL + "/test",
+					URI:           FakeAuthAllURL + "/test",
 					HasToken:      true,
 					ExpectedProxy: true,
 					Headers: map[string]string{

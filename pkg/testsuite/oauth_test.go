@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package testsuite
 
 import (
 	"context"
@@ -37,10 +37,10 @@ func TestGetUserinfo(t *testing.T) {
 		&oauth2.Token{AccessToken: token},
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), proxy.config.OpenIDProviderTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), proxy.Config.OpenIDProviderTimeout)
 	defer cancel()
 
-	userInfo, err := proxy.provider.UserInfo(ctx, tokenSource)
+	userInfo, err := proxy.Provider.UserInfo(ctx, tokenSource)
 	assert.NoError(t, err)
 
 	claims := DefaultTestTokenClaims{}
@@ -73,9 +73,9 @@ func TestTokenExpired(t *testing.T) {
 			continue
 		}
 
-		verifier := proxy.provider.Verifier(
+		verifier := proxy.Provider.Verifier(
 			&oidc3.Config{
-				ClientID:          proxy.config.ClientID,
+				ClientID:          proxy.Config.ClientID,
 				SkipClientIDCheck: true,
 			},
 		)

@@ -1,6 +1,3 @@
-//go:build !e2e
-// +build !e2e
-
 /*
 Copyright 2015 All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package testsuite
 
 import (
 	"fmt"
@@ -27,6 +24,7 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
 	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -136,7 +134,7 @@ func TestGetIndentity(t *testing.T) {
 		token, err := newTestToken(idp.getLocation()).getToken()
 		assert.NoError(t, err)
 
-		user, err := p.getIdentity(testCase.Request(token))
+		user, err := p.GetIdentity(testCase.Request(token))
 
 		if err != nil && testCase.Ok {
 			t.Errorf("test case %d should not have errored", idx)
@@ -152,7 +150,7 @@ func TestGetIndentity(t *testing.T) {
 			continue
 		}
 
-		if user.rawToken != token {
+		if user.RawToken != token {
 			t.Errorf("test case %d the tokens are not the same", idx)
 		}
 	}
@@ -244,11 +242,11 @@ func TestGetTokenInRequest(t *testing.T) {
 }
 
 func TestIsExpired(t *testing.T) {
-	user := &userContext{
-		expiresAt: time.Now(),
+	user := &proxy.UserContext{
+		ExpiresAt: time.Now(),
 	}
 	time.Sleep(1 * time.Millisecond)
-	if !user.isExpired() {
+	if !user.IsExpired() {
 		t.Error("we should have been false")
 	}
 }
@@ -263,13 +261,13 @@ func TestGetUserContext(t *testing.T) {
 	assert.NoError(t, err)
 	webToken, err := jwt.ParseSigned(jwtToken)
 	assert.NoError(t, err)
-	context, err := extractIdentity(webToken)
+	context, err := proxy.ExtractIdentity(webToken)
 	assert.NoError(t, err)
 	assert.NotNil(t, context)
-	assert.Equal(t, "1e11e539-8256-4b3b-bda8-cc0d56cddb48", context.id)
-	assert.Equal(t, "gambol99@gmail.com", context.email)
-	assert.Equal(t, "rjayawardene", context.preferredName)
-	assert.Equal(t, append(realmRoles, clientRoles...), context.roles)
+	assert.Equal(t, "1e11e539-8256-4b3b-bda8-cc0d56cddb48", context.ID)
+	assert.Equal(t, "gambol99@gmail.com", context.Email)
+	assert.Equal(t, "rjayawardene", context.PreferredName)
+	assert.Equal(t, append(realmRoles, clientRoles...), context.Roles)
 }
 
 func TestGetUserRealmRoleContext(t *testing.T) {
@@ -280,15 +278,15 @@ func TestGetUserRealmRoleContext(t *testing.T) {
 	assert.NoError(t, err)
 	webToken, err := jwt.ParseSigned(jwtToken)
 	assert.NoError(t, err)
-	context, err := extractIdentity(webToken)
+	context, err := proxy.ExtractIdentity(webToken)
 	assert.NoError(t, err)
 	assert.NotNil(t, context)
-	assert.Equal(t, "1e11e539-8256-4b3b-bda8-cc0d56cddb48", context.id)
-	assert.Equal(t, "gambol99@gmail.com", context.email)
-	assert.Equal(t, "rjayawardene", context.preferredName)
+	assert.Equal(t, "1e11e539-8256-4b3b-bda8-cc0d56cddb48", context.ID)
+	assert.Equal(t, "gambol99@gmail.com", context.Email)
+	assert.Equal(t, "rjayawardene", context.PreferredName)
 	// we have "defaultclient:default" in default test claims
 	roles = append(roles, "defaultclient:default")
-	assert.Equal(t, roles, context.roles)
+	assert.Equal(t, roles, context.Roles)
 }
 
 func TestUserContextString(t *testing.T) {
@@ -297,7 +295,7 @@ func TestUserContextString(t *testing.T) {
 	assert.NoError(t, err)
 	webToken, err := jwt.ParseSigned(jwtToken)
 	assert.NoError(t, err)
-	context, err := extractIdentity(webToken)
+	context, err := proxy.ExtractIdentity(webToken)
 	assert.NoError(t, err)
 	assert.NotNil(t, context)
 	assert.NotEmpty(t, context.String())

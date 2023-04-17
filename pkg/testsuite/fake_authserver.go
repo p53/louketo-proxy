@@ -1,10 +1,9 @@
-package main
+package testsuite
 
 import (
 	"crypto/rand"
 	"crypto/sha1"
 	"crypto/sha256"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -20,26 +19,11 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/config"
-	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
-	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
-	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/grokify/go-pkce"
 	"github.com/jochasinga/relay"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/websocket"
 	jose2 "gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
-
-	"io/ioutil"
-	"log"
-	"net"
-	"testing"
-
-	resty "github.com/go-resty/resty/v2"
-	uuid "github.com/gofrs/uuid"
-	"github.com/oleiade/reflections"
-	strcase "github.com/stoewer/go-strcase"
 )
 
 type RoleClaim struct {
@@ -104,791 +88,6 @@ var defTestTokenClaims = DefaultTestTokenClaims{
 	Item1: []string{"default"},
 	Item2: []string{"default"},
 	Item3: []string{"default"},
-}
-
-const (
-	testEncryptionKey = "ZSeCYDUxIlhDrmPpa1Ldc7il384esSF2"
-	randomLocalHost   = "127.0.0.1:0"
-)
-
-type fakeRequest struct {
-	BasicAuth                     bool
-	Cookies                       []*http.Cookie
-	Expires                       time.Duration
-	FormValues                    map[string]string
-	Groups                        []string
-	HasCookieToken                bool
-	HasLogin                      bool
-	LoginXforwarded               bool
-	HasToken                      bool
-	Headers                       map[string]string
-	Method                        string
-	NotSigned                     bool
-	OnResponse                    func(int, *resty.Request, *resty.Response)
-	Password                      string
-	ProxyProtocol                 string
-	ProxyRequest                  bool
-	RawToken                      string
-	Redirects                     bool
-	Roles                         []string
-	SkipClientIDCheck             bool
-	SkipIssuerCheck               bool
-	RequestCA                     string
-	TokenClaims                   map[string]interface{}
-	TokenAuthorization            *authorization.Permissions
-	URI                           string
-	URL                           string
-	Username                      string
-	TLSMin                        uint16
-	TLSMax                        uint16
-	ExpectedCode                  int
-	ExpectedContent               func(body string, testNum int)
-	ExpectedContentContains       string
-	ExpectedRequestError          string
-	ExpectedCookies               map[string]string
-	ExpectedHeaders               map[string]string
-	ExpectedLocation              string
-	ExpectedNoProxyHeaders        []string
-	ExpectedProxy                 bool
-	ExpectedProxyHeaders          map[string]string
-	ExpectedProxyHeadersValidator map[string]func(*testing.T, *config.Config, string)
-	ExpectedCookiesValidator      map[string]func(*testing.T, *config.Config, string) bool
-	ExpectedLoginCookiesValidator map[string]func(*testing.T, *config.Config, string) bool
-}
-
-type fakeProxy struct {
-	config  *config.Config
-	idp     *fakeAuthServer
-	proxy   *oauthProxy
-	cookies map[string]*http.Cookie
-}
-
-func newFakeProxy(cfg *config.Config, authConfig *fakeAuthConfig) *fakeProxy {
-	log.SetOutput(ioutil.Discard)
-
-	if cfg == nil {
-		cfg = newFakeKeycloakConfig()
-	}
-
-	auth := newFakeAuthServer(authConfig)
-
-	if authConfig.EnableProxy {
-		cfg.OpenIDProviderProxy = auth.getProxyURL()
-	}
-
-	cfg.DiscoveryURL = auth.getLocation()
-	// c.Verbose = true
-	cfg.DisableAllLogging = true
-	err := cfg.Update()
-
-	if err != nil {
-		panic("failed to create fake proxy service, error: " + err.Error())
-	}
-
-	proxy, err := newProxy(cfg)
-
-	if err != nil {
-		panic("failed to create fake proxy service, error: " + err.Error())
-	}
-
-	// proxy.log = zap.NewNop()
-
-	if cfg.Upstream == "" {
-		proxy.upstream = &fakeUpstreamService{}
-	}
-
-	if err = proxy.Run(); err != nil {
-		panic("failed to create the proxy service, error: " + err.Error())
-	}
-
-	cfg.RedirectionURL = fmt.Sprintf("http://%s", proxy.listener.Addr().String())
-
-	return &fakeProxy{cfg, auth, proxy, make(map[string]*http.Cookie)}
-}
-
-func (f *fakeProxy) getServiceURL() string {
-	return fmt.Sprintf("http://%s", f.proxy.listener.Addr().String())
-}
-
-// RunTests performs a series of requests against a fake proxy service
-//
-//nolint:gocyclo,funlen,cyclop
-func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
-	defer func() {
-		f.idp.Close()
-		f.proxy.server.Close()
-	}()
-
-	for idx := range requests {
-		reqCfg := requests[idx]
-		var upstream fakeUpstreamResponse
-
-		f.config.NoRedirects = !reqCfg.Redirects
-		f.config.SkipAccessTokenClientIDCheck = reqCfg.SkipClientIDCheck
-		f.config.SkipAccessTokenIssuerCheck = reqCfg.SkipIssuerCheck
-		// we need to set any defaults
-		if reqCfg.Method == "" {
-			reqCfg.Method = http.MethodGet
-		}
-		// create a http client
-		client := resty.New()
-
-		if reqCfg.TLSMin != 0 {
-			client.SetTLSClientConfig(&tls.Config{MinVersion: reqCfg.TLSMin})
-		}
-
-		if reqCfg.TLSMax != 0 {
-			client.SetTLSClientConfig(&tls.Config{MaxVersion: reqCfg.TLSMax})
-		}
-
-		request := client.SetRedirectPolicy(resty.NoRedirectPolicy()).R()
-
-		if reqCfg.ProxyProtocol != "" {
-			client.SetTransport(&http.Transport{
-				Dial: func(network, addr string) (net.Conn, error) {
-					conn, err := net.Dial("tcp", addr)
-
-					if err != nil {
-						return nil, err
-					}
-
-					header := fmt.Sprintf(
-						"PROXY TCP4 %s 10.0.0.1 1000 2000\r\n",
-						reqCfg.ProxyProtocol,
-					)
-					_, _ = conn.Write([]byte(header))
-
-					return conn, nil
-				},
-			})
-		}
-
-		if reqCfg.RequestCA != "" {
-			client.SetRootCertificateFromString(reqCfg.RequestCA)
-		}
-
-		// are we performing a oauth login beforehand
-		if reqCfg.HasLogin {
-			if err := f.performUserLogin(&reqCfg); err != nil {
-				t.Errorf(
-					"case %d, unable to login to oauth server, error: %s",
-					idx,
-					err,
-				)
-				return
-			}
-		}
-
-		if len(f.cookies) > 0 {
-			for _, k := range f.cookies {
-				client.SetCookie(k)
-			}
-		}
-
-		if reqCfg.ExpectedProxy {
-			request.SetResult(&upstream)
-		}
-
-		if reqCfg.ProxyRequest {
-			client.SetProxy(f.getServiceURL())
-		}
-
-		if reqCfg.BasicAuth {
-			request.SetBasicAuth(reqCfg.Username, reqCfg.Password)
-		}
-
-		if reqCfg.RawToken != "" {
-			setRequestAuthentication(f.config, client, request, &reqCfg, reqCfg.RawToken)
-		}
-
-		if len(reqCfg.Cookies) > 0 {
-			client.SetCookies(reqCfg.Cookies)
-		}
-
-		if len(reqCfg.Headers) > 0 {
-			request.SetHeaders(reqCfg.Headers)
-		}
-
-		if reqCfg.FormValues != nil {
-			request.SetFormData(reqCfg.FormValues)
-		}
-
-		if reqCfg.HasToken {
-			token := newTestToken(f.idp.getLocation())
-
-			if reqCfg.TokenClaims != nil && len(reqCfg.TokenClaims) > 0 {
-				for i := range reqCfg.TokenClaims {
-					err := reflections.SetField(
-						&token.claims,
-						strcase.UpperCamelCase(i),
-						reqCfg.TokenClaims[i],
-					)
-					assert.NoError(t, err)
-				}
-			}
-
-			if len(reqCfg.Roles) > 0 {
-				token.addRealmRoles(reqCfg.Roles)
-			}
-
-			if len(reqCfg.Groups) > 0 {
-				token.addGroups(reqCfg.Groups)
-			}
-
-			if reqCfg.Expires > 0 || reqCfg.Expires < 0 {
-				token.setExpiration(time.Now().Add(reqCfg.Expires))
-			}
-
-			if reqCfg.TokenAuthorization != nil {
-				token.claims.Authorization = *reqCfg.TokenAuthorization
-			}
-
-			if reqCfg.NotSigned {
-				authToken, err := token.getUnsignedToken()
-				assert.NoError(t, err)
-				setRequestAuthentication(f.config, client, request, &reqCfg, authToken)
-			} else {
-				authToken, err := token.getToken()
-				assert.NoError(t, err)
-				setRequestAuthentication(f.config, client, request, &reqCfg, authToken)
-			}
-		}
-
-		// step: execute the request
-		var resp *resty.Response
-		var err error
-
-		switch reqCfg.URL {
-		case "":
-			resp, err = request.Execute(reqCfg.Method, f.getServiceURL()+reqCfg.URI)
-		default:
-			resp, err = request.Execute(reqCfg.Method, reqCfg.URL)
-		}
-
-		if reqCfg.ExpectedRequestError != "" {
-			if !strings.Contains(err.Error(), reqCfg.ExpectedRequestError) {
-				assert.Fail(
-					t,
-					"case %d, expected error %s, got error: %s",
-					idx,
-					reqCfg.ExpectedRequestError,
-					err,
-				)
-			}
-		} else if err != nil {
-			if !strings.Contains(err.Error(), "auto redirect is disabled") {
-				assert.NoError(
-					t,
-					err,
-					"case %d, unable to make request, error: %s",
-					idx,
-					err,
-				)
-				continue
-			}
-		}
-
-		status := resp.StatusCode()
-
-		if reqCfg.ExpectedCode != 0 {
-			assert.Equal(
-				t,
-				reqCfg.ExpectedCode,
-				status,
-				"case %d, expected status code: %d, got: %d",
-				idx,
-				reqCfg.ExpectedCode,
-				status,
-			)
-		}
-
-		if reqCfg.ExpectedLocation != "" {
-			loc, _ := url.Parse(resp.Header().Get("Location"))
-			assert.True(
-				t,
-				strings.Contains(
-					loc.String(),
-					reqCfg.ExpectedLocation,
-				),
-				"expected location to contain %s",
-				loc.String(),
-			)
-
-			if loc.Query().Get("state") != "" {
-				state, err := uuid.FromString(loc.Query().Get("state"))
-
-				if err != nil {
-					assert.Fail(
-						t,
-						"expected state parameter with valid UUID, got: %s with error %s",
-						state.String(),
-						err,
-					)
-				}
-			}
-		}
-
-		if len(reqCfg.ExpectedHeaders) > 0 {
-			for headerName, expVal := range reqCfg.ExpectedHeaders {
-				realVal := resp.Header().Get(headerName)
-
-				assert.Equal(
-					t,
-					expVal,
-					realVal,
-					"case %d, expected header %s=%s, got: %s",
-					idx,
-					headerName,
-					expVal,
-					realVal,
-				)
-			}
-		}
-
-		if reqCfg.ExpectedProxy {
-			assert.NotEmpty(
-				t,
-				resp.Header().Get(testsuite.TestProxyAccepted),
-				"case %d, did not proxy request",
-				idx,
-			)
-		} else {
-			assert.Empty(
-				t,
-				resp.Header().Get(testsuite.TestProxyAccepted),
-				"case %d, should NOT proxy request",
-				idx,
-			)
-		}
-
-		if reqCfg.ExpectedProxyHeaders != nil && len(reqCfg.ExpectedProxyHeaders) > 0 {
-			for headerName, headerVal := range reqCfg.ExpectedProxyHeaders {
-				headers := upstream.Headers
-
-				switch headerVal {
-				case "":
-					assert.NotEmpty(
-						t,
-						headers.Get(headerName),
-						"case %d, expected the proxy header: %s to exist",
-						idx,
-						headerName,
-					)
-				default:
-					assert.Equal(
-						t,
-						headerVal,
-						headers.Get(headerName),
-						"case %d, expected proxy header %s=%s, got: %s",
-						idx,
-						headerName,
-						headerVal,
-						headers.Get(headerName),
-					)
-				}
-			}
-		}
-
-		if reqCfg.ExpectedProxyHeadersValidator != nil &&
-			len(reqCfg.ExpectedProxyHeadersValidator) > 0 {
-			// comment
-			for headerName, headerValidator := range reqCfg.ExpectedProxyHeadersValidator {
-				headers := upstream.Headers
-				switch headerValidator {
-				case nil:
-					assert.NotNil(
-						t,
-						headerValidator,
-						"Validation function is nil, forgot to configure?",
-					)
-				default:
-					headerValidator(t, f.config, headers.Get(headerName))
-				}
-			}
-		}
-
-		if len(reqCfg.ExpectedNoProxyHeaders) > 0 {
-			for _, headerName := range reqCfg.ExpectedNoProxyHeaders {
-				assert.Empty(
-					t,
-					upstream.Headers.Get(headerName),
-					"case %d, header: %s was not expected to exist",
-					idx,
-					headerName,
-				)
-			}
-		}
-
-		if reqCfg.ExpectedContent != nil {
-			e := string(resp.Body())
-			reqCfg.ExpectedContent(e, idx)
-		}
-
-		if reqCfg.ExpectedContentContains != "" {
-			body := string(resp.Body())
-
-			assert.Contains(
-				t,
-				body,
-				reqCfg.ExpectedContentContains,
-				"case %d, expected content: %s, got: %s",
-				idx,
-				reqCfg.ExpectedContentContains,
-				body,
-			)
-		}
-
-		if len(reqCfg.ExpectedCookies) > 0 {
-			for cookName, expVal := range reqCfg.ExpectedCookies {
-				cookie := utils.FindCookie(cookName, resp.Cookies())
-
-				if !assert.NotNil(
-					t,
-					cookie,
-					"case %d, expected cookie %s not found",
-					idx,
-					cookName,
-				) {
-					continue
-				}
-
-				if expVal != "" {
-					assert.Equal(
-						t,
-						cookie.Value,
-						expVal,
-						"case %d, expected cookie value: %s, got: %s",
-						idx,
-						expVal,
-						cookie.Value,
-					)
-				}
-			}
-		}
-
-		if len(reqCfg.ExpectedCookiesValidator) > 0 {
-			for cookName, cookValidator := range reqCfg.ExpectedCookiesValidator {
-				cookie := utils.FindCookie(cookName, resp.Cookies())
-
-				if !assert.NotNil(
-					t,
-					cookie,
-					"case %d, expected cookie %s not found",
-					idx,
-					cookName,
-				) {
-					continue
-				}
-
-				if cookValidator != nil {
-					assert.True(
-						t,
-						cookValidator(t, f.config, cookie.Value),
-						"case %d, invalid cookie value: %s in expected cookie validator",
-						idx,
-						cookie.Value,
-					)
-				}
-			}
-		}
-
-		if len(reqCfg.ExpectedLoginCookiesValidator) > 0 {
-			for cookName, cookValidator := range reqCfg.ExpectedLoginCookiesValidator {
-				cookie, ok := f.cookies[cookName]
-
-				if !assert.True(t, ok, "case %d, expected cookie %s not found", idx, cookName) {
-					continue
-				}
-
-				if cookValidator != nil {
-					assert.True(
-						t,
-						cookValidator(t, f.config, cookie.Value),
-						"case %d, invalid cookie value in login cookie validator: %s",
-						idx,
-						cookie.Value,
-					)
-				}
-			}
-		}
-
-		if reqCfg.OnResponse != nil {
-			reqCfg.OnResponse(idx, request, resp)
-		}
-	}
-}
-
-func (f *fakeProxy) performUserLogin(reqCfg *fakeRequest) error {
-	userCookies := map[string]bool{
-		f.config.CookieAccessName:  true,
-		f.config.CookieRefreshName: true,
-		f.config.CookieIDTokenName: true,
-	}
-	resp, flowCookies, err := makeTestCodeFlowLogin(f.getServiceURL()+reqCfg.URI, reqCfg.LoginXforwarded)
-	if err != nil {
-		return err
-	}
-	for _, cookie := range resp.Cookies() {
-		if _, ok := userCookies[cookie.Name]; ok {
-			f.cookies[cookie.Name] = &http.Cookie{
-				Name:   cookie.Name,
-				Path:   "/",
-				Domain: "127.0.0.1",
-				Value:  cookie.Value,
-			}
-		}
-	}
-
-	for i, cook := range flowCookies {
-		f.cookies[cook.Name] = flowCookies[i]
-	}
-
-	defer resp.Body.Close()
-
-	return nil
-}
-
-func setRequestAuthentication(cfg *config.Config, client *resty.Client, request *resty.Request, c *fakeRequest, token string) {
-	switch c.HasCookieToken {
-	case true:
-		client.SetCookie(&http.Cookie{
-			Name:  cfg.CookieAccessName,
-			Path:  "/",
-			Value: token,
-		})
-	default:
-		request.SetAuthToken(token)
-	}
-}
-
-func newTestService() string {
-	_, _, u := newTestProxyService(nil)
-	return u
-}
-
-func newTestProxyService(config *config.Config) (*oauthProxy, *fakeAuthServer, string) {
-	if config == nil {
-		config = newFakeKeycloakConfig()
-	}
-
-	authConfig := &fakeAuthConfig{}
-	if config.SkipOpenIDProviderTLSVerify {
-		authConfig.EnableTLS = true
-	}
-
-	auth := newFakeAuthServer(authConfig)
-
-	config.DiscoveryURL = auth.getLocation()
-	config.RevocationEndpoint = auth.getRevocationURL()
-	config.Verbose = false
-	config.EnableLogging = false
-	err := config.Update()
-
-	if err != nil {
-		panic("failed to create proxy service, error: " + err.Error())
-	}
-
-	proxy, err := newProxy(config)
-	if err != nil {
-		panic("failed to create proxy service, error: " + err.Error())
-	}
-
-	// step: create an fake upstream endpoint
-	proxy.upstream = new(fakeUpstreamService)
-	service := httptest.NewServer(proxy.router)
-	config.RedirectionURL = service.URL
-
-	// step: we need to update the client config
-	if proxy.provider, proxy.idpClient, err = proxy.newOpenIDProvider(); err != nil {
-		panic("failed to recreate the openid client, error: " + err.Error())
-	}
-
-	return proxy, auth, service.URL
-}
-
-func newFakeHTTPRequest(method, path string) *http.Request {
-	return &http.Request{
-		Method: method,
-		Header: make(map[string][]string),
-		Host:   "127.0.0.1",
-		URL: &url.URL{
-			Scheme: "http",
-			Host:   "127.0.0.1",
-			Path:   path,
-		},
-	}
-}
-
-func newFakeKeycloakConfig() *config.Config {
-	return &config.Config{
-		ClientID:                    testsuite.FakeClientID,
-		ClientSecret:                testsuite.FakeSecret,
-		CookieAccessName:            constant.AccessCookie,
-		CookieRefreshName:           constant.RefreshCookie,
-		CookieIDTokenName:           constant.IDTokenCookie,
-		DisableAllLogging:           true,
-		DiscoveryURL:                randomLocalHost,
-		EnableAuthorizationCookies:  true,
-		EnableAuthorizationHeader:   true,
-		EnableLogging:               false,
-		EnableLoginHandler:          true,
-		EnableTokenHeader:           true,
-		EnableCompression:           false,
-		EnableMetrics:               false,
-		Listen:                      randomLocalHost,
-		ListenAdmin:                 "",
-		ListenAdminScheme:           "http",
-		TLSAdminCertificate:         "",
-		TLSAdminPrivateKey:          "",
-		TLSAdminCaCertificate:       "",
-		OAuthURI:                    "/oauth",
-		OpenIDProviderTimeout:       time.Second * 5,
-		SkipOpenIDProviderTLSVerify: false,
-		SkipUpstreamTLSVerify:       false,
-		Scopes:                      []string{},
-		Verbose:                     false,
-		Resources: []*authorization.Resource{
-			{
-				URL:     testsuite.FakeAdminRoleURL,
-				Methods: []string{"GET"},
-				Roles:   []string{testsuite.FakeAdminRole},
-			},
-			{
-				URL:     testsuite.FakeTestRoleURL,
-				Methods: []string{"GET"},
-				Roles:   []string{testsuite.FakeTestRole},
-			},
-			{
-				URL:     testsuite.FakeTestAdminRolesURL,
-				Methods: []string{"GET"},
-				Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
-			},
-			{
-				URL:     testsuite.FakeAuthAllURL,
-				Methods: utils.AllHTTPMethods,
-				Roles:   []string{},
-			},
-			{
-				URL:         testsuite.FakeTestWhitelistedURL,
-				WhiteListed: true,
-				Methods:     utils.AllHTTPMethods,
-				Roles:       []string{},
-			},
-		},
-	}
-}
-
-//nolint:cyclop
-func makeTestCodeFlowLogin(location string, xforwarded bool) (*http.Response, []*http.Cookie, error) {
-	flowCookies := make([]*http.Cookie, 0)
-
-	uri, err := url.Parse(location)
-
-	if err != nil {
-		return nil, nil, err
-	}
-	// step: get the redirect
-	var resp *http.Response
-	for count := 0; count < 4; count++ {
-		req, err := http.NewRequest(http.MethodGet, location, nil)
-
-		for _, cookie := range flowCookies {
-			req.AddCookie(cookie)
-		}
-
-		if xforwarded {
-			req.Header.Add("X-Forwarded-Host", uri.Host)
-			req.Header.Add("X-Forwarded-Proto", uri.Scheme)
-		}
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if resp != nil {
-			cookies := resp.Cookies()
-			flowCookies = append(flowCookies, cookies...)
-		}
-
-		// step: make the request
-		transport := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				//nolint:gas
-				InsecureSkipVerify: true,
-			},
-		}
-
-		resp, err = transport.RoundTrip(req)
-
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if resp.StatusCode != http.StatusSeeOther {
-			return nil, nil, fmt.Errorf("no redirection found in resp, status code %d", resp.StatusCode)
-		}
-
-		location = resp.Header.Get("Location")
-
-		if !strings.HasPrefix(location, "http") && !strings.HasPrefix(location, "https") {
-			location = fmt.Sprintf("%s://%s%s", uri.Scheme, uri.Host, location)
-		}
-	}
-	return resp, flowCookies, nil
-}
-
-// fakeUpstreamResponse is the response from fake upstream
-type fakeUpstreamResponse struct {
-	URI     string      `json:"uri"`
-	Method  string      `json:"method"`
-	Address string      `json:"address"`
-	Headers http.Header `json:"headers"`
-}
-
-// fakeUpstreamService acts as a fake upstream service, returns the headers and request
-type fakeUpstreamService struct{}
-
-func (f *fakeUpstreamService) ServeHTTP(wrt http.ResponseWriter, req *http.Request) {
-	wrt.Header().Set(testsuite.TestProxyAccepted, "true")
-
-	upgrade := strings.ToLower(req.Header.Get("Upgrade"))
-	if upgrade == "websocket" {
-		websocket.Handler(func(wsock *websocket.Conn) {
-			defer wsock.Close()
-			var data []byte
-			err := websocket.Message.Receive(wsock, &data)
-			if err != nil {
-				wsock.WriteClose(http.StatusBadRequest)
-				return
-			}
-			content, _ := json.Marshal(&fakeUpstreamResponse{
-				URI:     req.RequestURI,
-				Method:  req.Method,
-				Address: req.RemoteAddr,
-				Headers: req.Header,
-			})
-			_ = websocket.Message.Send(wsock, content)
-		}).ServeHTTP(wrt, req)
-	} else {
-		wrt.Header().Set("Content-Type", "application/json")
-		content, err := json.Marshal(&fakeUpstreamResponse{
-			// r.RequestURI is what was received by the proxy.
-			// r.URL.String() is what is actually sent to the upstream service.
-			// KEYCLOAK-10864, KEYCLOAK-11276, KEYCLOAK-13315
-			URI:     req.URL.String(),
-			Method:  req.Method,
-			Address: req.RemoteAddr,
-			Headers: req.Header,
-		})
-
-		if err != nil {
-			wrt.WriteHeader(http.StatusInternalServerError)
-		} else {
-			wrt.WriteHeader(http.StatusOK)
-		}
-
-		_, _ = wrt.Write(content)
-	}
 }
 
 type fakeToken struct {
@@ -1294,7 +493,7 @@ func (r *fakeAuthServer) userInfoHandler(wrt http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	user, err := extractIdentity(token)
+	user, err := proxy.ExtractIdentity(token)
 
 	if err != nil {
 		wrt.WriteHeader(http.StatusUnauthorized)
@@ -1302,13 +501,13 @@ func (r *fakeAuthServer) userInfoHandler(wrt http.ResponseWriter, req *http.Requ
 	}
 
 	renderJSON(http.StatusOK, wrt, req, map[string]interface{}{
-		"sub":                user.claims["sub"],
-		"name":               user.claims["name"],
-		"given_name":         user.claims["given_name"],
-		"family_name":        user.claims["familty_name"],
-		"preferred_username": user.claims["preferred_username"],
-		"email":              user.claims["email"],
-		"picture":            user.claims["picture"],
+		"sub":                user.Claims["sub"],
+		"name":               user.Claims["name"],
+		"given_name":         user.Claims["given_name"],
+		"family_name":        user.Claims["familty_name"],
+		"preferred_username": user.Claims["preferred_username"],
+		"email":              user.Claims["email"],
+		"picture":            user.Claims["picture"],
 	})
 }
 
@@ -1322,7 +521,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 	refreshToken.setExpiration(refreshExpires)
 	codeVerifier := ""
 
-	if req.FormValue("grant_type") == proxy.GrantTypeUmaTicket {
+	if req.FormValue("grant_type") == config.GrantTypeUmaTicket {
 		token.claims.Authorization = authorization.Permissions{
 			Permissions: []authorization.Permission{
 				{
@@ -1357,7 +556,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 	}
 
 	switch req.FormValue("grant_type") {
-	case proxy.GrantTypeUserCreds:
+	case config.GrantTypeUserCreds:
 		username := req.FormValue("username")
 		password := req.FormValue("password")
 
@@ -1366,8 +565,8 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			return
 		}
 
-		if username == testsuite.ValidUsername && password == testsuite.ValidPassword {
-			renderJSON(http.StatusOK, writer, req, tokenResponse{
+		if username == ValidUsername && password == ValidPassword {
+			renderJSON(http.StatusOK, writer, req, proxy.TokenResponse{
 				IDToken:      jwtAccess,
 				AccessToken:  jwtAccess,
 				RefreshToken: jwtRefresh,
@@ -1380,7 +579,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			"error":             "invalid_grant",
 			"error_description": "invalid user credentials",
 		})
-	case proxy.GrantTypeClientCreds:
+	case config.GrantTypeClientCreds:
 		clientID := req.FormValue("client_id")
 		clientSecret := req.FormValue("client_secret")
 
@@ -1395,8 +594,8 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			}
 		}
 
-		if clientID == testsuite.ValidUsername && clientSecret == testsuite.ValidPassword {
-			renderJSON(http.StatusOK, writer, req, tokenResponse{
+		if clientID == ValidUsername && clientSecret == ValidPassword {
+			renderJSON(http.StatusOK, writer, req, proxy.TokenResponse{
 				IDToken:      jwtAccess,
 				AccessToken:  jwtAccess,
 				RefreshToken: jwtRefresh,
@@ -1409,7 +608,7 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			"error":             "invalid_grant",
 			"error_description": "invalid client credentials",
 		})
-	case proxy.GrantTypeRefreshToken:
+	case config.GrantTypeRefreshToken:
 		oldRefreshToken, err := jwt.ParseSigned(req.FormValue("refresh_token"))
 
 		if err != nil {
@@ -1448,12 +647,12 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			return
 		}
 
-		renderJSON(http.StatusOK, writer, req, tokenResponse{
+		renderJSON(http.StatusOK, writer, req, proxy.TokenResponse{
 			IDToken:     jwtAccess,
 			AccessToken: jwtAccess,
 			ExpiresIn:   float64(expires.Second()),
 		})
-	case proxy.GrantTypeAuthCode:
+	case config.GrantTypeAuthCode:
 		if r.fakeAuthConfig.EnablePKCE {
 			codeChallenge := pkce.CodeChallengeS256(codeVerifier)
 			if codeChallenge != r.pkceChallenge {
@@ -1462,14 +661,14 @@ func (r *fakeAuthServer) tokenHandler(writer http.ResponseWriter, req *http.Requ
 			}
 		}
 
-		renderJSON(http.StatusOK, writer, req, tokenResponse{
+		renderJSON(http.StatusOK, writer, req, proxy.TokenResponse{
 			IDToken:      jwtAccess,
 			AccessToken:  jwtAccess,
 			RefreshToken: jwtRefresh,
 			ExpiresIn:    float64(expires.Second()),
 		})
-	case proxy.GrantTypeUmaTicket:
-		renderJSON(http.StatusOK, writer, req, tokenResponse{
+	case config.GrantTypeUmaTicket:
+		renderJSON(http.StatusOK, writer, req, proxy.TokenResponse{
 			IDToken:      jwtAccess,
 			AccessToken:  jwtAccess,
 			RefreshToken: jwtRefresh,

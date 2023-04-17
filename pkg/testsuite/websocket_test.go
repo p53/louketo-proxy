@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package testsuite
 
 import (
 	"encoding/json"
@@ -32,7 +32,7 @@ import (
 // TestWebSocket is used to validate that the proxy reverse proxy WebSocket connections.
 func TestWebSocket(t *testing.T) {
 	// Setup an upstream service.
-	upstream := &fakeUpstreamService{}
+	upstream := &FakeUpstreamService{}
 
 	upstreamService := httptest.NewServer(upstream)
 	defer upstreamService.Close()

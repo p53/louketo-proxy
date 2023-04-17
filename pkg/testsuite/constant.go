@@ -13,4 +13,6 @@ const (
 	TestProxyAccepted      = "Proxy-Accepted"
 	ValidUsername          = "test"
 	ValidPassword          = "test"
+	testEncryptionKey      = "ZSeCYDUxIlhDrmPpa1Ldc7il384esSF2"
+	randomLocalHost        = "127.0.0.1:0"
 )

@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package proxy
 
 import (
 	"crypto/tls"
@@ -23,7 +23,6 @@ import (
 
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
 	"github.com/gogatekeeper/gatekeeper/pkg/config"
-	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/grokify/go-pkce"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -32,18 +31,18 @@ import (
 )
 
 // newOAuth2Config returns a oauth2 config
-func (r *oauthProxy) newOAuth2Config(redirectionURL string) *oauth2.Config {
+func (r *OauthProxy) newOAuth2Config(redirectionURL string) *oauth2.Config {
 	defaultScope := []string{"openid"}
 
 	conf := &oauth2.Config{
-		ClientID:     r.config.ClientID,
-		ClientSecret: r.config.ClientSecret,
+		ClientID:     r.Config.ClientID,
+		ClientSecret: r.Config.ClientSecret,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  r.provider.Endpoint().AuthURL,
-			TokenURL: r.provider.Endpoint().TokenURL,
+			AuthURL:  r.Provider.Endpoint().AuthURL,
+			TokenURL: r.Provider.Endpoint().TokenURL,
 		},
 		RedirectURL: redirectionURL,
-		Scopes:      append(r.config.Scopes, defaultScope...),
+		Scopes:      append(r.Config.Scopes, defaultScope...),
 	}
 
 	return conf
@@ -164,7 +163,7 @@ func exchangeAuthenticationCode(
 ) (*oauth2.Token, error) {
 	return getToken(
 		client,
-		proxy.GrantTypeAuthCode,
+		config.GrantTypeAuthCode,
 		code,
 		codeVerifierCookie,
 		skipOpenIDProviderTLSVerify,
@@ -173,7 +172,7 @@ func exchangeAuthenticationCode(
 
 // getToken retrieves a code from the provider
 func getToken(
-	config *oauth2.Config,
+	oConfig *oauth2.Config,
 	grantType,
 	code string,
 	codeVerifierCookie *http.Cookie,
@@ -195,7 +194,7 @@ func getToken(
 	start := time.Now()
 	authCodeOptions := []oauth2.AuthCodeOption{}
 
-	if grantType == proxy.GrantTypeAuthCode {
+	if grantType == config.GrantTypeAuthCode {
 		if codeVerifierCookie != nil {
 			if codeVerifierCookie.Value == "" {
 				return nil, apperrors.ErrPKCECookieEmpty
@@ -207,7 +206,7 @@ func getToken(
 		}
 	}
 
-	token, err := config.Exchange(ctx, code, authCodeOptions...)
+	token, err := oConfig.Exchange(ctx, code, authCodeOptions...)
 
 	if err != nil {
 		return token, err
@@ -216,10 +215,10 @@ func getToken(
 	taken := time.Since(start).Seconds()
 
 	switch grantType {
-	case proxy.GrantTypeAuthCode:
+	case config.GrantTypeAuthCode:
 		oauthTokensMetric.WithLabelValues("exchange").Inc()
 		oauthLatencyMetric.WithLabelValues("exchange").Observe(taken)
-	case proxy.GrantTypeRefreshToken:
+	case config.GrantTypeRefreshToken:
 		oauthTokensMetric.WithLabelValues("renew").Inc()
 		oauthLatencyMetric.WithLabelValues("renew").Observe(taken)
 	}

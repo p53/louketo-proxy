@@ -26,6 +26,7 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/urfave/cli"
 )
@@ -36,7 +37,7 @@ func newOauthProxyApp() *cli.App {
 	app := cli.NewApp()
 	app.Name = constant.Prog
 	app.Usage = constant.Description
-	app.Version = getVersion()
+	app.Version = proxy.GetVersion()
 	app.Author = constant.Author
 	app.Email = constant.Email
 	app.Flags = getCommandLineOptions()
@@ -73,7 +74,7 @@ func newOauthProxyApp() *cli.App {
 		}
 
 		// step: create the proxy
-		proxy, err := newProxy(defaultConfig)
+		proxy, err := proxy.NewProxy(defaultConfig)
 		if err != nil {
 			return utils.PrintError(err.Error())
 		}

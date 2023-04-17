@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package testsuite
 
 import (
 	"encoding/json"
@@ -28,6 +28,7 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -315,7 +316,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						cfg.CookieIDTokenName: checkAccessTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
-						resp := tokenResponse{}
+						resp := proxy.TokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.True(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
@@ -350,7 +351,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
-						resp := tokenResponse{}
+						resp := proxy.TokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.True(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
@@ -383,7 +384,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						cfg.CookieAccessName: checkAccessTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
-						resp := tokenResponse{}
+						resp := proxy.TokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
@@ -418,7 +419,7 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
-						resp := tokenResponse{}
+						resp := proxy.TokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
@@ -454,17 +455,17 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 								return false
 							}
 
-							user, err := extractIdentity(token)
+							user, err := proxy.ExtractIdentity(token)
 
 							if err != nil {
 								return false
 							}
 
-							return assert.Contains(t, user.claims, "aud") && assert.Contains(t, user.claims, "email")
+							return assert.Contains(t, user.Claims, "aud") && assert.Contains(t, user.Claims, "email")
 						},
 					},
 					ExpectedContent: func(body string, testNum int) {
-						resp := tokenResponse{}
+						resp := proxy.TokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))
@@ -504,18 +505,18 @@ func TestTokenEncryptionLoginHandler(t *testing.T) {
 								return false
 							}
 
-							user, err := extractIdentity(token)
+							user, err := proxy.ExtractIdentity(token)
 
 							if err != nil {
 								return false
 							}
 
-							return assert.Contains(t, user.claims, "aud") && assert.Contains(t, user.claims, "email")
+							return assert.Contains(t, user.Claims, "aud") && assert.Contains(t, user.Claims, "email")
 						},
 						cfg.CookieRefreshName: checkRefreshTokenEncryption,
 					},
 					ExpectedContent: func(body string, testNum int) {
-						resp := tokenResponse{}
+						resp := proxy.TokenResponse{}
 						err := json.Unmarshal([]byte(body), &resp)
 						require.NoError(t, err)
 						assert.False(t, checkAccessTokenEncryption(t, cfg, resp.AccessToken))

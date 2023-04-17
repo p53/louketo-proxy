@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package testsuite
 
 import (
 	"net/http"
@@ -82,7 +82,7 @@ func TestGetAccessCookieExpiration_NoExp(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
 	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
-	duration := proxy.getAccessCookieExpiration(token)
+	duration := proxy.GetAccessCookieExpiration(token)
 	assertAlmostEquals(t, c.AccessTokenDuration, duration)
 }
 
@@ -94,7 +94,7 @@ func TestGetAccessCookieExpiration_ZeroExp(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
 	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
-	duration := proxy.getAccessCookieExpiration(token)
+	duration := proxy.GetAccessCookieExpiration(token)
 	assert.True(t, duration > 0, "duration should be positive")
 	assertAlmostEquals(t, c.AccessTokenDuration, duration)
 }
@@ -107,7 +107,7 @@ func TestGetAccessCookieExpiration_PastExp(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
 	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
-	duration := proxy.getAccessCookieExpiration(token)
+	duration := proxy.GetAccessCookieExpiration(token)
 	assertAlmostEquals(t, c.AccessTokenDuration, duration)
 }
 
@@ -118,7 +118,7 @@ func TestGetAccessCookieExpiration_ValidExp(t *testing.T) {
 	c := newFakeKeycloakConfig()
 	c.AccessTokenDuration = time.Duration(1) * time.Hour
 	proxy := newFakeProxy(c, &fakeAuthConfig{}).proxy
-	duration := proxy.getAccessCookieExpiration(token)
+	duration := proxy.GetAccessCookieExpiration(token)
 	expectedDuration := time.Until(time.Unix(fToken.claims.Exp, 0))
 	assertAlmostEquals(t, expectedDuration, duration)
 }

@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package proxy
 
 import (
 	"bytes"
@@ -53,15 +53,15 @@ type DiscoveryResponse struct {
 }
 
 // getRedirectionURL returns the redirectionURL for the oauth flow
-func (r *oauthProxy) getRedirectionURL(wrt http.ResponseWriter, req *http.Request) string {
+func (r *OauthProxy) getRedirectionURL(wrt http.ResponseWriter, req *http.Request) string {
 	var redirect string
 
-	switch r.config.RedirectionURL {
+	switch r.Config.RedirectionURL {
 	case "":
 		scheme := ""
 		host := ""
 
-		if r.config.NoProxy && !r.config.NoRedirects {
+		if r.Config.NoProxy && !r.Config.NoRedirects {
 			scheme = req.Header.Get("X-Forwarded-Proto")
 			host = req.Header.Get("X-Forwarded-Host")
 		} else {
@@ -76,23 +76,23 @@ func (r *oauthProxy) getRedirectionURL(wrt http.ResponseWriter, req *http.Reques
 
 		redirect = fmt.Sprintf("%s://%s", scheme, host)
 	default:
-		redirect = r.config.RedirectionURL
+		redirect = r.Config.RedirectionURL
 	}
 
-	state, _ := req.Cookie(r.config.CookieOAuthStateName)
+	state, _ := req.Cookie(r.Config.CookieOAuthStateName)
 
 	if state != nil && req.URL.Query().Get("state") != state.Value {
-		r.log.Error("state parameter mismatch")
+		r.Log.Error("state parameter mismatch")
 		wrt.WriteHeader(http.StatusForbidden)
 		return ""
 	}
 
-	return fmt.Sprintf("%s%s", redirect, r.config.WithOAuthURI("callback"))
+	return fmt.Sprintf("%s%s", redirect, r.Config.WithOAuthURI("callback"))
 }
 
 // oauthAuthorizationHandler is responsible for performing the redirection to oauth provider
-func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *http.Request) {
-	if r.config.SkipTokenVerification {
+func (r *OauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *http.Request) {
+	if r.Config.SkipTokenVerification {
 		wrt.WriteHeader(http.StatusNotAcceptable)
 		return
 	}
@@ -100,7 +100,7 @@ func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 	scope, assertOk := req.Context().Value(constant.ContextScopeName).(*RequestScope)
 
 	if !assertOk {
-		r.log.Error(
+		r.Log.Error(
 			"assertion failed",
 		)
 		return
@@ -110,7 +110,7 @@ func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 	// step: set the access type of the session
 	accessType := oauth2.AccessTypeOnline
 
-	if utils.ContainedIn("offline", r.config.Scopes) {
+	if utils.ContainedIn("offline", r.Config.Scopes) {
 		accessType = oauth2.AccessTypeOffline
 	}
 
@@ -118,11 +118,11 @@ func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 		accessType,
 	}
 
-	if r.config.EnablePKCE {
+	if r.Config.EnablePKCE {
 		codeVerifier, err := pkce.NewCodeVerifierWithLength(96)
 
 		if err != nil {
-			r.log.Error(
+			r.Log.Error(
 				apperrors.ErrPKCECodeCreation.Error(),
 			)
 			return
@@ -153,15 +153,15 @@ func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 	)
 
 	// step: if we have a custom sign in page, lets display that
-	if r.config.HasCustomSignInPage() {
+	if r.Config.HasCustomSignInPage() {
 		model := make(map[string]string)
 		model["redirect"] = authURL
 
 		wrt.WriteHeader(http.StatusOK)
 		_ = r.Render(
 			wrt,
-			path.Base(r.config.SignInPage),
-			utils.MergeMaps(model, r.config.Tags),
+			path.Base(r.Config.SignInPage),
+			utils.MergeMaps(model, r.Config.Tags),
 		)
 		return
 	}
@@ -173,8 +173,8 @@ func (r *oauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 	oauthCallbackHandler is responsible for handling the response from oauth service
 */
 //nolint:funlen,cyclop
-func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.Request) {
-	if r.config.SkipTokenVerification {
+func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.Request) {
+	if r.Config.SkipTokenVerification {
 		writer.WriteHeader(http.StatusNotAcceptable)
 		return
 	}
@@ -182,7 +182,7 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	scope, assertOk := req.Context().Value(constant.ContextScopeName).(*RequestScope)
 
 	if !assertOk {
-		r.log.Error(
+		r.Log.Error(
 			"assertion failed",
 		)
 		return
@@ -200,9 +200,9 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 
 	var codeVerifier *http.Cookie
 
-	if r.config.EnablePKCE {
+	if r.Config.EnablePKCE {
 		var err error
-		codeVerifier, err = req.Cookie(r.config.CookiePKCEName)
+		codeVerifier, err = req.Cookie(r.Config.CookiePKCEName)
 		if err != nil {
 			scope.Logger.Error("problem getting pkce cookie", zap.Error(err))
 			r.accessForbidden(writer, req)
@@ -215,7 +215,7 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		conf,
 		code,
 		codeVerifier,
-		r.config.SkipOpenIDProviderTLSVerify,
+		r.Config.SkipOpenIDProviderTLSVerify,
 	)
 
 	if err != nil {
@@ -238,13 +238,13 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 
 	rawToken = rawIDToken
 
-	verifier := r.provider.Verifier(&oidc3.Config{ClientID: r.config.ClientID})
+	verifier := r.Provider.Verifier(&oidc3.Config{ClientID: r.Config.ClientID})
 
 	var idToken *oidc3.IDToken
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
-		r.config.OpenIDProviderTimeout,
+		r.Config.OpenIDProviderTimeout,
 	)
 
 	defer cancel()
@@ -319,13 +319,13 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	identityToken := rawIDToken
 
 	// step: are we encrypting the access token?
-	if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie {
-		if accessToken, err = encryption.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
+	if r.Config.EnableEncryptedToken || r.Config.ForceEncryptedCookie {
+		if accessToken, err = encryption.EncodeText(accessToken, r.Config.EncryptionKey); err != nil {
 			scope.Logger.Error("unable to encode the access token", zap.Error(err))
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if identityToken, err = encryption.EncodeText(identityToken, r.config.EncryptionKey); err != nil {
+		if identityToken, err = encryption.EncodeText(identityToken, r.Config.EncryptionKey); err != nil {
 			scope.Logger.Error("unable to encode the id token", zap.Error(err))
 			writer.WriteHeader(http.StatusInternalServerError)
 			return
@@ -353,9 +353,9 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	oauthTokensMetric.WithLabelValues("issued").Inc()
 
 	// step: does the response have a refresh token and we do NOT ignore refresh tokens?
-	if r.config.EnableRefreshTokens && resp.RefreshToken != "" {
+	if r.Config.EnableRefreshTokens && resp.RefreshToken != "" {
 		var encrypted string
-		encrypted, err = encryption.EncodeText(resp.RefreshToken, r.config.EncryptionKey)
+		encrypted, err = encryption.EncodeText(resp.RefreshToken, r.Config.EncryptionKey)
 
 		if err != nil {
 			scope.Logger.Error(
@@ -373,14 +373,14 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 			req,
 			writer,
 			accessToken,
-			r.getAccessCookieExpiration(resp.RefreshToken),
+			r.GetAccessCookieExpiration(resp.RefreshToken),
 		)
 
 		r.dropIDTokenCookie(
 			req,
 			writer,
 			identityToken,
-			r.getAccessCookieExpiration(resp.RefreshToken),
+			r.GetAccessCookieExpiration(resp.RefreshToken),
 		)
 
 		var expiration time.Duration
@@ -422,7 +422,7 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 				)
 			}
 		default:
-			r.dropRefreshTokenCookie(req, writer, encrypted, expiration)
+			r.DropRefreshTokenCookie(req, writer, encrypted, expiration)
 		}
 	} else {
 		r.dropAccessTokenCookie(
@@ -443,7 +443,7 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	redirectURI := "/"
 
 	if req.URL.Query().Get("state") != "" {
-		if encodedRequestURI, _ := req.Cookie(r.config.CookieRequestURIName); encodedRequestURI != nil {
+		if encodedRequestURI, _ := req.Cookie(r.Config.CookieRequestURIName); encodedRequestURI != nil {
 			// some clients URL-escape padding characters
 			unescapedValue, err := url.PathUnescape(encodedRequestURI.Value)
 
@@ -478,11 +478,11 @@ func (r *oauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	loginHandler provide's a generic endpoint for clients to perform a user_credentials login to the provider
 */
 //nolint:funlen,cyclop // refactor
-func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request) {
+func (r *OauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request) {
 	scope, assertOk := req.Context().Value(constant.ContextScopeName).(*RequestScope)
 
 	if !assertOk {
-		r.log.Error(
+		r.Log.Error(
 			"assertion failed",
 		)
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -492,10 +492,10 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 	errorMsg, code, err := func() (string, int, error) {
 		ctx, cancel := context.WithTimeout(
 			context.Background(),
-			r.config.OpenIDProviderTimeout,
+			r.Config.OpenIDProviderTimeout,
 		)
 
-		if r.config.SkipOpenIDProviderTLSVerify {
+		if r.Config.SkipOpenIDProviderTLSVerify {
 			tr := &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			}
@@ -505,7 +505,7 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 
 		defer cancel()
 
-		if !r.config.EnableLoginHandler {
+		if !r.Config.EnableLoginHandler {
 			return "attempt to login when login handler is disabled",
 				http.StatusNotImplemented,
 				errors.New("login handler disabled")
@@ -546,7 +546,7 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 			return "unable to decode the access token", http.StatusNotImplemented, err
 		}
 
-		identity, err := extractIdentity(accessTokenObj)
+		identity, err := ExtractIdentity(accessTokenObj)
 
 		if err != nil {
 			return "unable to extract identity from access token",
@@ -574,15 +574,15 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 		// step: are we encrypting the access token?
 		plainIDToken := idToken
 
-		if r.config.EnableEncryptedToken || r.config.ForceEncryptedCookie {
-			if accessToken, err = encryption.EncodeText(accessToken, r.config.EncryptionKey); err != nil {
+		if r.Config.EnableEncryptedToken || r.Config.ForceEncryptedCookie {
+			if accessToken, err = encryption.EncodeText(accessToken, r.Config.EncryptionKey); err != nil {
 				scope.Logger.Error("unable to encode the access token", zap.Error(err))
 				return "unable to encode the access token",
 					http.StatusInternalServerError,
 					err
 			}
 
-			if idToken, err = encryption.EncodeText(idToken, r.config.EncryptionKey); err != nil {
+			if idToken, err = encryption.EncodeText(idToken, r.Config.EncryptionKey); err != nil {
 				scope.Logger.Error("unable to encode the idToken token", zap.Error(err))
 				return "unable to encode the idToken token",
 					http.StatusInternalServerError,
@@ -591,8 +591,8 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 		}
 
 		// step: does the response have a refresh token and we do NOT ignore refresh tokens?
-		if r.config.EnableRefreshTokens && token.RefreshToken != "" {
-			refreshToken, err = encryption.EncodeText(token.RefreshToken, r.config.EncryptionKey)
+		if r.Config.EnableRefreshTokens && token.RefreshToken != "" {
+			refreshToken, err = encryption.EncodeText(token.RefreshToken, r.Config.EncryptionKey)
 
 			if err != nil {
 				scope.Logger.Error("failed to encrypt the refresh token", zap.Error(err))
@@ -606,14 +606,14 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 				req,
 				writer,
 				accessToken,
-				r.getAccessCookieExpiration(token.RefreshToken),
+				r.GetAccessCookieExpiration(token.RefreshToken),
 			)
 
 			r.dropIDTokenCookie(
 				req,
 				writer,
 				idToken,
-				r.getAccessCookieExpiration(token.RefreshToken),
+				r.GetAccessCookieExpiration(token.RefreshToken),
 			)
 
 			var expiration time.Duration
@@ -647,20 +647,20 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 					)
 				}
 			default:
-				r.dropRefreshTokenCookie(req, writer, refreshToken, expiration)
+				r.DropRefreshTokenCookie(req, writer, refreshToken, expiration)
 			}
 		} else {
 			r.dropAccessTokenCookie(
 				req,
 				writer,
 				accessToken,
-				time.Until(identity.expiresAt),
+				time.Until(identity.ExpiresAt),
 			)
 			r.dropIDTokenCookie(
 				req,
 				writer,
 				idToken,
-				time.Until(identity.expiresAt),
+				time.Until(identity.ExpiresAt),
 			)
 		}
 
@@ -679,10 +679,10 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 			}
 		}
 
-		var resp tokenResponse
+		var resp TokenResponse
 
-		if r.config.EnableEncryptedToken {
-			resp = tokenResponse{
+		if r.Config.EnableEncryptedToken {
+			resp = TokenResponse{
 				IDToken:      idToken,
 				AccessToken:  accessToken,
 				RefreshToken: refreshToken,
@@ -690,7 +690,7 @@ func (r *oauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 				Scope:        tScope,
 			}
 		} else {
-			resp = tokenResponse{
+			resp = TokenResponse{
 				IDToken:      plainIDToken,
 				AccessToken:  token.AccessToken,
 				RefreshToken: refreshToken,
@@ -729,12 +729,12 @@ func emptyHandler(w http.ResponseWriter, req *http.Request) {}
 	- optionally, the user can be redirected by to a url
 */
 //nolint:cyclop
-func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request) {
+func (r *OauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request) {
 	// @check if the redirection is there
 	var redirectURL string
 
-	if r.config.PostLogoutRedirectURI != "" {
-		redirectURL = r.config.PostLogoutRedirectURI
+	if r.Config.PostLogoutRedirectURI != "" {
+		redirectURL = r.Config.PostLogoutRedirectURI
 	} else {
 		for k := range req.URL.Query() {
 			if k == "redirect" {
@@ -743,7 +743,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 				if redirectURL == "" {
 					// then we can default to redirection url
 					redirectURL = strings.TrimSuffix(
-						r.config.RedirectionURL,
+						r.Config.RedirectionURL,
 						"/oauth/callback",
 					)
 				}
@@ -754,7 +754,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	scope, assertOk := req.Context().Value(constant.ContextScopeName).(*RequestScope)
 
 	if !assertOk {
-		r.log.Error(
+		r.Log.Error(
 			"assertion failed",
 		)
 		writer.WriteHeader(http.StatusInternalServerError)
@@ -762,7 +762,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	}
 
 	// @step: drop the access token
-	user, err := r.getIdentity(req)
+	user, err := r.GetIdentity(req)
 
 	if err != nil {
 		r.accessError(writer, req)
@@ -770,7 +770,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	}
 
 	// step: can either use the access token or the refresh token
-	identityToken := user.rawToken
+	identityToken := user.RawToken
 
 	//nolint:vetshadow
 	if refresh, _, err := r.retrieveRefreshToken(req, user); err == nil {
@@ -782,10 +782,10 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	// we are doing it so that in case with no-redirects=true, we can pass
 	// id token in authorization header
 	if err != nil {
-		idToken = user.rawToken
+		idToken = user.RawToken
 	}
 
-	r.clearAllCookies(req, writer)
+	r.ClearAllCookies(req, writer)
 
 	// @metric increment the logout counter
 	oauthTokensMetric.WithLabelValues("logout").Inc()
@@ -793,7 +793,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	// step: check if the user has a state session and if so revoke it
 	if r.useStore() {
 		go func() {
-			if err = r.DeleteRefreshToken(user.rawToken); err != nil {
+			if err = r.DeleteRefreshToken(user.RawToken); err != nil {
 				scope.Logger.Error(
 					"unable to remove the refresh token from store",
 					zap.Error(err),
@@ -803,9 +803,9 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	}
 
 	// @check if we should redirect to the provider
-	if r.config.EnableLogoutRedirect {
+	if r.Config.EnableLogoutRedirect {
 		postLogoutParams := ""
-		if r.config.PostLogoutRedirectURI != "" {
+		if r.Config.PostLogoutRedirectURI != "" {
 			postLogoutParams = fmt.Sprintf(
 				"?id_token_hint=%s&post_logout_redirect_uri=%s",
 				idToken,
@@ -816,7 +816,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 		sendTo := fmt.Sprintf(
 			"%s/protocol/openid-connect/logout%s",
 			strings.TrimSuffix(
-				r.config.DiscoveryURL,
+				r.Config.DiscoveryURL,
 				"/.well-known/openid-configuration",
 			),
 			postLogoutParams,
@@ -836,27 +836,27 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 	revokeDefault := fmt.Sprintf(
 		"%s/protocol/openid-connect/revoke",
 		strings.TrimSuffix(
-			r.config.DiscoveryURL,
+			r.Config.DiscoveryURL,
 			"/.well-known/openid-configuration",
 		),
 	)
 
-	revocationURL := utils.DefaultTo(r.config.RevocationEndpoint, revokeDefault)
+	revocationURL := utils.DefaultTo(r.Config.RevocationEndpoint, revokeDefault)
 
 	// step: do we have a revocation endpoint?
 	if revocationURL != "" {
 		client := &http.Client{
-			Timeout: r.config.OpenIDProviderTimeout,
+			Timeout: r.Config.OpenIDProviderTimeout,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: r.config.SkipOpenIDProviderTLSVerify,
+					InsecureSkipVerify: r.Config.SkipOpenIDProviderTLSVerify,
 				},
 			},
 		}
 
 		// step: add the authentication headers
-		encodedID := url.QueryEscape(r.config.ClientID)
-		encodedSecret := url.QueryEscape(r.config.ClientSecret)
+		encodedID := url.QueryEscape(r.Config.ClientID)
+		encodedSecret := url.QueryEscape(r.Config.ClientSecret)
 
 		// step: construct the url for revocation
 		request, err := http.NewRequest(
@@ -896,7 +896,7 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 		case http.StatusOK:
 			scope.Logger.Info(
 				"successfully logged out of the endpoint",
-				zap.String("email", user.email),
+				zap.String("email", user.Email),
 			)
 		default:
 			content, _ := ioutil.ReadAll(response.Body)
@@ -919,15 +919,15 @@ func (r *oauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 }
 
 // expirationHandler checks if the token has expired
-func (r *oauthProxy) expirationHandler(wrt http.ResponseWriter, req *http.Request) {
-	user, err := r.getIdentity(req)
+func (r *OauthProxy) expirationHandler(wrt http.ResponseWriter, req *http.Request) {
+	user, err := r.GetIdentity(req)
 
 	if err != nil {
 		wrt.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	if user.isExpired() {
+	if user.IsExpired() {
 		wrt.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -936,15 +936,15 @@ func (r *oauthProxy) expirationHandler(wrt http.ResponseWriter, req *http.Reques
 }
 
 // tokenHandler display access token to screen
-func (r *oauthProxy) tokenHandler(wrt http.ResponseWriter, req *http.Request) {
-	user, err := r.getIdentity(req)
+func (r *OauthProxy) tokenHandler(wrt http.ResponseWriter, req *http.Request) {
+	user, err := r.GetIdentity(req)
 
 	if err != nil {
 		r.accessError(wrt, req)
 		return
 	}
 
-	token, err := jwt.ParseSigned(user.rawToken)
+	token, err := jwt.ParseSigned(user.RawToken)
 
 	if err != nil {
 		r.accessError(wrt, req)
@@ -972,8 +972,8 @@ func (r *oauthProxy) tokenHandler(wrt http.ResponseWriter, req *http.Request) {
 }
 
 // healthHandler is a health check handler for the service
-func (r *oauthProxy) healthHandler(w http.ResponseWriter, req *http.Request) {
-	w.Header().Set(constant.VersionHeader, getVersion())
+func (r *OauthProxy) healthHandler(w http.ResponseWriter, req *http.Request) {
+	w.Header().Set(constant.VersionHeader, GetVersion())
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK\n"))
 }
@@ -981,7 +981,7 @@ func (r *oauthProxy) healthHandler(w http.ResponseWriter, req *http.Request) {
 // debugHandler is responsible for providing the pprof
 //
 //nolint:cyclop
-func (r *oauthProxy) debugHandler(writer http.ResponseWriter, req *http.Request) {
+func (r *OauthProxy) debugHandler(writer http.ResponseWriter, req *http.Request) {
 	const symbolProfile = "symbol"
 	//nolint:contextcheck
 	name := chi.URLParam(req, "name")
@@ -1019,8 +1019,8 @@ func (r *oauthProxy) debugHandler(writer http.ResponseWriter, req *http.Request)
 }
 
 // proxyMetricsHandler forwards the request into the prometheus handler
-func (r *oauthProxy) proxyMetricsHandler(wrt http.ResponseWriter, req *http.Request) {
-	if r.config.LocalhostMetrics {
+func (r *OauthProxy) proxyMetricsHandler(wrt http.ResponseWriter, req *http.Request) {
+	if r.Config.LocalhostMetrics {
 		if !net.ParseIP(utils.RealIP(req)).IsLoopback() {
 			r.accessForbidden(wrt, req)
 			return
@@ -1030,15 +1030,15 @@ func (r *oauthProxy) proxyMetricsHandler(wrt http.ResponseWriter, req *http.Requ
 }
 
 // retrieveRefreshToken retrieves the refresh token from store or cookie
-func (r *oauthProxy) retrieveRefreshToken(req *http.Request, user *userContext) (string, string, error) {
+func (r *OauthProxy) retrieveRefreshToken(req *http.Request, user *UserContext) (string, string, error) {
 	var token string
 	var err error
 
 	switch r.useStore() {
 	case true:
-		token, err = r.GetRefreshToken(user.rawToken)
+		token, err = r.GetRefreshToken(user.RawToken)
 	default:
-		token, err = utils.GetRefreshTokenFromCookie(req, r.config.CookieRefreshName)
+		token, err = utils.GetRefreshTokenFromCookie(req, r.Config.CookieRefreshName)
 	}
 
 	if err != nil {
@@ -1046,25 +1046,25 @@ func (r *oauthProxy) retrieveRefreshToken(req *http.Request, user *userContext) 
 	}
 
 	encrypted := token // returns encrypted, avoids encoding twice
-	token, err = encryption.DecodeText(token, r.config.EncryptionKey)
+	token, err = encryption.DecodeText(token, r.Config.EncryptionKey)
 	return token, encrypted, err
 }
 
 // retrieveIDToken retrieves the id token from cookie
-func (r *oauthProxy) retrieveIDToken(req *http.Request, user *userContext) (string, string, error) {
+func (r *OauthProxy) retrieveIDToken(req *http.Request, user *UserContext) (string, string, error) {
 	var token string
 	var err error
 	var encrypted string
 
-	token, err = utils.GetTokenInCookie(req, r.config.CookieIDTokenName)
+	token, err = utils.GetTokenInCookie(req, r.Config.CookieIDTokenName)
 
 	if err != nil {
 		return token, "", err
 	}
 
-	if r.config.EnableEncryptedToken {
+	if r.Config.EnableEncryptedToken {
 		encrypted = token
-		token, err = encryption.DecodeText(token, r.config.EncryptionKey)
+		token, err = encryption.DecodeText(token, r.Config.EncryptionKey)
 	}
 
 	return token, encrypted, err
@@ -1076,18 +1076,18 @@ func methodNotAllowHandlder(w http.ResponseWriter, req *http.Request) {
 }
 
 // discoveryHandler provides endpoint info
-func (r *oauthProxy) discoveryHandler(wrt http.ResponseWriter, req *http.Request) {
+func (r *OauthProxy) discoveryHandler(wrt http.ResponseWriter, req *http.Request) {
 	resp := &DiscoveryResponse{
-		ExpiredURL: r.config.WithOAuthURI(strings.TrimPrefix(constant.ExpiredURL, "/")),
-		LogoutURL:  r.config.WithOAuthURI(strings.TrimPrefix(constant.LogoutURL, "/")),
-		TokenURL:   r.config.WithOAuthURI(strings.TrimPrefix(constant.TokenURL, "/")),
-		LoginURL:   r.config.WithOAuthURI(strings.TrimPrefix(constant.LoginURL, "/")),
+		ExpiredURL: r.Config.WithOAuthURI(strings.TrimPrefix(constant.ExpiredURL, "/")),
+		LogoutURL:  r.Config.WithOAuthURI(strings.TrimPrefix(constant.LogoutURL, "/")),
+		TokenURL:   r.Config.WithOAuthURI(strings.TrimPrefix(constant.TokenURL, "/")),
+		LoginURL:   r.Config.WithOAuthURI(strings.TrimPrefix(constant.LoginURL, "/")),
 	}
 
 	respBody, err := json.Marshal(resp)
 
 	if err != nil {
-		r.log.Error(
+		r.Log.Error(
 			"problem marshalling response",
 			zap.String("error", err.Error()),
 		)
@@ -1101,7 +1101,7 @@ func (r *oauthProxy) discoveryHandler(wrt http.ResponseWriter, req *http.Request
 	_, err = wrt.Write(respBody)
 
 	if err != nil {
-		r.log.Error(
+		r.Log.Error(
 			"problem during response write",
 			zap.String("error", err.Error()),
 		)

@@ -32,9 +32,16 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
-	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	yaml "gopkg.in/yaml.v2"
+)
+
+const (
+	GrantTypeAuthCode     = "authorization_code"
+	GrantTypeUserCreds    = "password"
+	GrantTypeRefreshToken = "refresh_token"
+	GrantTypeClientCreds  = "client_credentials"
+	GrantTypeUmaTicket    = "urn:ietf:params:oauth:grant-type:uma-ticket"
 )
 
 // Config is the configuration for the proxy
@@ -355,7 +362,7 @@ func NewDefaultConfig() *Config {
 		UpstreamTLSHandshakeTimeout:   10 * time.Second,
 		UpstreamTimeout:               10 * time.Second,
 		UseLetsEncrypt:                false,
-		ForwardingGrantType:           proxy.GrantTypeUserCreds,
+		ForwardingGrantType:           GrantTypeUserCreds,
 		PatRetryCount:                 5,
 		PatRetryInterval:              10 * time.Second,
 		OpaTimeout:                    10 * time.Second,
@@ -742,7 +749,7 @@ func (r *Config) isDiscoveryURLValid() error {
 }
 
 func (r *Config) isForwardingGrantValid() error {
-	if r.ForwardingGrantType == proxy.GrantTypeUserCreds {
+	if r.ForwardingGrantType == GrantTypeUserCreds {
 		if r.ForwardingUsername == "" {
 			return errors.New("no forwarding username")
 		}
@@ -752,7 +759,7 @@ func (r *Config) isForwardingGrantValid() error {
 		}
 	}
 
-	if r.ForwardingGrantType == proxy.GrantTypeClientCreds {
+	if r.ForwardingGrantType == GrantTypeClientCreds {
 		if r.ClientSecret == "" {
 			return errors.New("you have not specified the client secret")
 		}

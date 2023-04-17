@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package proxy
 
 import (
 	"context"
@@ -21,8 +21,8 @@ import (
 	"net/http"
 
 	"github.com/Nerzal/gocloak/v12"
+	"github.com/gogatekeeper/gatekeeper/pkg/config"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
-	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"go.uber.org/zap"
 )
@@ -32,7 +32,7 @@ import (
 	request to the upstream endpoint
 */
 //nolint:cyclop
-func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
+func (r *OauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(wrt http.ResponseWriter, req *http.Request) {
 		next.ServeHTTP(wrt, req)
 
@@ -44,7 +44,7 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 			scope, assertOk = ctxVal.(*RequestScope)
 
 			if !assertOk {
-				r.log.Error(
+				r.Log.Error(
 					"assertion failed",
 				)
 				return
@@ -65,18 +65,18 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		req.Header.Set("X-Forwarded-Proto", req.Header.Get("X-Forwarded-Proto"))
 
-		if len(r.config.CorsOrigins) > 0 {
+		if len(r.Config.CorsOrigins) > 0 {
 			// if CORS is enabled by Gatekeeper, do not propagate CORS requests upstream
 			req.Header.Del("Origin")
 		}
 		// @step: add any custom headers to the request
-		for k, v := range r.config.Headers {
+		for k, v := range r.Config.Headers {
 			req.Header.Set(k, v)
 		}
 
 		// @note: by default goproxy only provides a forwarding proxy, thus all requests have to be absolute and we must update the host headers
-		req.URL.Host = r.endpoint.Host
-		req.URL.Scheme = r.endpoint.Scheme
+		req.URL.Host = r.Endpoint.Host
+		req.URL.Scheme = r.Endpoint.Scheme
 		// Restore the unprocessed original path, so that we pass upstream exactly what we received
 		// as the resource request.
 		if scope != nil {
@@ -86,37 +86,37 @@ func (r *oauthProxy) proxyMiddleware(next http.Handler) http.Handler {
 		if v := req.Header.Get("Host"); v != "" {
 			req.Host = v
 			req.Header.Del("Host")
-		} else if !r.config.PreserveHost {
-			req.Host = r.endpoint.Host
+		} else if !r.Config.PreserveHost {
+			req.Host = r.Endpoint.Host
 		}
 
 		if utils.IsUpgradedConnection(req) {
 			clientIP := utils.RealIP(req)
-			r.log.Debug("upgrading the connnection",
+			r.Log.Debug("upgrading the connnection",
 				zap.String("client_ip", clientIP),
 				zap.String("remote_addr", req.RemoteAddr),
 			)
-			if err := utils.TryUpdateConnection(req, wrt, r.endpoint); err != nil {
-				r.log.Error("failed to upgrade connection", zap.Error(err))
+			if err := utils.TryUpdateConnection(req, wrt, r.Endpoint); err != nil {
+				r.Log.Error("failed to upgrade connection", zap.Error(err))
 				wrt.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 			return
 		}
 
-		r.upstream.ServeHTTP(wrt, req)
+		r.Upstream.ServeHTTP(wrt, req)
 	})
 }
 
 // forwardProxyHandler is responsible for signing outbound requests
-func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
+func (r *OauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 	return func(req *http.Request, resp *http.Response) {
 		var token string
 
-		if r.config.EnableUma {
+		if r.Config.EnableUma {
 			ctx, cancel := context.WithTimeout(
 				context.Background(),
-				r.config.OpenIDProviderTimeout,
+				r.Config.OpenIDProviderTimeout,
 			)
 
 			defer cancel()
@@ -132,15 +132,15 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 			pat := r.pat.Token.AccessToken
 			r.pat.m.Unlock()
 
-			resources, err := r.idpClient.GetResourcesClient(
+			resources, err := r.IdpClient.GetResourcesClient(
 				ctx,
 				pat,
-				r.config.Realm,
+				r.Config.Realm,
 				resourceParam,
 			)
 
 			if err != nil {
-				r.log.Error(
+				r.Log.Error(
 					"problem getting resources for path",
 					zap.String("path", req.URL.Path),
 					zap.Error(err),
@@ -149,7 +149,7 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 			}
 
 			if len(resources) == 0 {
-				r.log.Info(
+				r.Log.Info(
 					"no resources for path",
 					zap.String("path", req.URL.Path),
 				)
@@ -160,7 +160,7 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 			resourceScopes := make([]string, 0)
 
 			if len(*resources[0].ResourceScopes) == 0 {
-				r.log.Error(
+				r.Log.Error(
 					"missing scopes for resource in IDP provider",
 					zap.String("resourceID", *resourceID),
 				)
@@ -178,15 +178,15 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 				},
 			}
 
-			permTicket, err := r.idpClient.CreatePermissionTicket(
+			permTicket, err := r.IdpClient.CreatePermissionTicket(
 				ctx,
 				pat,
-				r.config.Realm,
+				r.Config.Realm,
 				permissions,
 			)
 
 			if err != nil {
-				r.log.Error(
+				r.Log.Error(
 					"problem getting permission ticket for resourceId",
 					zap.String("resourceID", *resourceID),
 					zap.Error(err),
@@ -194,17 +194,17 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 				return
 			}
 
-			grantType := proxy.GrantTypeUmaTicket
+			grantType := config.GrantTypeUmaTicket
 
 			rptOptions := gocloak.RequestingPartyTokenOptions{
 				GrantType: &grantType,
 				Ticket:    permTicket.Ticket,
 			}
 
-			rpt, err := r.idpClient.GetRequestingPartyToken(ctx, pat, r.config.Realm, rptOptions)
+			rpt, err := r.IdpClient.GetRequestingPartyToken(ctx, pat, r.Config.Realm, rptOptions)
 
 			if err != nil {
-				r.log.Error(
+				r.Log.Error(
 					"problem getting RPT for resource (hint: do you have permissions assigned to resource?)",
 					zap.String("resourceID", *resourceID),
 					zap.Error(err),
@@ -222,7 +222,7 @@ func (r *oauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 		hostname := req.Host
 		req.URL.Host = hostname
 		// is the host being signed?
-		if len(r.config.ForwardingDomains) == 0 || utils.ContainsSubString(hostname, r.config.ForwardingDomains) {
+		if len(r.Config.ForwardingDomains) == 0 || utils.ContainsSubString(hostname, r.Config.ForwardingDomains) {
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 			req.Header.Set("X-Forwarded-Agent", constant.Prog)
 		}

@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package proxy
 
 import (
 	"fmt"
@@ -29,19 +29,19 @@ import (
 )
 
 // useStore checks if we are using a store to hold the refresh tokens
-func (r *oauthProxy) useStore() bool {
-	return r.store != nil
+func (r *OauthProxy) useStore() bool {
+	return r.Store != nil
 }
 
 // StoreRefreshToken the token to the store
-func (r *oauthProxy) StoreRefreshToken(token string, value string, expiration time.Duration) error {
-	return r.store.Set(utils.GetHashKey(token), value, expiration)
+func (r *OauthProxy) StoreRefreshToken(token string, value string, expiration time.Duration) error {
+	return r.Store.Set(utils.GetHashKey(token), value, expiration)
 }
 
 // Get retrieves a token from the store, the key we are using here is the access token
-func (r *oauthProxy) GetRefreshToken(token string) (string, error) {
+func (r *OauthProxy) GetRefreshToken(token string) (string, error) {
 	// step: the key is the access token
-	val, err := r.store.Get(utils.GetHashKey(token))
+	val, err := r.Store.Get(utils.GetHashKey(token))
 
 	if err != nil {
 		return val, err
@@ -54,9 +54,9 @@ func (r *oauthProxy) GetRefreshToken(token string) (string, error) {
 }
 
 // DeleteRefreshToken removes a key from the store
-func (r *oauthProxy) DeleteRefreshToken(token string) error {
-	if err := r.store.Delete(utils.GetHashKey(token)); err != nil {
-		r.log.Error("unable to delete token", zap.Error(err))
+func (r *OauthProxy) DeleteRefreshToken(token string) error {
+	if err := r.Store.Delete(utils.GetHashKey(token)); err != nil {
+		r.Log.Error("unable to delete token", zap.Error(err))
 
 		return err
 	}
@@ -67,7 +67,7 @@ func (r *oauthProxy) DeleteRefreshToken(token string) error {
 // StoreAuthz
 //
 //nolint:interfacer
-func (r *oauthProxy) StoreAuthz(token string, url *url.URL, value authorization.AuthzDecision, expiration time.Duration) error {
+func (r *OauthProxy) StoreAuthz(token string, url *url.URL, value authorization.AuthzDecision, expiration time.Duration) error {
 	if len(token) == 0 {
 		return fmt.Errorf("token of zero length")
 	}
@@ -75,11 +75,11 @@ func (r *oauthProxy) StoreAuthz(token string, url *url.URL, value authorization.
 	tokenHash := utils.GetHashKey(token)
 	pathHash := utils.GetHashKey(url.Path)
 	hash := fmt.Sprintf("%s%s", pathHash, tokenHash)
-	return r.store.Set(hash, value.String(), expiration)
+	return r.Store.Set(hash, value.String(), expiration)
 }
 
 // Get retrieves a authz decision from store
-func (r *oauthProxy) GetAuthz(token string, url *url.URL) (authorization.AuthzDecision, error) {
+func (r *OauthProxy) GetAuthz(token string, url *url.URL) (authorization.AuthzDecision, error) {
 	if len(token) == 0 {
 		return authorization.DeniedAuthz, apperrors.ErrZeroLengthToken
 	}
@@ -88,7 +88,7 @@ func (r *oauthProxy) GetAuthz(token string, url *url.URL) (authorization.AuthzDe
 	pathHash := utils.GetHashKey(url.Path)
 	hash := fmt.Sprintf("%s%s", pathHash, tokenHash)
 
-	exists, err := r.store.Exists(hash)
+	exists, err := r.Store.Exists(hash)
 
 	if err != nil {
 		return authorization.DeniedAuthz, err
@@ -98,7 +98,7 @@ func (r *oauthProxy) GetAuthz(token string, url *url.URL) (authorization.AuthzDe
 		return authorization.DeniedAuthz, apperrors.ErrNoAuthzFound
 	}
 
-	val, err := r.store.Get(hash)
+	val, err := r.Store.Get(hash)
 
 	if err != nil {
 		return authorization.DeniedAuthz, err
@@ -114,9 +114,9 @@ func (r *oauthProxy) GetAuthz(token string, url *url.URL) (authorization.AuthzDe
 }
 
 // Close is used to close off any resources
-func (r *oauthProxy) CloseStore() error {
-	if r.store != nil {
-		return r.store.Close()
+func (r *OauthProxy) CloseStore() error {
+	if r.Store != nil {
+		return r.Store.Close()
 	}
 
 	return nil

@@ -16,6 +16,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	resty "github.com/go-resty/resty/v2"
+	"github.com/gogatekeeper/gatekeeper/pkg/testsuite"
 	"golang.org/x/oauth2/clientcredentials"
 )
 
@@ -65,7 +66,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2E(t *testing.T) {
-	server := httptest.NewServer(&fakeUpstreamService{})
+	server := httptest.NewServer(&testsuite.FakeUpstreamService{})
 	rand.Seed(time.Now().UnixNano())
 	min := 1024
 	max := 65000
