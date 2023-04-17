@@ -29,8 +29,13 @@ import (
 
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
-	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
-	"github.com/gogatekeeper/gatekeeper/pkg/testsuite.go"
+)
+
+var (
+	fakeAdminRoleURL      = "/admin*"
+	fakeAdminRole         = "role:admin"
+	fakeTestAdminRolesURL = "/test_admin_roles"
+	fakeTestRole          = "role:test"
 )
 
 func TestNewDefaultConfig(t *testing.T) {
@@ -999,7 +1004,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "some-client",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   proxy.GrantTypeUserCreds,
+				ForwardingGrantType:   GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 			},
@@ -1021,7 +1026,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   proxy.GrantTypeUserCreds,
+				ForwardingGrantType:   GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 			},
@@ -1036,7 +1041,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "some-client",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   proxy.GrantTypeUserCreds,
+				ForwardingGrantType:   GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 				TLSCertificate:        "/sometest",
@@ -1052,7 +1057,7 @@ func TestIsForwardingProxySettingsValid(t *testing.T) {
 				OpenIDProviderTimeout: 30 * time.Second,
 				ClientID:              "some-client",
 				DiscoveryURL:          "https://somediscoveryurl",
-				ForwardingGrantType:   proxy.GrantTypeUserCreds,
+				ForwardingGrantType:   GrantTypeUserCreds,
 				ForwardingUsername:    "someuser",
 				ForwardingPassword:    "somepass",
 				TLSPrivateKey:         "/sometest",
@@ -1458,7 +1463,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "ValidForwardingGrantTypeUserCreds",
 			Config: &Config{
-				ForwardingGrantType: proxy.GrantTypeUserCreds,
+				ForwardingGrantType: GrantTypeUserCreds,
 				ForwardingUsername:  "someuser",
 				ForwardingPassword:  "somepass",
 			},
@@ -1467,7 +1472,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeUserCredsMissingUsername",
 			Config: &Config{
-				ForwardingGrantType: proxy.GrantTypeUserCreds,
+				ForwardingGrantType: GrantTypeUserCreds,
 				ForwardingUsername:  "",
 				ForwardingPassword:  "somepass",
 			},
@@ -1476,7 +1481,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeUserCredsMissingPassword",
 			Config: &Config{
-				ForwardingGrantType: proxy.GrantTypeUserCreds,
+				ForwardingGrantType: GrantTypeUserCreds,
 				ForwardingUsername:  "",
 				ForwardingPassword:  "somepass",
 			},
@@ -1485,7 +1490,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeUserCredsBoth",
 			Config: &Config{
-				ForwardingGrantType: proxy.GrantTypeUserCreds,
+				ForwardingGrantType: GrantTypeUserCreds,
 				ForwardingUsername:  "",
 				ForwardingPassword:  "",
 			},
@@ -1494,7 +1499,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "ValidForwardingGrantTypeClientCreds",
 			Config: &Config{
-				ForwardingGrantType: proxy.GrantTypeClientCreds,
+				ForwardingGrantType: GrantTypeClientCreds,
 				ClientSecret:        "somesecret",
 			},
 			Valid: true,
@@ -1502,7 +1507,7 @@ func TestIsForwardingGrantValid(t *testing.T) {
 		{
 			Name: "InValidForwardingGrantTypeClientCreds",
 			Config: &Config{
-				ForwardingGrantType: proxy.GrantTypeClientCreds,
+				ForwardingGrantType: GrantTypeClientCreds,
 				ClientSecret:        "",
 			},
 			Valid: false,
@@ -1769,14 +1774,14 @@ func TestIsResourceValid(t *testing.T) {
 			Config: &Config{
 				Resources: []*authorization.Resource{
 					{
-						URL:     testsuite.FakeAdminRoleURL,
+						URL:     fakeAdminRoleURL,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole},
+						Roles:   []string{fakeAdminRole},
 					},
 					{
-						URL:     testsuite.FakeTestAdminRolesURL,
+						URL:     fakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
+						Roles:   []string{fakeAdminRole, fakeTestRole},
 					},
 				},
 			},
@@ -1788,14 +1793,14 @@ func TestIsResourceValid(t *testing.T) {
 				CustomHTTPMethods: []string{"SOME"},
 				Resources: []*authorization.Resource{
 					{
-						URL:     testsuite.FakeAdminRoleURL,
+						URL:     fakeAdminRoleURL,
 						Methods: []string{"SOME"},
-						Roles:   []string{testsuite.FakeAdminRole},
+						Roles:   []string{fakeAdminRole},
 					},
 					{
-						URL:     testsuite.FakeTestAdminRolesURL,
+						URL:     fakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
+						Roles:   []string{fakeAdminRole, fakeTestRole},
 					},
 				},
 			},
@@ -1806,14 +1811,14 @@ func TestIsResourceValid(t *testing.T) {
 			Config: &Config{
 				Resources: []*authorization.Resource{
 					{
-						URL:     testsuite.FakeAdminRoleURL,
+						URL:     fakeAdminRoleURL,
 						Methods: []string{"SOMER"},
-						Roles:   []string{testsuite.FakeAdminRole},
+						Roles:   []string{fakeAdminRole},
 					},
 					{
-						URL:     testsuite.FakeTestAdminRolesURL,
+						URL:     fakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
+						Roles:   []string{fakeAdminRole, fakeTestRole},
 					},
 				},
 			},
@@ -1826,12 +1831,12 @@ func TestIsResourceValid(t *testing.T) {
 					{
 						URL:     "",
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole},
+						Roles:   []string{fakeAdminRole},
 					},
 					{
-						URL:     testsuite.FakeTestAdminRolesURL,
+						URL:     fakeTestAdminRolesURL,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
+						Roles:   []string{fakeAdminRole, fakeTestRole},
 					},
 				},
 			},
@@ -1843,15 +1848,15 @@ func TestIsResourceValid(t *testing.T) {
 				EnableDefaultDeny: true,
 				Resources: []*authorization.Resource{
 					{
-						URL:     testsuite.FakeAdminRoleURL,
+						URL:     fakeAdminRoleURL,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole},
+						Roles:   []string{fakeAdminRole},
 					},
 					{
 						URL:         constant.AllPath,
 						WhiteListed: true,
 						Methods:     []string{"GET"},
-						Roles:       []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
+						Roles:       []string{fakeAdminRole, fakeTestRole},
 					},
 				},
 			},
@@ -1863,14 +1868,14 @@ func TestIsResourceValid(t *testing.T) {
 				EnableDefaultDeny: true,
 				Resources: []*authorization.Resource{
 					{
-						URL:     testsuite.FakeAdminRoleURL,
+						URL:     fakeAdminRoleURL,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole},
+						Roles:   []string{fakeAdminRole},
 					},
 					{
 						URL:     constant.AllPath,
 						Methods: []string{"GET"},
-						Roles:   []string{testsuite.FakeAdminRole, testsuite.FakeTestRole},
+						Roles:   []string{fakeAdminRole, fakeTestRole},
 					},
 				},
 			},
