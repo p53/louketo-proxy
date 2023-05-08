@@ -22,8 +22,7 @@ You can view all settings also in this table [Settings](https://gogatekeeper.git
 
 ## Requirements
 
-  - Go 1.18 or higher
-  - Make
+  - Go 1.19 or higher
 
 ## Configuration options
 
@@ -240,6 +239,14 @@ There are two parameters which you can use to set up cookie names for access tok
 --cookie-refresh-name=myRefreshTokenCookie
 ```
 
+## Websocket proxy
+
+You can protect also websocket servers with gatekeeper proxy. You must use standard upgrade headers to proxy to your websocket backend.
+There are additional considerations you need to take into account when protecting websocket backend. Browsers doesn't have built-in protection against CORS for websocket protocol like they have for HTTP. That means you need
+to consider enabling additional methods for verifying that browsers connect only to your backend and receives response only from your backend.
+For this we recommend to turn-on `--enable-encrypted-token` and `--encryption-key` options and also verify `Origin` header with headers matching, please
+refer to [Headers matching](#headers-matching).
+
 ## Forward-signing proxy
 
 Forward-signing provides a mechanism for authentication and
@@ -262,7 +269,7 @@ in Keycloak, providing granular role controls over issue tokens.
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:2.3.1
+  image: quay.io/gogatekeeper/gatekeeper:2.4.0
   args:
   - --enable-forwarding=true
   - --forwarding-username=projecta
@@ -289,7 +296,7 @@ Example setup client credentials grant:
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:2.3.1
+  image: quay.io/gogatekeeper/gatekeeper:2.4.0
   args:
   - --enable-forwarding=true
   - --forwarding-domains=projecta.svc.cluster.local
