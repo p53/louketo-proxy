@@ -25,9 +25,9 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -200,13 +200,13 @@ func CreateCertificate(key *rsa.PrivateKey, hostnames []string, expire time.Dura
 
 // loadCA loads the certificate authority
 func LoadCA(cert, key string) (*tls.Certificate, error) {
-	caCert, err := ioutil.ReadFile(cert)
+	caCert, err := os.ReadFile(cert)
 
 	if err != nil {
 		return nil, err
 	}
 
-	caKey, err := ioutil.ReadFile(key)
+	caKey, err := os.ReadFile(key)
 
 	if err != nil {
 		return nil, err

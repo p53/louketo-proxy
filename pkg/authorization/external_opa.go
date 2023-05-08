@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"testing"
@@ -60,7 +60,7 @@ func (p *OpaAuthorizationProvider) Authorize() (AuthzDecision, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), p.timeout)
 	defer cancel()
 
-	reqBody, err := ioutil.ReadAll(p.req.Body)
+	reqBody, err := io.ReadAll(p.req.Body)
 
 	if err != nil {
 		return DeniedAuthz, err
@@ -104,7 +104,7 @@ func (p *OpaAuthorizationProvider) Authorize() (AuthzDecision, error) {
 		return DeniedAuthz, err
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 
 	if err != nil {
 		return DeniedAuthz, err

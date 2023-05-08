@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -162,7 +161,7 @@ func NewProxy(config *config.Config) (*OauthProxy, error) {
 
 // createLogger is responsible for creating the service logger
 func createLogger(config *config.Config) (*zap.Logger, error) {
-	httplog.SetOutput(ioutil.Discard) // disable the http logger
+	httplog.SetOutput(io.Discard) // disable the http logger
 
 	if config.DisableAllLogging {
 		return zap.NewNop(), nil
@@ -863,7 +862,7 @@ func (r *OauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 
 		// @check if we doing mutual tls
 		if config.clientCert != "" {
-			caCert, err := ioutil.ReadFile(config.clientCert)
+			caCert, err := io.ReadFile(config.clientCert)
 
 			if err != nil {
 				return nil, err
@@ -910,7 +909,7 @@ func (r *OauthProxy) createUpstreamProxy(upstream *url.URL) error {
 	// @TODO provide a means of reload on the client certificate when it expires. I'm not sure if it's just a
 	// case of update the http transport settings - Also we to place this go-routine?
 	if r.Config.TLSClientCertificate != "" {
-		cert, err := ioutil.ReadFile(r.Config.TLSClientCertificate)
+		cert, err := io.ReadFile(r.Config.TLSClientCertificate)
 
 		if err != nil {
 			r.Log.Error(
@@ -935,7 +934,7 @@ func (r *OauthProxy) createUpstreamProxy(upstream *url.URL) error {
 				zap.String("path", r.Config.UpstreamCA),
 			)
 
-			cAuthority, err := ioutil.ReadFile(r.Config.UpstreamCA)
+			cAuthority, err := io.ReadFile(r.Config.UpstreamCA)
 
 			if err != nil {
 				return err
@@ -954,7 +953,7 @@ func (r *OauthProxy) createUpstreamProxy(upstream *url.URL) error {
 	// kept in response. This is true for CORS headers ([KEYCOAK-9045])
 	// and for refreshed cookies (htts://github.com/louketo/louketo-proxy/pulls/456])
 	proxy.KeepDestinationHeaders = true
-	proxy.Logger = httplog.New(ioutil.Discard, "", 0)
+	proxy.Logger = httplog.New(io.Discard, "", 0)
 	proxy.KeepDestinationHeaders = true
 	r.Upstream = proxy
 

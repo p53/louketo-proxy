@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -279,7 +278,7 @@ func TestAdminListener(t *testing.T) {
 
 				if certFile != "" {
 					fakeCertByte := []byte(fakeCert)
-					err := ioutil.WriteFile(certFile, fakeCertByte, 0644)
+					err := os.WriteFile(certFile, fakeCertByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing certificate %s", err)
@@ -289,7 +288,7 @@ func TestAdminListener(t *testing.T) {
 
 				if privFile != "" {
 					fakeKeyByte := []byte(fakePrivateKey)
-					err := ioutil.WriteFile(privFile, fakeKeyByte, 0644)
+					err := os.WriteFile(privFile, fakeKeyByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing privateKey %s", err)
@@ -299,7 +298,7 @@ func TestAdminListener(t *testing.T) {
 
 				if caFile != "" {
 					fakeCAByte := []byte(fakeCA)
-					err := ioutil.WriteFile(caFile, fakeCAByte, 0644)
+					err := os.WriteFile(caFile, fakeCAByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing cacertificate %s", err)

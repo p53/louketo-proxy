@@ -21,7 +21,6 @@ package testsuite
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -1629,7 +1628,7 @@ func TestTLS(t *testing.T) {
 
 				if certFile != "" {
 					fakeCertByte := []byte(fakeCert)
-					err := ioutil.WriteFile(certFile, fakeCertByte, 0644)
+					err := io.WriteFile(certFile, fakeCertByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing certificate %s", err)
@@ -1639,7 +1638,7 @@ func TestTLS(t *testing.T) {
 
 				if privFile != "" {
 					fakeKeyByte := []byte(fakePrivateKey)
-					err := ioutil.WriteFile(privFile, fakeKeyByte, 0644)
+					err := io.WriteFile(privFile, fakeKeyByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing privateKey %s", err)
@@ -1649,7 +1648,7 @@ func TestTLS(t *testing.T) {
 
 				if caFile != "" {
 					fakeCAByte := []byte(fakeCA)
-					err := ioutil.WriteFile(caFile, fakeCAByte, 0644)
+					err := io.WriteFile(caFile, fakeCAByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing cacertificate %s", err)

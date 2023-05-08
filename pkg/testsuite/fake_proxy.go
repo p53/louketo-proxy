@@ -3,7 +3,7 @@ package testsuite
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -78,7 +78,7 @@ type fakeProxy struct {
 }
 
 func newFakeProxy(cfg *config.Config, authConfig *fakeAuthConfig) *fakeProxy {
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 
 	if cfg == nil {
 		cfg = newFakeKeycloakConfig()

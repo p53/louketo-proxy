@@ -20,7 +20,6 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/url"
 	"os"
@@ -685,7 +684,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 				}
 
 				if certFile != "" && testCase.TLSCertificateExists {
-					err := ioutil.WriteFile(certFile, []byte(""), 0644)
+					err := os.WriteFile(certFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing certificate %s", err)
@@ -694,7 +693,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 				}
 
 				if clientCertFile != "" && testCase.TLSClientCertificateExists {
-					err := ioutil.WriteFile(clientCertFile, []byte(""), 0644)
+					err := os.WriteFile(clientCertFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing certificate %s", err)
@@ -703,7 +702,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 				}
 
 				if privFile != "" && testCase.TLSPrivateKeyExists {
-					err := ioutil.WriteFile(privFile, []byte(""), 0644)
+					err := os.WriteFile(privFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing privateKey %s", err)
@@ -712,7 +711,7 @@ func TestIsTLSFilesValid(t *testing.T) {
 				}
 
 				if caFile != "" && testCase.TLSCaCertificateExists {
-					err := ioutil.WriteFile(caFile, []byte(""), 0644)
+					err := os.WriteFile(caFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing cacertificate %s", err)
@@ -891,7 +890,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 				}
 
 				if certFile != "" && testCase.TLSAdminCertificateExists {
-					err := ioutil.WriteFile(certFile, []byte(""), 0644)
+					err := os.WriteFile(certFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing certificate %s", err)
@@ -900,7 +899,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 				}
 
 				if clientCertFile != "" && testCase.TLSAdminClientCertificateExists {
-					err := ioutil.WriteFile(clientCertFile, []byte(""), 0644)
+					err := os.WriteFile(clientCertFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing certificate %s", err)
@@ -909,7 +908,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 				}
 
 				if privFile != "" && testCase.TLSAdminPrivateKeyExists {
-					err := ioutil.WriteFile(privFile, []byte(""), 0644)
+					err := os.WriteFile(privFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing privateKey %s", err)
@@ -918,7 +917,7 @@ func TestIsAdminTLSFilesValid(t *testing.T) {
 				}
 
 				if caFile != "" && testCase.TLSAdminCaCertificateExists {
-					err := ioutil.WriteFile(caFile, []byte(""), 0644)
+					err := os.WriteFile(caFile, []byte(""), 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing cacertificate %s", err)

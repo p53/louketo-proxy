@@ -23,7 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 
 	"net/http"
@@ -899,7 +899,7 @@ func (r *OauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 				zap.String("email", user.Email),
 			)
 		default:
-			content, _ := ioutil.ReadAll(response.Body)
+			content, _ := io.ReadAll(response.Body)
 
 			scope.Logger.Error(
 				"invalid response from revocation endpoint",

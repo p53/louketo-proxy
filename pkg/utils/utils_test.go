@@ -21,7 +21,6 @@ package utils
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -364,7 +363,7 @@ func TestFileExists(t *testing.T) {
 		t.Error("we should have received false")
 	}
 
-	tmpfile, err := ioutil.TempFile(
+	tmpfile, err := os.CreateTemp(
 		os.TempDir()+"",
 		fmt.Sprintf("test_file_%d", os.Getpid()),
 	)

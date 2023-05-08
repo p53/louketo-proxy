@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -371,7 +370,7 @@ func NewDefaultConfig() *Config {
 
 // readConfigFile reads and parses the configuration file
 func ReadConfigFile(filename string, config *Config) error {
-	content, err := ioutil.ReadFile(filename)
+	content, err := os.ReadFile(filename)
 
 	if err != nil {
 		return err
@@ -388,13 +387,13 @@ func ReadConfigFile(filename string, config *Config) error {
 }
 
 func writeFakeConfigFile(t *testing.T, content string) *os.File {
-	file, err := ioutil.TempFile("", "node_label_file")
+	file, err := os.CreateTemp("", "node_label_file")
 	if err != nil {
 		t.Fatalf("unexpected error creating node_label_file: %v", err)
 	}
 	file.Close()
 
-	if err := ioutil.WriteFile(file.Name(), []byte(content), 0600); err != nil {
+	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
 		t.Fatalf("unexpected error writing node label file: %v", err)
 	}
 
