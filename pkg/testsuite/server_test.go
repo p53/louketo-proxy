@@ -1628,7 +1628,7 @@ func TestTLS(t *testing.T) {
 
 				if certFile != "" {
 					fakeCertByte := []byte(fakeCert)
-					err := io.WriteFile(certFile, fakeCertByte, 0644)
+					err := os.WriteFile(certFile, fakeCertByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing certificate %s", err)
@@ -1638,7 +1638,7 @@ func TestTLS(t *testing.T) {
 
 				if privFile != "" {
 					fakeKeyByte := []byte(fakePrivateKey)
-					err := io.WriteFile(privFile, fakeKeyByte, 0644)
+					err := os.WriteFile(privFile, fakeKeyByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing privateKey %s", err)
@@ -1648,7 +1648,7 @@ func TestTLS(t *testing.T) {
 
 				if caFile != "" {
 					fakeCAByte := []byte(fakeCA)
-					err := io.WriteFile(caFile, fakeCAByte, 0644)
+					err := os.WriteFile(caFile, fakeCAByte, 0644)
 
 					if err != nil {
 						t.Fatalf("Problem writing cacertificate %s", err)

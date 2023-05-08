@@ -862,7 +862,7 @@ func (r *OauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 
 		// @check if we doing mutual tls
 		if config.clientCert != "" {
-			caCert, err := io.ReadFile(config.clientCert)
+			caCert, err := os.ReadFile(config.clientCert)
 
 			if err != nil {
 				return nil, err
@@ -909,7 +909,7 @@ func (r *OauthProxy) createUpstreamProxy(upstream *url.URL) error {
 	// @TODO provide a means of reload on the client certificate when it expires. I'm not sure if it's just a
 	// case of update the http transport settings - Also we to place this go-routine?
 	if r.Config.TLSClientCertificate != "" {
-		cert, err := io.ReadFile(r.Config.TLSClientCertificate)
+		cert, err := os.ReadFile(r.Config.TLSClientCertificate)
 
 		if err != nil {
 			r.Log.Error(
@@ -934,7 +934,7 @@ func (r *OauthProxy) createUpstreamProxy(upstream *url.URL) error {
 				zap.String("path", r.Config.UpstreamCA),
 			)
 
-			cAuthority, err := io.ReadFile(r.Config.UpstreamCA)
+			cAuthority, err := os.ReadFile(r.Config.UpstreamCA)
 
 			if err != nil {
 				return err
