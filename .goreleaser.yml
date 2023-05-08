@@ -16,7 +16,7 @@ builds:
       - CGO_ENABLED=0
     # Adds some metadata to the build like version, commit reference and the date of the build
     ldflags:
-      - -s -w -X "proxy.release={{.Version}}" -X "proxy.gitsha={{ .FullCommit }}" -X "proxy.compiled={{ .Timestamp }}"
+      - -s -w -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.release={{.Version}}" -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.gitsha={{ .FullCommit }}" -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.compiled={{ .Timestamp }}"
 
   - id: linux
     goos: [linux]
@@ -32,7 +32,7 @@ builds:
       - CGO_ENABLED=0
     # Adds some metadata to the build like version, commit reference and the date of the build
     ldflags:
-      - -s -w -X "proxy.release={{.Version}}" -X "proxy.gitsha={{ .FullCommit }}" -X "proxy.compiled={{ .Timestamp }}"
+      - -s -w -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.release={{.Version}}" -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.gitsha={{ .FullCommit }}" -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.compiled={{ .Timestamp }}"
 
   - id: windows
     goos: [windows]
@@ -42,7 +42,7 @@ builds:
       - CGO_ENABLED=0
     # Adds some metadata to the build like version, commit reference and the date of the build
     ldflags:
-      - -s -w -X "proxy.release={{.Version}}" -X "proxy.gitsha={{ .FullCommit }}" -X "proxy.compiled={{ .Timestamp }}"
+      - -s -w -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.release={{.Version}}" -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.gitsha={{ .FullCommit }}" -X "github.com/gogatekeeper/gatekeeper/pkg/proxy.compiled={{ .Timestamp }}"
 
 signs:
   - artifacts: checksum
