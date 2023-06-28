@@ -50,4 +50,14 @@ const (
 	SameSiteNone   = "None"
 
 	AllPath = "/*"
+
+	IdpWellKnownUri   = "/.well-known/openid-configuration"
+	IdpCertsUri       = "/protocol/openid-connect/certs"
+	IdpTokenUri       = "/protocol/openid-connect/token"
+	IdpAuthUri        = "/protocol/openid-connect/auth"
+	IdpUserUri        = "/protocol/openid-connect/userinfo"
+	IdpLogoutUri      = "/protocol/openid-connect/logout"
+	IdpRevokeUri      = "/protocol/openid-connect/revoke"
+	IdpResourceSetUri = "/authz/protection/resource_set"
+	IdpProtectPermUri = "/authz/protection/permission"
 )

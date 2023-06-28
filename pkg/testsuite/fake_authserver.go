@@ -19,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/config"
+	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/grokify/go-pkce"
 	"github.com/jochasinga/relay"
@@ -333,17 +334,17 @@ func newFakeAuthServer(config *fakeAuthConfig) *fakeAuthServer {
 
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
-	router.Get(baseURI+"/.well-known/openid-configuration", service.discoveryHandler)
-	router.Get(baseURI+"/protocol/openid-connect/certs", service.keysHandler)
-	router.Get(baseURI+"/protocol/openid-connect/token", service.tokenHandler)
-	router.Get(baseURI+"/protocol/openid-connect/auth", service.authHandler)
-	router.Get(baseURI+"/protocol/openid-connect/userinfo", service.userInfoHandler)
-	router.Post(baseURI+"/protocol/openid-connect/logout", service.logoutHandler)
-	router.Post(baseURI+"/protocol/openid-connect/revoke", service.revocationHandler)
-	router.Post(baseURI+"/protocol/openid-connect/token", service.tokenHandler)
-	router.Get(baseURI+"/authz/protection/resource_set", service.ResourcesHandler)
-	router.Get(baseURI+"/authz/protection/resource_set/{id}", service.ResourceHandler)
-	router.Post(baseURI+"/authz/protection/permission", service.PermissionTicketHandler)
+	router.Get(baseURI+constant.IdpWellKnownUri, service.discoveryHandler)
+	router.Get(baseURI+constant.IdpCertsUri, service.keysHandler)
+	router.Get(baseURI+constant.IdpTokenUri, service.tokenHandler)
+	router.Get(baseURI+constant.IdpAuthUri, service.authHandler)
+	router.Get(baseURI+constant.IdpUserUri, service.userInfoHandler)
+	router.Post(baseURI+constant.IdpLogoutUri, service.logoutHandler)
+	router.Post(baseURI+constant.IdpRevokeUri, service.revocationHandler)
+	router.Post(baseURI+constant.IdpTokenUri, service.tokenHandler)
+	router.Get(baseURI+constant.IdpResourceSetUri, service.ResourcesHandler)
+	router.Get(baseURI+constant.IdpResourceSetUri+"/{id}", service.ResourceHandler)
+	router.Post(baseURI+constant.IdpProtectPermUri, service.PermissionTicketHandler)
 
 	if config.EnableTLS {
 		service.server = httptest.NewTLSServer(router)
