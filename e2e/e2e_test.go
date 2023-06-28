@@ -78,7 +78,7 @@ var _ = Describe("NoRedirects Simple login/logout", func() {
 			ClientID:     testClient,
 			ClientSecret: testClientSecret,
 			Scopes:       []string{"email", "openid"},
-			TokenURL:     idpRealmURI + constant.IdpTokenUri,
+			TokenURL:     idpRealmURI + constant.IdpTokenURI,
 		}
 
 		respToken, err := conf.Token(ctx)

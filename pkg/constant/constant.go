@@ -51,13 +51,13 @@ const (
 
 	AllPath = "/*"
 
-	IdpWellKnownUri   = "/.well-known/openid-configuration"
-	IdpCertsUri       = "/protocol/openid-connect/certs"
-	IdpTokenUri       = "/protocol/openid-connect/token"
-	IdpAuthUri        = "/protocol/openid-connect/auth"
-	IdpUserUri        = "/protocol/openid-connect/userinfo"
-	IdpLogoutUri      = "/protocol/openid-connect/logout"
-	IdpRevokeUri      = "/protocol/openid-connect/revoke"
-	IdpResourceSetUri = "/authz/protection/resource_set"
-	IdpProtectPermUri = "/authz/protection/permission"
+	IdpWellKnownURI   = "/.well-known/openid-configuration"
+	IdpCertsURI       = "/protocol/openid-connect/certs"
+	IdpTokenURI       = "/protocol/openid-connect/token"
+	IdpAuthURI        = "/protocol/openid-connect/auth"
+	IdpUserURI        = "/protocol/openid-connect/userinfo"
+	IdpLogoutURI      = "/protocol/openid-connect/logout"
+	IdpRevokeURI      = "/protocol/openid-connect/revoke"
+	IdpResourceSetURI = "/authz/protection/resource_set"
+	IdpProtectPermURI = "/authz/protection/permission"
 )
