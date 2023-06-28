@@ -24,10 +24,10 @@ const (
 	testClient       = "test-client"
 	testClientSecret = "6447d0c0-d510-42a7-b654-6e3a16b2d7e2"
 	timeout          = time.Second * 300
-	idpUri           = "http://localhost:8081"
+	idpURI           = "http://localhost:8081"
 )
 
-var idpRealmUri = fmt.Sprintf("%s/realms/%s", idpUri, testRealm)
+var idpRealmURI = fmt.Sprintf("%s/realms/%s", idpURI, testRealm)
 
 func generateRandomPort() string {
 	rand.Seed(time.Now().UnixNano())
@@ -45,7 +45,7 @@ var _ = Describe("NoRedirects Simple login/logout", func() {
 		portNum = generateRandomPort()
 		proxyAddress = "http://localhost:" + portNum
 
-		os.Setenv("PROXY_DISCOVERY_URL", idpRealmUri)
+		os.Setenv("PROXY_DISCOVERY_URL", idpRealmURI)
 		os.Setenv("PROXY_OPENID_PROVIDER_TIMEOUT", "120s")
 		os.Setenv("PROXY_LISTEN", "0.0.0.0:"+portNum)
 		os.Setenv("PROXY_CLIENT_ID", testClient)
@@ -78,7 +78,7 @@ var _ = Describe("NoRedirects Simple login/logout", func() {
 			ClientID:     testClient,
 			ClientSecret: testClientSecret,
 			Scopes:       []string{"email", "openid"},
-			TokenURL:     idpRealmUri + constant.IdpTokenUri,
+			TokenURL:     idpRealmURI + constant.IdpTokenUri,
 		}
 
 		respToken, err := conf.Token(ctx)
