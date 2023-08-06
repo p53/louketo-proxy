@@ -70,18 +70,21 @@ var _ = Describe("NoRedirects Simple login/logout", func() {
 		portNum = generateRandomPort()
 		proxyAddress = "http://localhost:" + portNum
 
-		os.Setenv("PROXY_DISCOVERY_URL", idpRealmURI)
-		os.Setenv("PROXY_OPENID_PROVIDER_TIMEOUT", "120s")
-		os.Setenv("PROXY_LISTEN", "0.0.0.0:"+portNum)
-		os.Setenv("PROXY_CLIENT_ID", testClient)
-		os.Setenv("PROXY_CLIENT_SECRET", testClientSecret)
-		os.Setenv("PROXY_UPSTREAM_URL", server.URL)
-		os.Setenv("PROXY_NO_REDIRECTS", "true")
-		os.Setenv("PROXY_SKIP_ACCESS_TOKEN_CLIENT_ID_CHECK", "true")
-		os.Setenv("PROXY_SKIP_ACCESS_TOKEN_ISSUER_CHECK", "true")
-		os.Setenv("PROXY_OPENID_PROVIDER_RETRY_COUNT", "30")
-
 		osArgs := []string{os.Args[0]}
+		proxyArgs := []string{
+			"--discovery-url=" + idpRealmURI,
+			"--openid-provider-timeout=120s",
+			"--listen=" + "0.0.0.0:" + portNum,
+			"--client-id=" + testClient,
+			"--client-secret=" + testClientSecret,
+			"--upstream-url=" + server.URL,
+			"--no-redirects=true",
+			"--skip-access-token-clientid-check=true",
+			"--skip-access-token-issuer-check=true",
+			"--openid-provider-retry-count=30",
+		}
+
+		osArgs = append(osArgs, proxyArgs...)
 		startAndWait(portNum, osArgs)
 	})
 
@@ -117,19 +120,22 @@ var _ = Describe("Code Flow Simple login/logout", func() {
 		portNum = generateRandomPort()
 		proxyAddress = "http://localhost:" + portNum
 
-		os.Setenv("PROXY_DISCOVERY_URL", idpRealmURI)
-		os.Setenv("PROXY_OPENID_PROVIDER_TIMEOUT", "120s")
-		os.Setenv("PROXY_LISTEN", "0.0.0.0:"+portNum)
-		os.Setenv("PROXY_CLIENT_ID", testClient)
-		os.Setenv("PROXY_CLIENT_SECRET", testClientSecret)
-		os.Setenv("PROXY_UPSTREAM_URL", server.URL)
-		os.Setenv("PROXY_NO_REDIRECTS", "false")
-		os.Setenv("PROXY_SKIP_ACCESS_TOKEN_CLIENT_ID_CHECK", "true")
-		os.Setenv("PROXY_SKIP_ACCESS_TOKEN_ISSUER_CHECK", "true")
-		os.Setenv("PROXY_OPENID_PROVIDER_RETRY_COUNT", "30")
-		os.Setenv("PROXY_SECURE_COOKIE", "false")
-
 		osArgs := []string{os.Args[0]}
+		proxyArgs := []string{
+			"--discovery-url=" + idpRealmURI,
+			"--openid-provider-timeout=120s",
+			"--listen=" + "0.0.0.0:" + portNum,
+			"--client-id=" + testClient,
+			"--client-secret=" + testClientSecret,
+			"--upstream-url=" + server.URL,
+			"--no-redirects=false",
+			"--skip-access-token-clientid-check=true",
+			"--skip-access-token-issuer-check=true",
+			"--openid-provider-retry-count=30",
+			"--secure-cookie=false",
+		}
+
+		osArgs = append(osArgs, proxyArgs...)
 		startAndWait(portNum, osArgs)
 	})
 
@@ -177,22 +183,24 @@ var _ = Describe("Code Flow PKCE login/logout", func() {
 		server := httptest.NewServer(&testsuite.FakeUpstreamService{})
 		portNum = generateRandomPort()
 		proxyAddress = "http://localhost:" + portNum
-
-		os.Setenv("PROXY_DISCOVERY_URL", idpRealmURI)
-		os.Setenv("PROXY_OPENID_PROVIDER_TIMEOUT", "120s")
-		os.Setenv("PROXY_LISTEN", "0.0.0.0:"+portNum)
-		os.Setenv("PROXY_CLIENT_ID", pkceTestClient)
-		os.Setenv("PROXY_CLIENT_SECRET", pkceTestClientSecret)
-		os.Setenv("PROXY_UPSTREAM_URL", server.URL)
-		os.Setenv("PROXY_NO_REDIRECTS", "false")
-		os.Setenv("PROXY_SKIP_ACCESS_TOKEN_CLIENT_ID_CHECK", "true")
-		os.Setenv("PROXY_SKIP_ACCESS_TOKEN_ISSUER_CHECK", "true")
-		os.Setenv("PROXY_OPENID_PROVIDER_RETRY_COUNT", "30")
-		os.Setenv("PROXY_SECURE_COOKIE", "false")
-		os.Setenv("PROXY_ENABLE_PKCE", "true")
-		os.Setenv("PROXY_COOKIE_PKCE_NAME", pkceCookieName)
-
 		osArgs := []string{os.Args[0]}
+		proxyArgs := []string{
+			"--discovery-url=" + idpRealmURI,
+			"--openid-provider-timeout=120s",
+			"--listen=" + "0.0.0.0:" + portNum,
+			"--client-id=" + pkceTestClient,
+			"--client-secret=" + pkceTestClientSecret,
+			"--upstream-url=" + server.URL,
+			"--no-redirects=false",
+			"--skip-access-token-clientid-check=true",
+			"--skip-access-token-issuer-check=true",
+			"--openid-provider-retry-count=30",
+			"--secure-cookie=false",
+			"--enable-pkce=true",
+			"--cookie-pkce-name=" + pkceCookieName,
+		}
+
+		osArgs = append(osArgs, proxyArgs...)
 		startAndWait(portNum, osArgs)
 	})
 
