@@ -27,8 +27,16 @@ import (
 func ProduceProxy(cfg configcore.Configs) (proxycore.OauthProxies, error) {
 	switch reflect.TypeOf(cfg) {
 	case reflect.TypeOf(&(keycloakconfig.Config{})):
-		return keycloakproxy.NewProxy(cfg.(*keycloakconfig.Config))
+		c, ok := cfg.(*keycloakconfig.Config)
+		if !ok {
+			panic("unexpected assertion problem")
+		}
+		return keycloakproxy.NewProxy(c)
 	default:
-		return keycloakproxy.NewProxy(cfg.(*keycloakconfig.Config))
+		c, ok := cfg.(*keycloakconfig.Config)
+		if !ok {
+			panic("unexpected assertion problem")
+		}
+		return keycloakproxy.NewProxy(c)
 	}
 }
