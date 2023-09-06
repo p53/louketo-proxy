@@ -241,9 +241,9 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 		MatchingURI: &matchingURI,
 	}
 
-	r.pat.m.Lock()
+	r.pat.m.RLock()
 	token := r.pat.Token.AccessToken
-	r.pat.m.Unlock()
+	r.pat.m.RUnlock()
 
 	resources, err := r.IdpClient.GetResourcesClient(
 		ctx,
@@ -447,8 +447,18 @@ func (r *OauthProxy) getPAT(done chan bool) {
 	}
 }
 
+func (r *OauthProxy) getUmaToken(req *http.Request, writer http.ResponseWriter) (*gocloak.JWT, context.Context, error) {
+	token, err := r.getRPT(req)
+	if err != nil {
+		r.Log.Error("", zap.Error(err))
+		r.accessForbidden(writer, req)
+		return nil, r.accessForbidden(writer, req), err
+	}
+	return token, nil, nil
+}
+
 // getRPT retrieves relaying party token
-func (r *OauthProxy) getRPT(req *http.Request, resp *http.Response) *gocloak.JWT {
+func (r *OauthProxy) getRPT(req *http.Request) (*gocloak.JWT, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		r.Config.OpenIDProviderTimeout,
@@ -457,15 +467,14 @@ func (r *OauthProxy) getRPT(req *http.Request, resp *http.Response) *gocloak.JWT
 	defer cancel()
 
 	matchingURI := true
-
 	resourceParam := gocloak.GetResourceParams{
 		URI:         &req.URL.Path,
 		MatchingURI: &matchingURI,
 	}
 
-	r.pat.m.Lock()
+	r.pat.m.RLock()
 	pat := r.pat.Token.AccessToken
-	r.pat.m.Unlock()
+	r.pat.m.RUnlock()
 
 	resources, err := r.IdpClient.GetResourcesClient(
 		ctx,
@@ -475,31 +484,26 @@ func (r *OauthProxy) getRPT(req *http.Request, resp *http.Response) *gocloak.JWT
 	)
 
 	if err != nil {
-		r.Log.Error(
-			"problem getting resources for path",
-			zap.String("path", req.URL.Path),
-			zap.Error(err),
+		return nil, fmt.Errorf(
+			"%s %s",
+			apperrors.ErrNoIDPResourceForPath.Error(),
+			err,
 		)
-		return nil
 	}
 
 	if len(resources) == 0 {
-		r.Log.Info(
-			"no resources for path",
-			zap.String("path", req.URL.Path),
-		)
-		return nil
+		return nil, apperrors.ErrNoIDPResourceForPath
 	}
 
 	resourceID := resources[0].ID
 	resourceScopes := make([]string, 0)
 
 	if len(*resources[0].ResourceScopes) == 0 {
-		r.Log.Error(
-			"missing scopes for resource in IDP provider",
-			zap.String("resourceID", *resourceID),
+		return nil, fmt.Errorf(
+			"%w, resource: %s",
+			apperrors.ErrMissingScopesForResource,
+			*resourceID,
 		)
-		return nil
 	}
 
 	for _, scope := range *resources[0].ResourceScopes {
@@ -521,12 +525,12 @@ func (r *OauthProxy) getRPT(req *http.Request, resp *http.Response) *gocloak.JWT
 	)
 
 	if err != nil {
-		r.Log.Error(
-			"problem getting permission ticket for resourceId",
-			zap.String("resourceID", *resourceID),
-			zap.Error(err),
+		return nil, fmt.Errorf(
+			"%s resource: %s %w",
+			apperrors.ErrPermissionTicketForResourceID.Error(),
+			*resourceID,
+			err,
 		)
-		return nil
 	}
 
 	grantType := configcore.GrantTypeUmaTicket
@@ -539,15 +543,15 @@ func (r *OauthProxy) getRPT(req *http.Request, resp *http.Response) *gocloak.JWT
 	rpt, err := r.IdpClient.GetRequestingPartyToken(ctx, pat, r.Config.Realm, rptOptions)
 
 	if err != nil {
-		r.Log.Error(
-			"problem getting RPT for resource (hint: do you have permissions assigned to resource?)",
-			zap.String("resourceID", *resourceID),
-			zap.Error(err),
+		return nil, fmt.Errorf(
+			"%s resource: %s %w",
+			apperrors.ErrRetrieveRPT.Error(),
+			*resourceID,
+			err,
 		)
-		return nil
 	}
 
-	return rpt
+	return rpt, nil
 }
 
 func (r *OauthProxy) getCodeFlowTokens(
@@ -599,6 +603,40 @@ func (r *OauthProxy) getCodeFlowTokens(
 	}
 
 	return resp.AccessToken, idToken, resp.RefreshToken, nil
+}
+
+func (r *OauthProxy) verifyUmaToken(
+	accessUserCtx *UserContext,
+	umaUserCtx *UserContext,
+	writer http.ResponseWriter,
+	req *http.Request,
+) error {
+	// make sure somebody doesn't sent one user access token
+	// and others user valid uma token in one request
+	if umaUserCtx.ID != accessUserCtx.ID {
+		return apperrors.ErrAccessMismatchUmaToken
+	}
+
+	verifier := r.Provider.Verifier(
+		&oidc3.Config{
+			ClientID:          r.Config.ClientID,
+			SkipClientIDCheck: r.Config.SkipAccessTokenClientIDCheck,
+			SkipIssuerCheck:   r.Config.SkipAccessTokenIssuerCheck,
+		},
+	)
+
+	ctx, cancel := context.WithTimeout(req.Context(), r.Config.OpenIDProviderTimeout)
+	defer cancel()
+
+	_, err := verifier.Verify(ctx, umaUserCtx.RawToken)
+	if err != nil {
+		if strings.Contains(err.Error(), "token is expired") {
+			return apperrors.ErrUMATokenExpired
+		}
+		return fmt.Errorf("%s %w", apperrors.ErrTokenVerificationFailure.Error(), err)
+	}
+
+	return nil
 }
 
 func (r *OauthProxy) verifyOIDCTokens(

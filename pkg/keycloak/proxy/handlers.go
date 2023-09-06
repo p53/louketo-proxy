@@ -201,6 +201,16 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		return
 	}
 
+	var umaToken string
+	if r.Config.EnableUma {
+		//nolint:contextcheck
+		token, _, err := r.getUmaToken(req, writer)
+		if err != nil {
+			return
+		}
+		umaToken = token.AccessToken
+	}
+
 	// step: are we encrypting the access token?
 	if r.Config.EnableEncryptedToken || r.Config.ForceEncryptedCookie {
 		accessToken, err = r.encryptToken(scope, accessToken, r.Config.EncryptionKey, "access", writer, req)
@@ -211,6 +221,13 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		identityToken, err = r.encryptToken(scope, identityToken, r.Config.EncryptionKey, "id", writer, req)
 		if err != nil {
 			return
+		}
+
+		if r.Config.EnableUma {
+			umaToken, err = r.encryptToken(scope, umaToken, r.Config.EncryptionKey, "uma", writer, req)
+			if err != nil {
+				return
+			}
 		}
 	}
 
@@ -247,6 +264,11 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		default:
 			r.DropRefreshTokenCookie(req, writer, encrypted, oidcTokensCookiesExp)
 		}
+	}
+
+	if r.Config.EnableUma {
+		//nolint:contextcheck
+		r.dropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
 	}
 
 	r.dropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)

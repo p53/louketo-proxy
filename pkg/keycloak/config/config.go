@@ -178,6 +178,8 @@ type Config struct {
 	CookieRequestURIName string `json:"cookie-request-uri-name" yaml:"cookie-request-uri-name" usage:"name of the cookie used to hold the request uri" env:"COOKIE_REQUEST_URI_NAME"`
 	// CookiePKCEName is the name of PKCE code verifier cookie
 	CookiePKCEName string `json:"cookie-pkce-name" yaml:"cookie-pkce-name" usage:"name of the cookie used to hold PKCE code verifier" env:"COOKIE_PKCE_NAME"`
+	// CookieUMAName string is the name of cookie for RPT token
+	CookieUMAName string `json:"cookie-uma-name" yaml:"cookie-uma-name" usage:"name of the cookie used to hold the UMA RPT token" env:"COOKIE_UMA_NAME"`
 	// SecureCookie enforces the cookie as secure
 	SecureCookie bool `json:"secure-cookie" yaml:"secure-cookie" usage:"enforces the cookie to be secure" env:"SECURE_COOKIE"`
 	// HTTPOnlyCookie enforces the cookie as http only
