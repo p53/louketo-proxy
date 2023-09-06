@@ -203,9 +203,8 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 
 	var umaToken string
 	if r.Config.EnableUma {
-		//nolint:contextcheck
-		token, _, err := r.getUmaToken(req, writer)
-		if err != nil {
+		token, _, errUma := r.getUmaToken(req, writer)
+		if errUma != nil {
 			return
 		}
 		umaToken = token.AccessToken
@@ -267,7 +266,6 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	}
 
 	if r.Config.EnableUma {
-		//nolint:contextcheck
 		r.dropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
 	}
 

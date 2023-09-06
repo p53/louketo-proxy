@@ -465,10 +465,12 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 
 				if err != nil {
 					r.Log.Error("problem getting uma token from request", zap.Error(err))
+					//nolint:contextcheck
 					next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 					return
 				}
 
+				//nolint:contextcheck
 				err = r.verifyUmaToken(user, umaUser, wrt, req)
 				if errors.Is(err, apperrors.ErrTokenVerificationFailure) {
 					scope.Logger.Error(
@@ -477,19 +479,21 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 						zap.String("type", "uma"),
 					)
 
+					//nolint:contextcheck
 					next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 					return
 				}
 
 				if errors.Is(err, apperrors.ErrUMATokenExpired) {
-					t, ctx, err := r.getUmaToken(req, wrt)
+					tok, ctx, err := r.getUmaToken(req, wrt)
 					if err != nil {
 						scope.Logger.Error(err.Error())
+						//nolint:contextcheck
 						next.ServeHTTP(wrt, req.WithContext(ctx))
 						return
 					}
 
-					tokenToVerify = t.AccessToken
+					tokenToVerify = tok.AccessToken
 					userPerms = umaUser.Permissions
 					r.dropUMATokenCookie(req, wrt, r.Config.CookieUMAName, time.Until(user.ExpiresAt))
 				}
