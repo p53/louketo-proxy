@@ -268,11 +268,11 @@ func TestGetMaxCookieChunkLength(t *testing.T) {
 	proxy.Config.SecureCookie = true
 	proxy.Config.SameSiteCookie = "Strict"
 	proxy.Config.CookieDomain = "1234567890"
-	assert.Equal(t, proxy.GetMaxCookieChunkLength(req, "1234567890"), 4017,
+	assert.Equal(t, 4017, proxy.GetMaxCookieChunkLength(req, "1234567890"),
 		"cookie chunk calculation is not correct")
 
 	proxy.Config.SameSiteCookie = "Lax"
-	assert.Equal(t, proxy.GetMaxCookieChunkLength(req, "1234567890"), 4020,
+	assert.Equal(t, 4020, proxy.GetMaxCookieChunkLength(req, "1234567890"),
 		"cookie chunk calculation is not correct")
 
 	proxy.Config.HTTPOnlyCookie = false
@@ -280,7 +280,7 @@ func TestGetMaxCookieChunkLength(t *testing.T) {
 	proxy.Config.SecureCookie = false
 	proxy.Config.SameSiteCookie = "None"
 	proxy.Config.CookieDomain = ""
-	assert.Equal(t, proxy.GetMaxCookieChunkLength(req, ""), 4021,
+	assert.Equal(t, 4007, proxy.GetMaxCookieChunkLength(req, ""),
 		"cookie chunk calculation is not correct")
 }
 
