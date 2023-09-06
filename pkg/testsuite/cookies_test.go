@@ -203,7 +203,7 @@ func TestSameSiteCookie(t *testing.T) {
 	proxy.DropCookie(resp, req.Host, "test-cookie", "test-value", 0)
 
 	assert.Equal(t, resp.Header().Get("Set-Cookie"),
-		"test-cookie=test-value; Path=/",
+		"test-cookie=test-value; Path=/; SameSite=None",
 		"we have not set the cookie, headers: %v", resp.Header())
 }
 
