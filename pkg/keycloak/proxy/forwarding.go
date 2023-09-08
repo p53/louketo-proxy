@@ -111,7 +111,7 @@ func (r *OauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 		var token string
 
 		if r.Config.EnableUma {
-			tok, err := r.getRPT(req)
+			tok, err := r.getRPT(req, req.URL.Path, "")
 
 			if err != nil {
 				r.Log.Error("", zap.Error(err))

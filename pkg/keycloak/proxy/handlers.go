@@ -201,35 +201,6 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		return
 	}
 
-	var umaToken string
-	if r.Config.EnableUma {
-		token, _, errUma := r.getUmaToken(req, writer)
-		if errUma != nil {
-			return
-		}
-		umaToken = token.AccessToken
-	}
-
-	// step: are we encrypting the access token?
-	if r.Config.EnableEncryptedToken || r.Config.ForceEncryptedCookie {
-		accessToken, err = r.encryptToken(scope, accessToken, r.Config.EncryptionKey, "access", writer, req)
-		if err != nil {
-			return
-		}
-
-		identityToken, err = r.encryptToken(scope, identityToken, r.Config.EncryptionKey, "id", writer, req)
-		if err != nil {
-			return
-		}
-
-		if r.Config.EnableUma {
-			umaToken, err = r.encryptToken(scope, umaToken, r.Config.EncryptionKey, "uma", writer, req)
-			if err != nil {
-				return
-			}
-		}
-	}
-
 	// @metric a token has been issued
 	oauthTokensMetric.WithLabelValues("issued").Inc()
 
@@ -237,7 +208,8 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	// step: does the response have a refresh token and we do NOT ignore refresh tokens?
 	if r.Config.EnableRefreshTokens && refreshToken != "" {
 		var encrypted string
-		stdRefreshClaims, err := r.verifyRefreshToken(scope, refreshToken, writer, req)
+		var stdRefreshClaims *jwt.Claims
+		stdRefreshClaims, err = r.verifyRefreshToken(scope, refreshToken, writer, req)
 		if err != nil {
 			return
 		}
@@ -265,13 +237,6 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		}
 	}
 
-	if r.Config.EnableUma {
-		r.dropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
-	}
-
-	r.dropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)
-	r.dropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
-
 	// step: decode the request variable
 	redirectURI := "/"
 	if req.URL.Query().Get("state") != "" {
@@ -279,6 +244,42 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 			redirectURI = r.getRequestURIFromCookie(scope, encodedRequestURI)
 		}
 	}
+
+	var umaToken string
+	if r.Config.EnableUma {
+		token, _, errUma := r.getUmaToken(req, writer, redirectURI, accessToken)
+		if errUma != nil {
+			return
+		}
+		umaToken = token.AccessToken
+	}
+
+	// step: are we encrypting the access token?
+	if r.Config.EnableEncryptedToken || r.Config.ForceEncryptedCookie {
+		accessToken, err = r.encryptToken(scope, accessToken, r.Config.EncryptionKey, "access", writer, req)
+		if err != nil {
+			return
+		}
+
+		identityToken, err = r.encryptToken(scope, identityToken, r.Config.EncryptionKey, "id", writer, req)
+		if err != nil {
+			return
+		}
+
+		if r.Config.EnableUma {
+			umaToken, err = r.encryptToken(scope, umaToken, r.Config.EncryptionKey, "uma", writer, req)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	if r.Config.EnableUma {
+		r.dropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
+	}
+
+	r.dropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)
+	r.dropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
 
 	scope.Logger.Debug("redirecting to", zap.String("location", redirectURI))
 	r.redirectToURL(redirectURI, writer, req, http.StatusSeeOther)

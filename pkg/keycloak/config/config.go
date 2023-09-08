@@ -326,6 +326,7 @@ func NewDefaultConfig() *Config {
 		CookieOAuthStateName:          constant.RequestStateCookie,
 		CookieRequestURIName:          constant.RequestURICookie,
 		CookiePKCEName:                constant.PKCECookie,
+		CookieUMAName:                 constant.UMACookie,
 		EnableAuthorizationCookies:    true,
 		EnableAuthorizationHeader:     true,
 		EnableDefaultDeny:             true,
@@ -917,11 +918,6 @@ func (r *Config) isExternalAuthzValid() error {
 		if r.ClientID == "" || r.ClientSecret == "" {
 			return errors.New(
 				"enable uma requires client credentials",
-			)
-		}
-		if !r.NoRedirects {
-			return errors.New(
-				"enable-uma requires no-redirects option",
 			)
 		}
 	} else if r.EnableOpa {

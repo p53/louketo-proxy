@@ -461,6 +461,14 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 
 			if !r.Config.NoRedirects && r.Config.EnableUma {
 				umaUser, err := r.GetUmaIdentity(req)
+
+				if err != nil {
+					r.Log.Error("problem getting identity from uma token", zap.Error(err))
+					//nolint:contextcheck
+					next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
+					return
+				}
+
 				tokenToVerify = umaUser.RawToken
 
 				if err != nil {
@@ -485,7 +493,7 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 				}
 
 				if errors.Is(err, apperrors.ErrUMATokenExpired) {
-					tok, ctx, err := r.getUmaToken(req, wrt)
+					tok, ctx, err := r.getUmaToken(req, wrt, req.URL.Path, user.RawToken)
 					if err != nil {
 						scope.Logger.Error(err.Error())
 						//nolint:contextcheck
@@ -494,9 +502,9 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 					}
 
 					tokenToVerify = tok.AccessToken
-					userPerms = umaUser.Permissions
 					r.dropUMATokenCookie(req, wrt, r.Config.CookieUMAName, time.Until(user.ExpiresAt))
 				}
+				userPerms = umaUser.Permissions
 			}
 
 			noAuthz := false

@@ -258,8 +258,7 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 			zap.String("path", req.URL.Path),
 			zap.Error(err),
 		)
-		wrt.WriteHeader(http.StatusUnauthorized)
-		return r.revokeProxy(wrt, req)
+		return r.accessForbidden(wrt, req)
 	}
 
 	if len(resources) == 0 {
@@ -267,8 +266,7 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 			"no resources for path",
 			zap.String("path", req.URL.Path),
 		)
-		wrt.WriteHeader(http.StatusUnauthorized)
-		return r.revokeProxy(wrt, req)
+		return r.accessForbidden(wrt, req)
 	}
 
 	resourceID := resources[0].ID
@@ -279,8 +277,7 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 			"missingg scopes for resource in IDP provider",
 			zap.String("resourceID", *resourceID),
 		)
-		wrt.WriteHeader(http.StatusUnauthorized)
-		return r.revokeProxy(wrt, req)
+		return r.accessForbidden(wrt, req)
 	}
 
 	for _, scope := range *resources[0].ResourceScopes {
@@ -308,8 +305,7 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 				zap.String("resourceID", *resourceID),
 				zap.Error(err),
 			)
-			wrt.WriteHeader(http.StatusUnauthorized)
-			return r.revokeProxy(wrt, req)
+			return r.accessForbidden(wrt, req)
 		}
 
 		permHeader := fmt.Sprintf(
@@ -447,18 +443,22 @@ func (r *OauthProxy) getPAT(done chan bool) {
 	}
 }
 
-func (r *OauthProxy) getUmaToken(req *http.Request, writer http.ResponseWriter) (*gocloak.JWT, context.Context, error) {
-	token, err := r.getRPT(req)
+func (r *OauthProxy) getUmaToken(
+	req *http.Request,
+	writer http.ResponseWriter,
+	targetPath string,
+	userToken string,
+) (*gocloak.JWT, context.Context, error) {
+	token, err := r.getRPT(req, targetPath, userToken)
 	if err != nil {
 		r.Log.Error("", zap.Error(err))
-		r.accessForbidden(writer, req)
 		return nil, r.accessForbidden(writer, req), err
 	}
 	return token, nil, nil
 }
 
 // getRPT retrieves relaying party token
-func (r *OauthProxy) getRPT(req *http.Request) (*gocloak.JWT, error) {
+func (r *OauthProxy) getRPT(req *http.Request, targetPath string, userToken string) (*gocloak.JWT, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		r.Config.OpenIDProviderTimeout,
@@ -468,7 +468,7 @@ func (r *OauthProxy) getRPT(req *http.Request) (*gocloak.JWT, error) {
 
 	matchingURI := true
 	resourceParam := gocloak.GetResourceParams{
-		URI:         &req.URL.Path,
+		URI:         &targetPath,
 		MatchingURI: &matchingURI,
 	}
 
@@ -540,7 +540,11 @@ func (r *OauthProxy) getRPT(req *http.Request) (*gocloak.JWT, error) {
 		Ticket:    permTicket.Ticket,
 	}
 
-	rpt, err := r.IdpClient.GetRequestingPartyToken(ctx, pat, r.Config.Realm, rptOptions)
+	if userToken == "" {
+		userToken = pat
+	}
+
+	rpt, err := r.IdpClient.GetRequestingPartyToken(ctx, userToken, r.Config.Realm, rptOptions)
 
 	if err != nil {
 		return nil, fmt.Errorf(
