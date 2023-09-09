@@ -493,11 +493,11 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 				}
 
 				if errors.Is(err, apperrors.ErrUMATokenExpired) {
-					tok, ctx, err := r.getUmaToken(req, wrt, req.URL.Path, user.RawToken)
+					tok, _, err := r.getUmaToken(req, wrt, req.URL.Path, user.RawToken)
 					if err != nil {
 						scope.Logger.Error(err.Error())
 						//nolint:contextcheck
-						next.ServeHTTP(wrt, req.WithContext(ctx))
+						next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 						return
 					}
 
@@ -566,7 +566,8 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 			default:
 				if err != nil {
 					scope.Logger.Error("Undexpected error during authorization", zap.Error(err))
-					r.accessForbidden(wrt, req)
+					//nolint:contextcheck
+					next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 					return
 				}
 			}
@@ -590,7 +591,8 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 					)
 				}
 
-				r.accessForbidden(wrt, req)
+				//nolint:contextcheck
+				next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 				return
 			}
 

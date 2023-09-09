@@ -495,6 +495,196 @@ data:
           "baseUrl": "",
           "adminUrl": "",
           "authorizationServicesEnabled": false
+        },
+        {
+          "id": "4c159536-d5d0-42ee-a64b-43d7cb5c1668",
+          "clientId": "test-client-uma",
+          "name": "",
+          "description": "",
+          "rootUrl": "",
+          "adminUrl": "",
+          "baseUrl": "",
+          "surrogateAuthRequired": false,
+          "enabled": true,
+          "alwaysDisplayInConsole": false,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "**********",
+          "redirectUris": [
+            "*"
+          ],
+          "webOrigins": [],
+          "notBefore": 0,
+          "bearerOnly": false,
+          "consentRequired": false,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "directAccessGrantsEnabled": true,
+          "serviceAccountsEnabled": true,
+          "authorizationServicesEnabled": true,
+          "publicClient": false,
+          "frontchannelLogout": true,
+          "protocol": "openid-connect",
+          "attributes": {
+            "oidc.ciba.grant.enabled": "false",
+            "client.secret.creation.time": "1694161560",
+            "backchannel.logout.session.required": "true",
+            "display.on.consent.screen": "false",
+            "oauth2.device.authorization.grant.enabled": "false",
+            "backchannel.logout.revoke.offline.tokens": "false"
+          },
+          "authenticationFlowBindingOverrides": {},
+          "fullScopeAllowed": true,
+          "nodeReRegistrationTimeout": -1,
+          "protocolMappers": [
+            {
+              "id": "53406d38-22ae-4195-87eb-530475e79c06",
+              "name": "Client Host",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usersessionmodel-note-mapper",
+              "consentRequired": false,
+              "config": {
+                "user.session.note": "clientHost",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "clientHost",
+                "jsonType.label": "String"
+              }
+            },
+            {
+              "id": "506c87aa-d2cc-4342-a2f6-eda5ccb77486",
+              "name": "Client ID",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usersessionmodel-note-mapper",
+              "consentRequired": false,
+              "config": {
+                "user.session.note": "clientId",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "clientId",
+                "jsonType.label": "String"
+              }
+            },
+            {
+              "id": "8432c797-1111-4b26-b3ea-e49e1cdd9306",
+              "name": "Client IP Address",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usersessionmodel-note-mapper",
+              "consentRequired": false,
+              "config": {
+                "user.session.note": "clientAddress",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "clientAddress",
+                "jsonType.label": "String"
+              }
+            }
+          ],
+          "defaultClientScopes": [
+            "web-origins",
+            "acr",
+            "profile",
+            "roles",
+            "email"
+          ],
+          "optionalClientScopes": [
+            "address",
+            "phone",
+            "offline_access",
+            "microprofile-jwt"
+          ],
+          "authorizationSettings": {
+            "allowRemoteResourceManagement": true,
+            "policyEnforcementMode": "ENFORCING",
+            "resources": [
+              {
+                "name": "onepet",
+                "ownerManagedAccess": true,
+                "attributes": {},
+                "_id": "90349071-4fbd-49cf-89ff-d7c4a311968b",
+                "uris": [
+                  "/pets/*"
+                ],
+                "scopes": [
+                  {
+                    "name": "mymy"
+                  }
+                ],
+                "icon_uri": ""
+              },
+              {
+                "name": "pets",
+                "ownerManagedAccess": true,
+                "attributes": {},
+                "_id": "f5e11025-0d33-4623-9514-7a9e073d0dc7",
+                "uris": [
+                  "/pets"
+                ],
+                "scopes": [
+                  {
+                    "name": "mymy"
+                  }
+                ],
+                "icon_uri": ""
+              }
+            ],
+            "policies": [
+              {
+                "id": "af157b90-2a77-4de7-a675-7de8ed804a36",
+                "name": "Default Policy",
+                "description": "A policy that grants access only for users within this realm",
+                "type": "js",
+                "logic": "POSITIVE",
+                "decisionStrategy": "AFFIRMATIVE",
+                "config": {
+                  "code": "// by default, grants any permission associated with this policy\n$evaluation.grant();\n"
+                }
+              },
+              {
+                "id": "cc1b1dff-c1f1-467d-97e9-d56988b11a3e",
+                "name": "mypol",
+                "description": "",
+                "type": "user",
+                "logic": "POSITIVE",
+                "decisionStrategy": "UNANIMOUS",
+                "config": {
+                  "users": "[\"myuser\"]"
+                }
+              },
+              {
+                "id": "309f3810-ed23-466f-bdbe-51aa963df5a3",
+                "name": "Default Permission",
+                "description": "A permission that applies to the default resource type",
+                "type": "resource",
+                "logic": "POSITIVE",
+                "decisionStrategy": "UNANIMOUS",
+                "config": {
+                  "defaultResourceType": "urn:test-client-uma:resources:default",
+                  "applyPolicies": "[\"Default Policy\"]"
+                }
+              },
+              {
+                "id": "9c93a9b0-519d-45dd-acd7-4d1c614061b4",
+                "name": "myperm",
+                "description": "",
+                "type": "resource",
+                "logic": "POSITIVE",
+                "decisionStrategy": "UNANIMOUS",
+                "config": {
+                  "defaultResourceType": "",
+                  "resources": "[\"pets\"]",
+                  "applyPolicies": "[\"mypol\"]"
+                }
+              }
+            ],
+            "scopes": [
+              {
+                "id": "434112a5-0533-4156-a8a0-a8c3a8a7f9ac",
+                "name": "mymy",
+                "iconUri": ""
+              }
+            ],
+            "decisionStrategy": "UNANIMOUS"
+          }
         }
       ],
       "clientScopes": [

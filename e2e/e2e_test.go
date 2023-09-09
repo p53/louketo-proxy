@@ -29,6 +29,8 @@ const (
 	testClientSecret     = "6447d0c0-d510-42a7-b654-6e3a16b2d7e2"
 	pkceTestClient       = "test-client-pkce"
 	pkceTestClientSecret = "F2GqU40xwX0P2LrTvHUHqwNoSk4U4n5R"
+	umaTestClient        = "test-client-uma"
+	umaTestClientSecret  = "QdCxBbulvxQFtA1UCnsu0flgaDARrmHb"
 	timeout              = time.Second * 300
 	idpURI               = "http://localhost:8081"
 	testUser             = "myuser"
@@ -239,5 +241,114 @@ var _ = Describe("Code Flow PKCE login/logout", func() {
 		rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
 		resp, err = rClient.R().Get(proxyAddress)
 		Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
+	})
+})
+
+var _ = Describe("UMA Code Flow authorization", func() {
+	var portNum string
+	var proxyAddress string
+	var umaCookieName = "TESTUMACOOKIE"
+
+	BeforeEach(func() {
+		server := httptest.NewServer(&testsuite.FakeUpstreamService{})
+		portNum = generateRandomPort()
+		proxyAddress = "http://localhost:" + portNum
+		osArgs := []string{os.Args[0]}
+		proxyArgs := []string{
+			"--discovery-url=" + idpRealmURI,
+			"--openid-provider-timeout=120s",
+			"--listen=" + "0.0.0.0:" + portNum,
+			"--client-id=" + umaTestClient,
+			"--client-secret=" + umaTestClientSecret,
+			"--upstream-url=" + server.URL,
+			"--no-redirects=false",
+			"--enable-uma=true",
+			"--cookie-uma-name=" + umaCookieName,
+			"--skip-access-token-clientid-check=true",
+			"--skip-access-token-issuer-check=true",
+			"--openid-provider-retry-count=30",
+			"--secure-cookie=false",
+		}
+
+		osArgs = append(osArgs, proxyArgs...)
+		startAndWait(portNum, osArgs)
+	})
+
+	When("Accessing resource, where user is allowed to access", func() {
+		It("should login with user/password and logout successfully", func(ctx context.Context) {
+			userAllowedPath := "/pets"
+			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
+			resp, err := rClient.R().Get(proxyAddress + userAllowedPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body()))
+			Expect(err).NotTo(HaveOccurred())
+
+			selection := doc.Find("#kc-form-login")
+			Expect(selection).ToNot(BeNil())
+
+			selection.Each(func(i int, s *goquery.Selection) {
+				action, exists := s.Attr("action")
+				Expect(exists).To(BeTrue())
+
+				rClient.FormData.Add("username", testUser)
+				rClient.FormData.Add("password", testPass)
+				resp, err = rClient.R().Post(action)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+				Expect(resp.Header().Get("Proxy-Accepted")).To(Equal("true"))
+
+				body := resp.Body()
+				Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
+			})
+
+			resp, err = rClient.R().Get(proxyAddress + "/oauth/logout")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
+			resp, err = rClient.R().Get(proxyAddress + userAllowedPath)
+			Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
+		})
+	})
+
+	When("Accessing resource, which does not exist", func() {
+		It("should be redirected to auth server", func(ctx context.Context) {
+			nonExistentResourcePath := "/cat"
+			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
+			resp, err := rClient.R().Get(proxyAddress + nonExistentResourcePath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
+		})
+	})
+
+	When("Accessing resource, which exists but user is not allowed", func() {
+		It("should be redirected to auth server", func(ctx context.Context) {
+			userForbiddenPath := "/pets/1"
+			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
+			resp, err := rClient.R().Get(proxyAddress + userForbiddenPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body()))
+			Expect(err).NotTo(HaveOccurred())
+
+			selection := doc.Find("#kc-form-login")
+			Expect(selection).ToNot(BeNil())
+
+			selection.Each(func(i int, s *goquery.Selection) {
+				action, exists := s.Attr("action")
+				Expect(exists).To(BeTrue())
+
+				rClient.FormData.Add("username", testUser)
+				rClient.FormData.Add("password", testPass)
+				resp, err = rClient.R().Post(action)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
+			})
+		})
 	})
 })

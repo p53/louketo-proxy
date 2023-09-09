@@ -231,11 +231,9 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 		context.Background(),
 		r.Config.OpenIDProviderTimeout,
 	)
-
 	defer cancel()
 
 	matchingURI := true
-
 	resourceParam := gocloak.GetResourceParams{
 		URI:         &req.URL.Path,
 		MatchingURI: &matchingURI,
