@@ -29,6 +29,7 @@ import (
 	"github.com/Nerzal/gocloak/v12"
 	oidc3 "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gogatekeeper/gatekeeper/pkg/apperrors"
+	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	configcore "github.com/gogatekeeper/gatekeeper/pkg/config/core"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
@@ -138,15 +139,9 @@ func (r *OauthProxy) redirectToURL(url string, wrt http.ResponseWriter, req *htt
 
 // redirectToAuthorization redirects the user to authorization handler
 func (r *OauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.Request) context.Context {
-	if r.Config.NoRedirects && !r.Config.EnableUma {
+	if r.Config.NoRedirects {
 		wrt.WriteHeader(http.StatusUnauthorized)
 		return r.revokeProxy(wrt, req)
-	}
-
-	if r.Config.EnableUma {
-		if v := r.redirectToAuthorizationUMA(wrt, req); v != nil {
-			return v
-		}
 	}
 
 	// step: add a state referrer to the authorization page
@@ -226,9 +221,13 @@ func (r *OauthProxy) GetAccessCookieExpiration(refresh string) time.Duration {
 	return duration
 }
 
-func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *http.Request) context.Context {
+func (r *OauthProxy) createUMAPermissionTicket(
+	ctx context.Context,
+	wrt http.ResponseWriter,
+	req *http.Request,
+) (string, error) {
 	ctx, cancel := context.WithTimeout(
-		context.Background(),
+		ctx,
 		r.Config.OpenIDProviderTimeout,
 	)
 	defer cancel()
@@ -256,7 +255,7 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 			zap.String("path", req.URL.Path),
 			zap.Error(err),
 		)
-		return r.accessForbidden(wrt, req)
+		return "", err
 	}
 
 	if len(resources) == 0 {
@@ -264,7 +263,7 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 			"no resources for path",
 			zap.String("path", req.URL.Path),
 		)
-		return r.accessForbidden(wrt, req)
+		return "", err
 	}
 
 	resourceID := resources[0].ID
@@ -275,50 +274,44 @@ func (r *OauthProxy) redirectToAuthorizationUMA(wrt http.ResponseWriter, req *ht
 			"missingg scopes for resource in IDP provider",
 			zap.String("resourceID", *resourceID),
 		)
-		return r.accessForbidden(wrt, req)
+		return "", err
 	}
 
 	for _, scope := range *resources[0].ResourceScopes {
 		resourceScopes = append(resourceScopes, *scope.Name)
 	}
 
-	if r.Config.NoRedirects {
-		permissions := []gocloak.CreatePermissionTicketParams{
-			{
-				ResourceID:     resourceID,
-				ResourceScopes: &resourceScopes,
-			},
-		}
-
-		permTicket, err := r.IdpClient.CreatePermissionTicket(
-			ctx,
-			token,
-			r.Config.Realm,
-			permissions,
-		)
-
-		if err != nil {
-			r.Log.Error(
-				"problem getting permission ticket for resourceId",
-				zap.String("resourceID", *resourceID),
-				zap.Error(err),
-			)
-			return r.accessForbidden(wrt, req)
-		}
-
-		permHeader := fmt.Sprintf(
-			`realm="%s", as_uri="%s", ticket="%s"`,
-			r.Config.Realm,
-			r.Config.DiscoveryURI.Host,
-			*permTicket.Ticket,
-		)
-
-		wrt.Header().Add("WWW-Authenticate", permHeader)
-		wrt.WriteHeader(http.StatusUnauthorized)
-		return r.revokeProxy(wrt, req)
+	permissions := []gocloak.CreatePermissionTicketParams{
+		{
+			ResourceID:     resourceID,
+			ResourceScopes: &resourceScopes,
+		},
 	}
 
-	return nil
+	permTicket, err := r.IdpClient.CreatePermissionTicket(
+		ctx,
+		token,
+		r.Config.Realm,
+		permissions,
+	)
+
+	if err != nil {
+		r.Log.Error(
+			"problem getting permission ticket for resourceId",
+			zap.String("resourceID", *resourceID),
+			zap.Error(err),
+		)
+		return "", err
+	}
+
+	permHeader := fmt.Sprintf(
+		`realm="%s", as_uri="%s", ticket="%s"`,
+		r.Config.Realm,
+		r.Config.DiscoveryURI.Host,
+		*permTicket.Ticket,
+	)
+
+	return permHeader, nil
 }
 
 //nolint:cyclop
@@ -817,4 +810,47 @@ func (r *OauthProxy) getRequestURIFromCookie(
 	}
 
 	return string(decoded)
+}
+
+func (r *OauthProxy) WithCodeFlowUMA(
+	req *http.Request,
+	wrt http.ResponseWriter,
+	user *UserContext,
+	authzFunc func(req *http.Request, userPerms authorization.Permissions) (authorization.AuthzDecision, error),
+) (authorization.AuthzDecision, error) {
+	umaUser, err := r.GetUmaIdentity(req)
+	if err != nil {
+		return authorization.DeniedAuthz,
+			fmt.Errorf("%w %s", apperrors.ErrGetIdentityFromUMA, err.Error())
+	}
+
+	err = r.verifyUmaToken(user, umaUser, wrt, req)
+	if err != nil {
+		return authorization.DeniedAuthz, err
+	}
+
+	return authzFunc(req, umaUser.Permissions)
+}
+
+func (r *OauthProxy) refreshUmaToken(
+	req *http.Request,
+	user *UserContext,
+) (*UserContext, error) {
+	tok, err := r.getRPT(req, req.URL.Path, user.RawToken)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := jwt.ParseSigned(tok.AccessToken)
+	if err != nil {
+		return nil, err
+	}
+
+	umaUser, err := ExtractIdentity(token)
+	if err != nil {
+		return nil, err
+	}
+
+	umaUser.RawToken = tok.AccessToken
+	return umaUser, nil
 }

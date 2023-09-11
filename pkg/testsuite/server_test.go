@@ -342,6 +342,7 @@ func TestUmaForwardingProxy(t *testing.T) {
 	fakeUpstream := httptest.NewServer(&FakeUpstreamService{})
 	upstreamConfig := newFakeKeycloakConfig()
 	upstreamConfig.EnableUma = true
+	upstreamConfig.NoRedirects = true
 	upstreamConfig.EnableDefaultDeny = true
 	upstreamConfig.ClientID = ValidUsername
 	upstreamConfig.ClientSecret = ValidPassword

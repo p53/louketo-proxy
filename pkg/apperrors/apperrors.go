@@ -15,6 +15,7 @@ var (
 	ErrRetrieveRPT                     = errors.New("problem getting RPT for resource (hint: do you have permissions assigned to resource?)")
 	ErrAccessMismatchUmaToken          = errors.New("access token and uma token user ID don't match")
 	ErrNoAuthzFound                    = errors.New("no authz found")
+	ErrGetIdentityFromUMA              = errors.New("problem getting identity from uma token")
 	ErrFailedAuthzRequest              = errors.New("unexpected error occurred during authz request")
 	ErrSessionNotFound                 = errors.New("authentication session not found")
 	ErrNoSessionStateFound             = errors.New("no session state found")

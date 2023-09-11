@@ -61,7 +61,6 @@ func (p *KeycloakAuthorizationProvider) Authorize() (AuthzDecision, error) {
 	defer cancel()
 
 	matchingURI := true
-
 	resourceParam := gocloak.GetResourceParams{
 		URI:         &p.req.URL.Path,
 		MatchingURI: &matchingURI,

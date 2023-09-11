@@ -14,13 +14,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/PuerkitoBio/goquery"
 	resty "github.com/go-resty/resty/v2"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/proxy"
 	"github.com/gogatekeeper/gatekeeper/pkg/testsuite"
-	"golang.org/x/oauth2/clientcredentials"
 )
 
 const (
@@ -268,6 +268,7 @@ var _ = Describe("UMA Code Flow authorization", func() {
 			"--skip-access-token-issuer-check=true",
 			"--openid-provider-retry-count=30",
 			"--secure-cookie=false",
+			"--verbose=true",
 		}
 
 		osArgs = append(osArgs, proxyArgs...)
@@ -277,6 +278,7 @@ var _ = Describe("UMA Code Flow authorization", func() {
 	When("Accessing resource, where user is allowed to access", func() {
 		It("should login with user/password and logout successfully", func(ctx context.Context) {
 			userAllowedPath := "/pets"
+			userForbiddenPath := "/pets/1"
 			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
 			resp, err := rClient.R().Get(proxyAddress + userAllowedPath)
 			Expect(err).NotTo(HaveOccurred())
@@ -299,10 +301,17 @@ var _ = Describe("UMA Code Flow authorization", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 				Expect(resp.Header().Get("Proxy-Accepted")).To(Equal("true"))
-
-				body := resp.Body()
-				Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
 			})
+
+			body := resp.Body()
+			Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
+
+			By("Accessing not allowed path")
+			resp, err = rClient.R().Get(proxyAddress + userForbiddenPath)
+			body = resp.Body()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
+			Expect(strings.Contains(string(body), umaCookieName)).To(BeFalse())
 
 			resp, err = rClient.R().Get(proxyAddress + "/oauth/logout")
 			Expect(err).NotTo(HaveOccurred())
@@ -315,18 +324,42 @@ var _ = Describe("UMA Code Flow authorization", func() {
 	})
 
 	When("Accessing resource, which does not exist", func() {
-		It("should be redirected to auth server", func(ctx context.Context) {
+		It("should be forbidden without permission ticket", func(ctx context.Context) {
 			nonExistentResourcePath := "/cat"
 			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
 			resp, err := rClient.R().Get(proxyAddress + nonExistentResourcePath)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body()))
+			Expect(err).NotTo(HaveOccurred())
+
+			selection := doc.Find("#kc-form-login")
+			Expect(selection).ToNot(BeNil())
+
+			selection.Each(func(i int, s *goquery.Selection) {
+				action, exists := s.Attr("action")
+				Expect(exists).To(BeTrue())
+
+				rClient.FormData.Add("username", testUser)
+				rClient.FormData.Add("password", testPass)
+				resp, err = rClient.R().Post(action)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
+			})
+
+			body := resp.Body()
+			Expect(strings.Contains(string(body), umaCookieName)).To(BeFalse())
+			Expect(strings.Contains(string(body), "ticket=")).To(BeFalse())
 		})
 	})
 
-	When("Accessing resource, which exists but user is not allowed", func() {
-		It("should be redirected to auth server", func(ctx context.Context) {
+	When("Accessing resource, which exists but user is not allowed and then allowed resource", func() {
+		It("should be forbidden without permission ticket and then allowed", func(ctx context.Context) {
 			userForbiddenPath := "/pets/1"
+			userAllowedPath := "/pets"
+
 			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
 			resp, err := rClient.R().Get(proxyAddress + userForbiddenPath)
 			Expect(err).NotTo(HaveOccurred())
@@ -349,6 +382,17 @@ var _ = Describe("UMA Code Flow authorization", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
 			})
+
+			body := resp.Body()
+			Expect(strings.Contains(string(body), umaCookieName)).To(BeFalse())
+			Expect(strings.Contains(string(body), "ticket=")).To(BeFalse())
+
+			By("Accessing allowed resource")
+			resp, err = rClient.R().Get(proxyAddress + userAllowedPath)
+			body = resp.Body()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+			Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
 		})
 	})
 })

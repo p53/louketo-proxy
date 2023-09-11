@@ -246,12 +246,17 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	}
 
 	var umaToken string
+	var umaError error
 	if r.Config.EnableUma {
-		token, _, errUma := r.getUmaToken(req, writer, redirectURI, accessToken)
-		if errUma != nil {
-			return
+		// we are not returning access forbidden immediately because we want to setup
+		// access/refresh cookie as authentication already was done properly and user
+		// could try to get new uma token/cookie, e.g in case he tried first to access
+		// resource to which he doesn't have access
+		//nolint:contextcheck
+		if token, erru := r.getRPT(req, redirectURI, accessToken); token != nil {
+			umaToken = token.AccessToken
+			umaError = erru
 		}
-		umaToken = token.AccessToken
 	}
 
 	// step: are we encrypting the access token?
@@ -266,7 +271,7 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 			return
 		}
 
-		if r.Config.EnableUma {
+		if r.Config.EnableUma && umaError == nil {
 			umaToken, err = r.encryptToken(scope, umaToken, r.Config.EncryptionKey, "uma", writer, req)
 			if err != nil {
 				return
@@ -274,12 +279,17 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		}
 	}
 
-	if r.Config.EnableUma {
+	r.dropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)
+	r.dropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
+
+	if r.Config.EnableUma && umaError == nil {
 		r.dropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
 	}
 
-	r.dropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)
-	r.dropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
+	if umaError != nil {
+		r.accessForbidden(writer, req)
+		return
+	}
 
 	scope.Logger.Debug("redirecting to", zap.String("location", redirectURI))
 	r.redirectToURL(redirectURI, writer, req, http.StatusSeeOther)
