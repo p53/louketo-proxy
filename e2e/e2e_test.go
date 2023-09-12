@@ -30,7 +30,7 @@ const (
 	pkceTestClient       = "test-client-pkce"
 	pkceTestClientSecret = "F2GqU40xwX0P2LrTvHUHqwNoSk4U4n5R"
 	umaTestClient        = "test-client-uma"
-	umaTestClientSecret  = "QdCxBbulvxQFtA1UCnsu0flgaDARrmHb"
+	umaTestClientSecret  = "A5vokiGdI3H2r4aXFrANbKvn4R7cbf6P"
 	timeout              = time.Second * 300
 	idpURI               = "http://localhost:8081"
 	testUser             = "myuser"
@@ -393,6 +393,88 @@ var _ = Describe("UMA Code Flow authorization", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 			Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("UMA Code Flow authorization with method scope", func() {
+	var portNum string
+	var proxyAddress string
+	var umaCookieName = "TESTUMACOOKIE"
+
+	BeforeEach(func() {
+		server := httptest.NewServer(&testsuite.FakeUpstreamService{})
+		portNum = generateRandomPort()
+		proxyAddress = "http://localhost:" + portNum
+		osArgs := []string{os.Args[0]}
+		proxyArgs := []string{
+			"--discovery-url=" + idpRealmURI,
+			"--openid-provider-timeout=120s",
+			"--listen=" + "0.0.0.0:" + portNum,
+			"--client-id=" + umaTestClient,
+			"--client-secret=" + umaTestClientSecret,
+			"--upstream-url=" + server.URL,
+			"--no-redirects=false",
+			"--enable-uma=true",
+			"--enable-uma-method-scope=true",
+			"--cookie-uma-name=" + umaCookieName,
+			"--skip-access-token-clientid-check=true",
+			"--skip-access-token-issuer-check=true",
+			"--openid-provider-retry-count=30",
+			"--secure-cookie=false",
+			"--verbose=true",
+			"--enable-logging=true",
+			"--enable-request-id=true",
+		}
+
+		osArgs = append(osArgs, proxyArgs...)
+		startAndWait(portNum, osArgs)
+	})
+
+	When("Accessing resource, where user is allowed to access and then not allowed resource", func() {
+		It("should login with user/password, don't access forbidden resource and logout successfully", func(ctx context.Context) {
+			userAllowedPath := "/horse"
+			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
+			resp, err := rClient.R().Get(proxyAddress + userAllowedPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			doc, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body()))
+			Expect(err).NotTo(HaveOccurred())
+
+			selection := doc.Find("#kc-form-login")
+			Expect(selection).ToNot(BeNil())
+
+			selection.Each(func(i int, s *goquery.Selection) {
+				action, exists := s.Attr("action")
+				Expect(exists).To(BeTrue())
+
+				rClient.FormData.Add("username", testUser)
+				rClient.FormData.Add("password", testPass)
+				resp, err = rClient.R().Post(action)
+
+				Expect(err).NotTo(HaveOccurred())
+				Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+				Expect(resp.Header().Get("Proxy-Accepted")).To(Equal("true"))
+			})
+
+			body := resp.Body()
+			Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
+
+			By("Accessing not allowed method")
+			resp, err = rClient.R().Post(proxyAddress + userAllowedPath)
+			body = resp.Body()
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
+			Expect(strings.Contains(string(body), umaCookieName)).To(BeFalse())
+
+			resp, err = rClient.R().Get(proxyAddress + "/oauth/logout")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
+			resp, err = rClient.R().Get(proxyAddress + userAllowedPath)
+			Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
 		})
 	})
 })

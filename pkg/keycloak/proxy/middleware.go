@@ -123,6 +123,8 @@ func (r *OauthProxy) loggingMiddleware(next http.Handler) http.Handler {
 		if r.Config.Verbose {
 			requestLogger := r.Log.With(
 				zap.Any("headers", req.Header),
+				zap.String("path", req.URL.Path),
+				zap.String("method", req.Method),
 			)
 			scope.Logger = requestLogger
 		}
@@ -171,6 +173,8 @@ func (r *OauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 			}
 
 			clientIP := utils.RealIP(req)
+
+			scope.Logger.Debug("authentication middleware")
 
 			// grab the user identity from the request
 			user, err := r.GetIdentity(req)
@@ -454,7 +458,7 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 				return
 			}
 
-			scope.Logger.Debug("query external authz provider for authz")
+			scope.Logger.Debug("authorization middleware")
 
 			user := scope.Identity
 			userPerms := user.Permissions
@@ -462,7 +466,14 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 			var decision authorization.AuthzDecision
 			var err error
 
+			scope.Logger.Debug("query external authz provider for authz")
+
 			if r.Config.EnableUma {
+				var methodScope string
+				if r.Config.EnableUmaMethodScope {
+					methodScope = "method:" + req.Method
+				}
+
 				authzFunc := func(
 					req *http.Request,
 					userPerms authorization.Permissions,
@@ -478,6 +489,7 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 						r.Config.OpenIDProviderTimeout,
 						token,
 						r.Config.Realm,
+						&methodScope,
 					)
 
 					return provider.Authorize()
@@ -489,22 +501,20 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 					if err != nil {
 						var umaUser *UserContext
 
+						scope.Logger.Error(err.Error())
 						scope.Logger.Info("trying to get new uma token")
+
 						//nolint:contextcheck
-						umaUser, err = r.refreshUmaToken(req, user)
+						umaUser, err = r.refreshUmaToken(req, user, &methodScope)
 						if err != nil {
-							scope.Logger.Error(
-								err.Error(),
-								zap.String("subject", user.Name),
-								zap.String("email", user.Email),
-							)
+							scope.Logger.Error(err.Error())
 							//nolint:contextcheck
 							next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
 							return
 						}
 
 						r.dropUMATokenCookie(req, wrt, umaUser.RawToken, time.Until(umaUser.ExpiresAt))
-						scope.Logger.Debug("got uma token", zap.String("uma", umaUser.RawToken))
+						scope.Logger.Debug("got uma token")
 						decision, err = authzFunc(req, umaUser.Permissions)
 					}
 				} else {

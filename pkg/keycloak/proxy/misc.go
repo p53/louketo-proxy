@@ -180,6 +180,8 @@ func (r *OauthProxy) redirectToAuthorization(wrt http.ResponseWriter, req *http.
 		)
 	}
 
+	r.Log.Debug("redirecting to url", zap.String("url", url))
+
 	r.redirectToURL(
 		url,
 		wrt,
@@ -219,99 +221,6 @@ func (r *OauthProxy) GetAccessCookieExpiration(refresh string) time.Duration {
 	}
 
 	return duration
-}
-
-func (r *OauthProxy) createUMAPermissionTicket(
-	ctx context.Context,
-	wrt http.ResponseWriter,
-	req *http.Request,
-) (string, error) {
-	ctx, cancel := context.WithTimeout(
-		ctx,
-		r.Config.OpenIDProviderTimeout,
-	)
-	defer cancel()
-
-	matchingURI := true
-	resourceParam := gocloak.GetResourceParams{
-		URI:         &req.URL.Path,
-		MatchingURI: &matchingURI,
-	}
-
-	r.pat.m.RLock()
-	token := r.pat.Token.AccessToken
-	r.pat.m.RUnlock()
-
-	resources, err := r.IdpClient.GetResourcesClient(
-		ctx,
-		token,
-		r.Config.Realm,
-		resourceParam,
-	)
-
-	if err != nil {
-		r.Log.Error(
-			"problem getting resources for path",
-			zap.String("path", req.URL.Path),
-			zap.Error(err),
-		)
-		return "", err
-	}
-
-	if len(resources) == 0 {
-		r.Log.Info(
-			"no resources for path",
-			zap.String("path", req.URL.Path),
-		)
-		return "", err
-	}
-
-	resourceID := resources[0].ID
-	resourceScopes := make([]string, 0)
-
-	if len(*resources[0].ResourceScopes) == 0 {
-		r.Log.Error(
-			"missingg scopes for resource in IDP provider",
-			zap.String("resourceID", *resourceID),
-		)
-		return "", err
-	}
-
-	for _, scope := range *resources[0].ResourceScopes {
-		resourceScopes = append(resourceScopes, *scope.Name)
-	}
-
-	permissions := []gocloak.CreatePermissionTicketParams{
-		{
-			ResourceID:     resourceID,
-			ResourceScopes: &resourceScopes,
-		},
-	}
-
-	permTicket, err := r.IdpClient.CreatePermissionTicket(
-		ctx,
-		token,
-		r.Config.Realm,
-		permissions,
-	)
-
-	if err != nil {
-		r.Log.Error(
-			"problem getting permission ticket for resourceId",
-			zap.String("resourceID", *resourceID),
-			zap.Error(err),
-		)
-		return "", err
-	}
-
-	permHeader := fmt.Sprintf(
-		`realm="%s", as_uri="%s", ticket="%s"`,
-		r.Config.Realm,
-		r.Config.DiscoveryURI.Host,
-		*permTicket.Ticket,
-	)
-
-	return permHeader, nil
 }
 
 //nolint:cyclop
@@ -375,11 +284,7 @@ func (r *OauthProxy) getPAT(done chan bool) {
 
 		if err != nil {
 			retry++
-			r.Log.Error(
-				"problem getting PAT token",
-
-				zap.Error(err),
-			)
+			r.Log.Error("problem getting PAT token", zap.Error(err))
 
 			if retry >= patRetryCount {
 				cancel()
@@ -434,22 +339,13 @@ func (r *OauthProxy) getPAT(done chan bool) {
 	}
 }
 
-func (r *OauthProxy) getUmaToken(
+// getRPT retrieves relaying party token
+func (r *OauthProxy) getRPT(
 	req *http.Request,
-	writer http.ResponseWriter,
 	targetPath string,
 	userToken string,
-) (*gocloak.JWT, context.Context, error) {
-	token, err := r.getRPT(req, targetPath, userToken)
-	if err != nil {
-		r.Log.Error("", zap.Error(err))
-		return nil, r.accessForbidden(writer, req), err
-	}
-	return token, nil, nil
-}
-
-// getRPT retrieves relaying party token
-func (r *OauthProxy) getRPT(req *http.Request, targetPath string, userToken string) (*gocloak.JWT, error) {
+	methodScope *string,
+) (*gocloak.JWT, error) {
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		r.Config.OpenIDProviderTimeout,
@@ -461,6 +357,7 @@ func (r *OauthProxy) getRPT(req *http.Request, targetPath string, userToken stri
 	resourceParam := gocloak.GetResourceParams{
 		URI:         &targetPath,
 		MatchingURI: &matchingURI,
+		Scope:       methodScope,
 	}
 
 	r.pat.m.RLock()
@@ -835,8 +732,9 @@ func (r *OauthProxy) WithCodeFlowUMA(
 func (r *OauthProxy) refreshUmaToken(
 	req *http.Request,
 	user *UserContext,
+	methodScope *string,
 ) (*UserContext, error) {
-	tok, err := r.getRPT(req, req.URL.Path, user.RawToken)
+	tok, err := r.getRPT(req, req.URL.Path, user.RawToken, methodScope)
 	if err != nil {
 		return nil, err
 	}

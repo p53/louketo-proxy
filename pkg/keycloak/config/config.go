@@ -191,6 +191,8 @@ type Config struct {
 	MatchClaims map[string]string `json:"match-claims" yaml:"match-claims" usage:"keypair values for matching access token claims e.g. aud=myapp, iss=http://example.*"`
 	// AddClaims is a series of claims that should be added to the auth headers
 	AddClaims []string `json:"add-claims" yaml:"add-claims" usage:"extra claims from the token and inject into headers, e.g given_name -> X-Auth-Given-Name"`
+	// EnableUmaMethodScope enables passing request method as "method:GET" scope to keycloak for authorization
+	EnableUmaMethodScope bool `json:"enable-uma-method-scope" yaml:"enable-uma-method-scope" usage:"enables passing request method as 'method:GET' scope to keycloak for authorization" env:"ENABLE_UMA_METHOD_SCOPE"`
 
 	// TLSCertificate is the location for a tls certificate
 	TLSCertificate string `json:"tls-cert" yaml:"tls-cert" usage:"path to ths TLS certificate" env:"TLS_CERTIFICATE"`

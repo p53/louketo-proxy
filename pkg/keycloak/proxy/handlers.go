@@ -108,6 +108,8 @@ func (r *OauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 		return
 	}
 
+	scope.Logger.Debug("authorization handler")
+
 	conf := r.newOAuth2Config(r.getRedirectionURL(wrt, req))
 	// step: set the access type of the session
 	accessType := oauth2.AccessTypeOnline
@@ -149,7 +151,6 @@ func (r *OauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 	scope.Logger.Debug(
 		"incoming authorization request from client address",
 		zap.Any("access_type", accessType),
-		zap.String("auth_url", authURL),
 		zap.String("client_ip", clientIP),
 		zap.String("remote_addr", req.RemoteAddr),
 	)
@@ -168,6 +169,7 @@ func (r *OauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 		return
 	}
 
+	scope.Logger.Debug("redirecting to auth_url", zap.String("auth_url", authURL))
 	r.redirectToURL(authURL, wrt, req, http.StatusSeeOther)
 }
 
@@ -187,6 +189,7 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 		return
 	}
 
+	scope.Logger.Debug("callback handler")
 	//nolint:contextcheck
 	accessToken, identityToken, refreshToken, err := r.getCodeFlowTokens(scope, writer, req)
 	if err != nil {
@@ -248,12 +251,16 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	var umaToken string
 	var umaError error
 	if r.Config.EnableUma {
+		var methodScope string
+		if r.Config.EnableUmaMethodScope {
+			methodScope = "method:" + req.Method
+		}
 		// we are not returning access forbidden immediately because we want to setup
 		// access/refresh cookie as authentication already was done properly and user
 		// could try to get new uma token/cookie, e.g in case he tried first to access
 		// resource to which he doesn't have access
 		//nolint:contextcheck
-		if token, erru := r.getRPT(req, redirectURI, accessToken); token != nil {
+		if token, erru := r.getRPT(req, redirectURI, accessToken, &methodScope); token != nil {
 			umaToken = token.AccessToken
 			umaError = erru
 		}
@@ -283,10 +290,12 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	r.dropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
 
 	if r.Config.EnableUma && umaError == nil {
+		scope.Logger.Debug("got uma token", zap.String("uma", umaToken))
 		r.dropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
 	}
 
 	if umaError != nil {
+		scope.Logger.Error(umaError.Error())
 		r.accessForbidden(writer, req)
 		return
 	}
