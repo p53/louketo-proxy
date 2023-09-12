@@ -35,6 +35,9 @@ const (
 	idpURI               = "http://localhost:8081"
 	testUser             = "myuser"
 	testPass             = "baba1234"
+	umaAllowedPath       = "/pets"
+	umaForbiddenPath     = "/pets/1"
+	umaNonExistentPath   = "/cat"
 )
 
 var idpRealmURI = fmt.Sprintf("%s/realms/%s", idpURI, testRealm)
@@ -277,10 +280,8 @@ var _ = Describe("UMA Code Flow authorization", func() {
 
 	When("Accessing resource, where user is allowed to access", func() {
 		It("should login with user/password and logout successfully", func(ctx context.Context) {
-			userAllowedPath := "/pets"
-			userForbiddenPath := "/pets/1"
 			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
-			resp, err := rClient.R().Get(proxyAddress + userAllowedPath)
+			resp, err := rClient.R().Get(proxyAddress + umaAllowedPath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 
@@ -307,7 +308,7 @@ var _ = Describe("UMA Code Flow authorization", func() {
 			Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
 
 			By("Accessing not allowed path")
-			resp, err = rClient.R().Get(proxyAddress + userForbiddenPath)
+			resp, err = rClient.R().Get(proxyAddress + umaForbiddenPath)
 			body = resp.Body()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
@@ -318,16 +319,15 @@ var _ = Describe("UMA Code Flow authorization", func() {
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 
 			rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
-			resp, err = rClient.R().Get(proxyAddress + userAllowedPath)
+			resp, err = rClient.R().Get(proxyAddress + umaAllowedPath)
 			Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
 		})
 	})
 
 	When("Accessing resource, which does not exist", func() {
 		It("should be forbidden without permission ticket", func(ctx context.Context) {
-			nonExistentResourcePath := "/cat"
 			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
-			resp, err := rClient.R().Get(proxyAddress + nonExistentResourcePath)
+			resp, err := rClient.R().Get(proxyAddress + umaNonExistentPath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 
@@ -357,11 +357,8 @@ var _ = Describe("UMA Code Flow authorization", func() {
 
 	When("Accessing resource, which exists but user is not allowed and then allowed resource", func() {
 		It("should be forbidden without permission ticket and then allowed", func(ctx context.Context) {
-			userForbiddenPath := "/pets/1"
-			userAllowedPath := "/pets"
-
 			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
-			resp, err := rClient.R().Get(proxyAddress + userForbiddenPath)
+			resp, err := rClient.R().Get(proxyAddress + umaForbiddenPath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 
@@ -388,7 +385,7 @@ var _ = Describe("UMA Code Flow authorization", func() {
 			Expect(strings.Contains(string(body), "ticket=")).To(BeFalse())
 
 			By("Accessing allowed resource")
-			resp, err = rClient.R().Get(proxyAddress + userAllowedPath)
+			resp, err = rClient.R().Get(proxyAddress + umaAllowedPath)
 			body = resp.Body()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
@@ -433,9 +430,9 @@ var _ = Describe("UMA Code Flow authorization with method scope", func() {
 
 	When("Accessing resource, where user is allowed to access and then not allowed resource", func() {
 		It("should login with user/password, don't access forbidden resource and logout successfully", func(ctx context.Context) {
-			userAllowedPath := "/horse"
+			umaAllowedPath := "/horse"
 			rClient := resty.New().SetRedirectPolicy(resty.FlexibleRedirectPolicy(5))
-			resp, err := rClient.R().Get(proxyAddress + userAllowedPath)
+			resp, err := rClient.R().Get(proxyAddress + umaAllowedPath)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 
@@ -462,7 +459,7 @@ var _ = Describe("UMA Code Flow authorization with method scope", func() {
 			Expect(strings.Contains(string(body), umaCookieName)).To(BeTrue())
 
 			By("Accessing not allowed method")
-			resp, err = rClient.R().Post(proxyAddress + userAllowedPath)
+			resp, err = rClient.R().Post(proxyAddress + umaAllowedPath)
 			body = resp.Body()
 			Expect(err).NotTo(HaveOccurred())
 			Expect(resp.StatusCode()).To(Equal(http.StatusForbidden))
@@ -473,7 +470,7 @@ var _ = Describe("UMA Code Flow authorization with method scope", func() {
 			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
 
 			rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
-			resp, err = rClient.R().Get(proxyAddress + userAllowedPath)
+			resp, err = rClient.R().Get(proxyAddress + umaAllowedPath)
 			Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
 		})
 	})
