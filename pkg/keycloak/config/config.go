@@ -765,9 +765,11 @@ func (r *Config) isForwardingGrantValid() error {
 		if r.ForwardingUsername == "" {
 			return errors.New("no forwarding username")
 		}
-
 		if r.ForwardingPassword == "" {
 			return errors.New("no forwarding password")
+		}
+		if r.EnableUma {
+			return errors.New("cannot use direct access grant with UMA")
 		}
 	}
 

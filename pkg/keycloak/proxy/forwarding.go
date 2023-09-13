@@ -115,13 +115,12 @@ func (r *OauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 			if r.Config.EnableUmaMethodScope {
 				methodScope = "method:" + req.Method
 			}
-			tok, err := r.getRPT(req, req.URL.Path, "", &methodScope)
 
+			tok, err := r.getRPT(req, req.URL.Path, "", &methodScope)
 			if err != nil {
 				r.Log.Error("", zap.Error(err))
 				return
 			}
-
 			token = tok.AccessToken
 		} else {
 			r.pat.m.RLock()

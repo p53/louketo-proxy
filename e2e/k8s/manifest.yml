@@ -525,7 +525,7 @@ data:
           "frontchannelLogout": true,
           "protocol": "openid-connect",
           "attributes": {
-            "access.token.lifespan": "5",
+            "access.token.lifespan": "300",
             "oidc.ciba.grant.enabled": "false",
             "client.secret.creation.time": "1694161560",
             "backchannel.logout.session.required": "true",
@@ -641,6 +641,21 @@ data:
                   }
                 ],
                 "icon_uri": ""
+              },
+              {
+                "name": "turtle",
+                "ownerManagedAccess": true,
+                "attributes": {},
+                "_id": "00a7af15-584f-4f09-ad84-2b3f095f1798",
+                "uris": [
+                  "/turtle"
+                ],
+                "scopes": [
+                  {
+                    "name": "method:GET"
+                  }
+                ],
+                "icon_uri": ""
               }
             ],
             "policies": [
@@ -656,6 +671,17 @@ data:
                 }
               },
               {
+                "id": "9be8c68c-5c11-4fb9-b60b-67c601d9805d",
+                "name": "forwclient",
+                "description": "",
+                "type": "client",
+                "logic": "POSITIVE",
+                "decisionStrategy": "UNANIMOUS",
+                "config": {
+                  "clients": "[\"test-client-uma\"]"
+                }
+              },
+              {
                 "id": "9466b340-4a02-471d-8716-c6608a79ee33",
                 "name": "test",
                 "description": "",
@@ -665,6 +691,18 @@ data:
                 "config": {
                   "resources": "[\"horse\",\"pets\"]",
                   "applyPolicies": "[\"tata\"]"
+                }
+              },
+              {
+                "id": "97f37d08-4a21-4a07-9af5-d9876cc90a99",
+                "name": "forward",
+                "description": "",
+                "type": "resource",
+                "logic": "POSITIVE",
+                "decisionStrategy": "UNANIMOUS",
+                "config": {
+                  "resources": "[\"turtle\"]",
+                  "applyPolicies": "[\"forwclient\"]"
                 }
               }
             ],
