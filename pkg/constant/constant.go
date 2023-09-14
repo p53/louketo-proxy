@@ -34,6 +34,7 @@ const (
 	PKCECookie         = "pkce"
 	IDTokenCookie      = "id_token"
 	UMACookie          = "uma_token"
+	UMAHeader          = "X-UMA-TOKEN"
 	UnsecureScheme     = "http"
 	SecureScheme       = "https"
 	AnyMethod          = "ANY"

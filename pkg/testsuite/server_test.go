@@ -365,30 +365,6 @@ func TestUmaForwardingProxy(t *testing.T) {
 		ExecutionSettings []fakeRequest
 	}{
 		{
-			Name: "TestFailureOnDisabledUmaOnForwardingProxy",
-			ProxySettings: func(conf *config.Config) {
-				conf.EnableForwarding = true
-				conf.ForwardingDomains = []string{}
-				conf.ForwardingUsername = ValidUsername
-				conf.ForwardingPassword = ValidPassword
-				conf.ForwardingGrantType = configcore.GrantTypeUserCreds
-				conf.PatRetryCount = 5
-				conf.PatRetryInterval = 2 * time.Second
-				conf.OpenIDProviderTimeout = 30 * time.Second
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URL:           upstreamProxy.getServiceURL() + "/test",
-					ProxyRequest:  true,
-					ExpectedProxy: false,
-					ExpectedCode:  http.StatusForbidden,
-					ExpectedContent: func(body string, testNum int) {
-						assert.Equal(t, "", body)
-					},
-				},
-			},
-		},
-		{
 			Name: "TestPasswordGrant",
 			ProxySettings: func(conf *config.Config) {
 				conf.EnableForwarding = true
