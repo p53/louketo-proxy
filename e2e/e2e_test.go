@@ -532,6 +532,21 @@ var _ = Describe("UMA no-redirects authorization with forwarding direct access g
 
 			body := resp.Body()
 			Expect(strings.Contains(string(body), umaMethodAllowedPath)).To(BeTrue())
+			Expect(resp.Header().Get(constant.UMAHeader)).NotTo(BeEmpty())
+
+			By("Repeating access to allowed resource, we verify that uma was saved and reused")
+			resp, err = rClient.R().Get(proxyAddress + umaMethodAllowedPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			body = resp.Body()
+			GinkgoLogr.Info(string(body))
+			Expect(strings.Contains(string(body), umaMethodAllowedPath)).To(BeTrue())
+			Expect(resp.Header().Get(constant.UMAHeader)).To(BeEmpty())
+			// as first request should return uma token in header, it should be
+			// saved in forwarding rpt structure and sent also in this request
+			// so we should see it in response body
+			Expect(strings.Contains(string(body), constant.UMAHeader)).To(BeTrue())
 
 			By("Accessing resource without access for user")
 			resp, err = rClient.R().Get(proxyAddress + umaForbiddenPath)

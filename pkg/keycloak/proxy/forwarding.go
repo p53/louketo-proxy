@@ -114,6 +114,13 @@ func (r *OauthProxy) forwardProxyHandler() func(*http.Request, *http.Response) {
 		token = r.pat.Token.AccessToken
 		r.pat.m.RUnlock()
 
+		if r.rpt != nil && r.Config.EnableUma {
+			r.rpt.m.RLock()
+			umaToken := r.rpt.Token
+			r.rpt.m.RUnlock()
+			req.Header.Set(constant.UMAHeader, umaToken)
+		}
+
 		hostname := req.Host
 		req.URL.Host = hostname
 		// is the host being signed?

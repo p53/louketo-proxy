@@ -493,7 +493,6 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 				decision, err = r.WithUMAIdentity(req, wrt, user, authzFunc)
 				if err != nil {
 					var umaUser *UserContext
-
 					scope.Logger.Error(err.Error())
 					scope.Logger.Info("trying to get new uma token")
 
@@ -506,7 +505,18 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 						return
 					}
 
-					r.dropUMATokenCookie(req, wrt, umaUser.RawToken, time.Until(umaUser.ExpiresAt))
+					umaToken := umaUser.RawToken
+					if r.Config.EnableEncryptedToken || r.Config.ForceEncryptedCookie {
+						if umaToken, err = encryption.EncodeText(umaToken, r.Config.EncryptionKey); err != nil {
+							scope.Logger.Error(err.Error())
+							//nolint:contextcheck
+							next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
+							return
+						}
+					}
+
+					r.dropUMATokenCookie(req, wrt, umaToken, time.Until(umaUser.ExpiresAt))
+					wrt.Header().Set(constant.UMAHeader, umaToken)
 					scope.Logger.Debug("got uma token")
 					decision, err = authzFunc(req, umaUser.Permissions)
 				}
