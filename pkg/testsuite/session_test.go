@@ -126,15 +126,15 @@ func TestGetIndentity(t *testing.T) {
 	}
 
 	for idx, testCase := range testCases {
-		c := newFakeKeycloakConfig()
+		cfg := newFakeKeycloakConfig()
 		testCase := testCase
-		testCase.ProxySettings(c)
+		testCase.ProxySettings(cfg)
 
-		p, idp, _ := newTestProxyService(c)
+		p, idp, _ := newTestProxyService(cfg)
 		token, err := newTestToken(idp.getLocation()).getToken()
 		assert.NoError(t, err)
 
-		user, err := p.GetIdentity(testCase.Request(token), c.CookieAccessName, "")
+		user, err := p.GetIdentity(testCase.Request(token), cfg.CookieAccessName, "")
 
 		if err != nil && testCase.Ok {
 			t.Errorf("test case %d should not have errored", idx)
