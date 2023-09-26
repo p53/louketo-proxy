@@ -200,6 +200,7 @@ func (r *OauthProxy) authenticationMiddleware() func(http.Handler) http.Handler 
 				)
 				_, err := r.Provider.UserInfo(ctx, tokenSource)
 				if err != nil {
+					//nolint:contextcheck
 					next.ServeHTTP(wrt, req.WithContext(r.redirectToAuthorization(wrt, req)))
 					return
 				}
