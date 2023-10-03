@@ -35,11 +35,14 @@ const (
 	idpURI                  = "http://localhost:8081"
 	testUser                = "myuser"
 	testPass                = "baba1234"
+	testPath                = "/test"
 	umaAllowedPath          = "/pets"
 	umaForbiddenPath        = "/pets/1"
 	umaNonExistentPath      = "/cat"
 	umaMethodAllowedPath    = "/horse"
 	umaFwdMethodAllowedPath = "/turtle"
+	postLoginRedirectPath   = "/post/login/path"
+	pkceCookieName          = "TESTPKCECOOKIE"
 )
 
 var idpRealmURI = fmt.Sprintf("%s/realms/%s", idpURI, testRealm)
@@ -145,7 +148,7 @@ var _ = Describe("NoRedirects Simple login/logout", func() {
 	})
 })
 
-var _ = Describe("Code Flow Simple login/logout", func() {
+var _ = Describe("Code Flow login/logout", func() {
 	var portNum string
 	var proxyAddress string
 
@@ -167,6 +170,7 @@ var _ = Describe("Code Flow Simple login/logout", func() {
 			"--skip-access-token-issuer-check=true",
 			"--openid-provider-retry-count=30",
 			"--secure-cookie=false",
+			"--post-login-redirect-path=" + postLoginRedirectPath,
 		}
 
 		osArgs = append(osArgs, proxyArgs...)
@@ -178,6 +182,9 @@ var _ = Describe("Code Flow Simple login/logout", func() {
 		rClient := resty.New()
 		resp := codeFlowLogin(rClient, proxyAddress, http.StatusOK)
 		Expect(resp.Header().Get("Proxy-Accepted")).To(Equal("true"))
+		body := resp.Body()
+		Expect(strings.Contains(string(body), postLoginRedirectPath)).To(BeTrue())
+
 		resp, err = rClient.R().Get(proxyAddress + "/oauth/logout")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(resp.StatusCode()).To(Equal(http.StatusOK))
@@ -191,7 +198,6 @@ var _ = Describe("Code Flow Simple login/logout", func() {
 var _ = Describe("Code Flow PKCE login/logout", func() {
 	var portNum string
 	var proxyAddress string
-	var pkceCookieName = "TESTPKCECOOKIE"
 
 	BeforeEach(func() {
 		server := httptest.NewServer(&testsuite.FakeUpstreamService{})
@@ -234,5 +240,100 @@ var _ = Describe("Code Flow PKCE login/logout", func() {
 		rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
 		resp, _ = rClient.R().Get(proxyAddress)
 		Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
+	})
+})
+
+var _ = Describe("Code Flow login/logout with session check", func() {
+	var portNum string
+	var proxyAddressFirst string
+	var proxyAddressSec string
+
+	BeforeEach(func() {
+		server := httptest.NewServer(&testsuite.FakeUpstreamService{})
+		portNum = generateRandomPort()
+		proxyAddressFirst = "http://127.0.0.1:" + portNum
+
+		osArgs := []string{os.Args[0]}
+		proxyArgs := []string{
+			"--discovery-url=" + idpRealmURI,
+			"--openid-provider-timeout=120s",
+			"--listen=" + "0.0.0.0:" + portNum,
+			"--client-id=" + testClient,
+			"--client-secret=" + testClientSecret,
+			"--upstream-url=" + server.URL,
+			"--no-redirects=false",
+			"--skip-access-token-clientid-check=true",
+			"--skip-access-token-issuer-check=true",
+			"--openid-provider-retry-count=30",
+			"--secure-cookie=false",
+			"--enable-idp-session-check=true",
+			"--enable-logout-redirect=true",
+			"--post-logout-redirect-uri=http://google.com",
+		}
+
+		osArgs = append(osArgs, proxyArgs...)
+		startAndWait(portNum, osArgs)
+
+		portNum = generateRandomPort()
+		proxyAddressSec = "http://localhost:" + portNum
+		osArgs = []string{os.Args[0]}
+		proxyArgs = []string{
+			"--discovery-url=" + idpRealmURI,
+			"--openid-provider-timeout=120s",
+			"--listen=" + "0.0.0.0:" + portNum,
+			"--client-id=" + pkceTestClient,
+			"--client-secret=" + pkceTestClientSecret,
+			"--upstream-url=" + server.URL,
+			"--no-redirects=false",
+			"--skip-access-token-clientid-check=true",
+			"--skip-access-token-issuer-check=true",
+			"--openid-provider-retry-count=30",
+			"--secure-cookie=false",
+			"--enable-pkce=true",
+			"--cookie-pkce-name=" + pkceCookieName,
+			"--enable-idp-session-check=true",
+			"--enable-logout-redirect=true",
+			"--post-logout-redirect-uri=http://google.com",
+		}
+
+		osArgs = append(osArgs, proxyArgs...)
+		startAndWait(portNum, osArgs)
+	})
+
+	When("Login user with one browser client on two clients/app and logout on one of them", func() {
+		It("should logout on both successfully", func(ctx context.Context) {
+			var err error
+			rClient := resty.New()
+			resp := codeFlowLogin(rClient, proxyAddressFirst, http.StatusOK)
+			Expect(resp.Header().Get("Proxy-Accepted")).To(Equal("true"))
+			resp = codeFlowLogin(rClient, proxyAddressSec, http.StatusOK)
+			Expect(resp.Header().Get("Proxy-Accepted")).To(Equal("true"))
+
+			resp, err = rClient.R().Get(proxyAddressFirst + testPath)
+			Expect(err).NotTo(HaveOccurred())
+			body := resp.Body()
+			Expect(strings.Contains(string(body), testPath)).To(BeTrue())
+
+			resp, err = rClient.R().Get(proxyAddressSec + testPath)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+			body = resp.Body()
+			Expect(strings.Contains(string(body), testPath)).To(BeTrue())
+
+			By("Logout user on first client")
+			resp, err = rClient.R().Get(proxyAddressFirst + "/oauth/logout")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode()).To(Equal(http.StatusOK))
+
+			By("Verify logged out on second client")
+			rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
+			resp, _ = rClient.R().Get(proxyAddressSec)
+			Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
+
+			By("Verify logged out on first client")
+			rClient.SetRedirectPolicy(resty.NoRedirectPolicy())
+			resp, _ = rClient.R().Get(proxyAddressFirst)
+			Expect(resp.StatusCode()).To(Equal(http.StatusSeeOther))
+		})
 	})
 })
