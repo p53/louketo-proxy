@@ -42,7 +42,7 @@ var (
 	ErrAccTokenRefreshFailure   = errors.New("failed to refresh the access token")
 	ErrEncryptAccToken          = errors.New("unable to encode access token")
 	ErrEncryptRefreshToken      = errors.New("failed to encrypt refresh token")
-	ErrEncryptIdToken           = errors.New("unable to encode idToken token")
+	ErrEncryptIDToken           = errors.New("unable to encode idToken token")
 
 	ErrDelTokFromStore = errors.New("failed to remove old token")
 	ErrSaveTokToStore  = errors.New("failed to store refresh token")

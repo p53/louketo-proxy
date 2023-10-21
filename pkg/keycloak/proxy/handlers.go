@@ -415,8 +415,8 @@ func (r *OauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 			}
 
 			if idToken, err = encryption.EncodeText(idToken, r.Config.EncryptionKey); err != nil {
-				scope.Logger.Error(apperrors.ErrEncryptIdToken.Error(), zap.Error(err))
-				return apperrors.ErrEncryptIdToken.Error(),
+				scope.Logger.Error(apperrors.ErrEncryptIDToken.Error(), zap.Error(err))
+				return apperrors.ErrEncryptIDToken.Error(),
 					http.StatusInternalServerError,
 					err
 			}
