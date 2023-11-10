@@ -27,7 +27,6 @@ import (
 
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 	"time"
 
@@ -154,21 +153,13 @@ func (r *OauthProxy) oauthAuthorizationHandler(wrt http.ResponseWriter, req *htt
 	)
 
 	// step: if we have a custom sign in page, lets display that
-	if r.Config.HasCustomSignInPage() {
-		model := make(map[string]string)
-		model["redirect"] = authURL
-
-		wrt.WriteHeader(http.StatusOK)
-		_ = r.Render(
-			wrt,
-			path.Base(r.Config.SignInPage),
-			utils.MergeMaps(model, r.Config.Tags),
-		)
+	if r.Config.SignInPage != "" {
+		r.customSignInPage(wrt, r.Config.SignInPage)
 		return
 	}
 
 	scope.Logger.Debug("redirecting to auth_url", zap.String("auth_url", authURL))
-	r.redirectToURL(authURL, wrt, req, http.StatusSeeOther)
+	r.redirectToURL(scope.Logger, authURL, wrt, req, http.StatusSeeOther)
 }
 
 /*
@@ -305,7 +296,7 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	}
 
 	scope.Logger.Debug("redirecting to", zap.String("location", redirectURI))
-	r.redirectToURL(redirectURI, writer, req, http.StatusSeeOther)
+	r.redirectToURL(scope.Logger, redirectURI, writer, req, http.StatusSeeOther)
 }
 
 /*
@@ -628,6 +619,7 @@ func (r *OauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 		)
 
 		r.redirectToURL(
+			scope.Logger,
 			sendTo,
 			writer,
 			req,
@@ -717,7 +709,7 @@ func (r *OauthProxy) logoutHandler(writer http.ResponseWriter, req *http.Request
 
 	// step: should we redirect the user
 	if redirectURL != "" {
-		r.redirectToURL(redirectURL, writer, req, http.StatusSeeOther)
+		r.redirectToURL(scope.Logger, redirectURL, writer, req, http.StatusSeeOther)
 	}
 }
 
