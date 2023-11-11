@@ -54,6 +54,7 @@ type OauthProxy struct {
 	accessForbidden  func(wrt http.ResponseWriter, req *http.Request) context.Context
 	accessError      func(wrt http.ResponseWriter, req *http.Request) context.Context
 	customSignInPage func(wrt http.ResponseWriter, authURL string)
+	GetIdentity      func(req *http.Request, tokenCookie string, tokenHeader string) (*UserContext, error)
 }
 
 // TokenResponse

@@ -27,6 +27,7 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/authorization"
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy/metrics"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"golang.org/x/oauth2"
 
@@ -72,8 +73,8 @@ func entrypointMiddleware(logger *zap.Logger) func(http.Handler) http.Handler {
 			next.ServeHTTP(resp, req.WithContext(context.WithValue(req.Context(), constant.ContextScopeName, scope)))
 
 			// @metric record the time taken then response code
-			latencyMetric.Observe(time.Since(start).Seconds())
-			statusMetric.WithLabelValues(fmt.Sprintf("%d", resp.Status()), req.Method).Inc()
+			metrics.LatencyMetric.Observe(time.Since(start).Seconds())
+			metrics.StatusMetric.WithLabelValues(fmt.Sprintf("%d", resp.Status()), req.Method).Inc()
 
 			// place back the original uri for any later consumers
 			req.URL.Path = scope.Path

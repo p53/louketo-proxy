@@ -52,6 +52,7 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/keycloak/config"
 	proxycore "github.com/gogatekeeper/gatekeeper/pkg/proxy/core"
 	"github.com/gogatekeeper/gatekeeper/pkg/proxy/handlers"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy/metrics"
 	"github.com/gogatekeeper/gatekeeper/pkg/storage"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"github.com/prometheus/client_golang/prometheus"
@@ -63,11 +64,11 @@ import (
 func init() {
 	_, _ = time.LoadLocation("UTC")      // ensure all time is in UTC [NOTE(fredbi): no this does just nothing]
 	runtime.GOMAXPROCS(runtime.NumCPU()) // set the core
-	prometheus.MustRegister(certificateRotationMetric)
-	prometheus.MustRegister(latencyMetric)
-	prometheus.MustRegister(oauthLatencyMetric)
-	prometheus.MustRegister(oauthTokensMetric)
-	prometheus.MustRegister(statusMetric)
+	prometheus.MustRegister(metrics.CertificateRotationMetric)
+	prometheus.MustRegister(metrics.LatencyMetric)
+	prometheus.MustRegister(metrics.OauthLatencyMetric)
+	prometheus.MustRegister(metrics.OauthTokensMetric)
+	prometheus.MustRegister(metrics.StatusMetric)
 }
 
 // NewProxy create's a new proxy from configuration
@@ -288,6 +289,14 @@ func (r *OauthProxy) CreateReverseProxy() error {
 	engine := chi.NewRouter()
 	r.useDefaultStack(engine)
 
+	r.GetIdentity = GetIdentity(
+		r.Log,
+		r.Config.SkipAuthorizationHeaderIdentity,
+		r.Config.EnableEncryptedToken,
+		r.Config.ForceEncryptedCookie,
+		r.Config.EncryptionKey,
+	)
+
 	if r.Config.EnableHmac {
 		engine.Use(hmacMiddleware(r.Log, r.Config.EncryptionKey))
 	}
@@ -332,7 +341,14 @@ func (r *OauthProxy) CreateReverseProxy() error {
 			"enabled the service metrics middleware",
 			zap.String("path", path.Clean(r.Config.WithOAuthURI(constant.MetricsURL))),
 		)
-		adminEngine.Get(constant.MetricsURL, r.proxyMetricsHandler)
+		adminEngine.Get(
+			constant.MetricsURL,
+			proxyMetricsHandler(
+				r.Config.LocalhostMetrics,
+				r.accessForbidden,
+				r.metricsHandler,
+			),
+		)
 	}
 
 	// step: add the routing for oauth
@@ -340,9 +356,12 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		eng.MethodNotAllowed(handlers.MethodNotAllowHandlder)
 		eng.HandleFunc(constant.AuthorizationURL, r.oauthAuthorizationHandler)
 		eng.Get(constant.CallbackURL, r.oauthCallbackHandler)
-		eng.Get(constant.ExpiredURL, r.expirationHandler)
+		eng.Get(constant.ExpiredURL, expirationHandler(r.GetIdentity, r.Config.CookieAccessName))
 		eng.With(r.authenticationMiddleware()).Get(constant.LogoutURL, r.logoutHandler)
-		eng.With(r.authenticationMiddleware()).Get(constant.TokenURL, r.tokenHandler)
+		eng.With(r.authenticationMiddleware()).Get(
+			constant.TokenURL,
+			tokenHandler(r.GetIdentity, r.Config.CookieAccessName, r.accessError),
+		)
 		eng.Post(constant.LoginURL, r.loginHandler)
 		eng.Get(constant.DiscoveryURL, r.discoveryHandler)
 
@@ -593,7 +612,7 @@ func (r *OauthProxy) createForwardingProxy() error {
 				}
 
 				latency := time.Since(start)
-				latencyMetric.Observe(latency.Seconds())
+				metrics.LatencyMetric.Observe(latency.Seconds())
 
 				r.Log.Info("client request",
 					zap.String("method", resp.Request.Method),
@@ -923,7 +942,7 @@ func (r *OauthProxy) createHTTPListener(config listenerConfig) (net.Listener, er
 				config.certificate,
 				config.privateKey,
 				r.Log,
-				&certificateRotationMetric,
+				&metrics.CertificateRotationMetric,
 			)
 
 			if err != nil {
