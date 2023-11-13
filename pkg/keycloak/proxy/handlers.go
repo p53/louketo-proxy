@@ -283,7 +283,9 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 	}
 
 	r.dropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)
-	r.dropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
+	if r.Config.EnableIDTokenCookie {
+		r.dropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
+	}
 
 	if r.Config.EnableUma && umaError == nil {
 		scope.Logger.Debug("got uma token", zap.String("uma", umaToken))
@@ -420,12 +422,14 @@ func (r *OauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 				r.GetAccessCookieExpiration(token.RefreshToken),
 			)
 
-			r.dropIDTokenCookie(
-				req,
-				writer,
-				idToken,
-				r.GetAccessCookieExpiration(token.RefreshToken),
-			)
+			if r.Config.EnableIDTokenCookie {
+				r.dropIDTokenCookie(
+					req,
+					writer,
+					idToken,
+					r.GetAccessCookieExpiration(token.RefreshToken),
+				)
+			}
 
 			var expiration time.Duration
 			// notes: not all idp refresh tokens are readable, google for example, so we attempt to decode into
@@ -463,12 +467,14 @@ func (r *OauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request)
 				accessToken,
 				time.Until(identity.ExpiresAt),
 			)
-			r.dropIDTokenCookie(
-				req,
-				writer,
-				idToken,
-				time.Until(identity.ExpiresAt),
-			)
+			if r.Config.EnableIDTokenCookie {
+				r.dropIDTokenCookie(
+					req,
+					writer,
+					idToken,
+					time.Until(identity.ExpiresAt),
+				)
+			}
 		}
 
 		// @metric a token has been issued
