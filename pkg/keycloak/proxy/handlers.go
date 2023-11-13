@@ -305,7 +305,7 @@ func (r *OauthProxy) oauthCallbackHandler(writer http.ResponseWriter, req *http.
 /*
 	loginHandler provide's a generic endpoint for clients to perform a user_credentials login to the provider
 */
-//nolint:cyclop // refactor
+//nolint:cyclop,funlen // refactor
 func (r *OauthProxy) loginHandler(writer http.ResponseWriter, req *http.Request) {
 	scope, assertOk := req.Context().Value(constant.ContextScopeName).(*RequestScope)
 
