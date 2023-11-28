@@ -37,7 +37,7 @@ const (
 	testPass                = "baba1234"
 	testPath                = "/test"
 	umaAllowedPath          = "/pets"
-	umaForbiddenPath        = "/pets/1"
+	umaForbiddenPath        = "/dog"
 	umaNonExistentPath      = "/cat"
 	umaMethodAllowedPath    = "/horse"
 	umaFwdMethodAllowedPath = "/turtle"
