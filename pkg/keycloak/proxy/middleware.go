@@ -511,9 +511,6 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 			default:
 				if err != nil {
 					scope.Logger.Error(apperrors.ErrFailedAuthzRequest.Error(), zap.Error(err))
-					//nolint:contextcheck
-					next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
-					return
 				}
 			}
 
@@ -526,20 +523,22 @@ func (r *OauthProxy) authorizationMiddleware() func(http.Handler) http.Handler {
 						scope.Logger.Error(apperrors.ErrAssertionFailed.Error())
 						//nolint:contextcheck
 						next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
+						return
 					}
 
 					//nolint:contextcheck
 					ticket, err := prv.GenerateUMATicket()
-					scope.Logger.Error(err.Error())
-
-					permHeader := fmt.Sprintf(
-						`realm="%s", as_uri="%s", ticket="%s"`,
-						r.Config.Realm,
-						r.Config.DiscoveryURI.Host,
-						ticket,
-					)
-
-					wrt.Header().Add(constant.UMATicketHeader, permHeader)
+					if err != nil {
+						scope.Logger.Error(err.Error())
+					} else {
+						permHeader := fmt.Sprintf(
+							`realm="%s", as_uri="%s", ticket="%s"`,
+							r.Config.Realm,
+							r.Config.DiscoveryURI.Host,
+							ticket,
+						)
+						wrt.Header().Add(constant.UMATicketHeader, permHeader)
+					}
 				}
 				//nolint:contextcheck
 				next.ServeHTTP(wrt, req.WithContext(r.accessForbidden(wrt, req)))
