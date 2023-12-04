@@ -656,7 +656,7 @@ func verifyToken(
 			ClientID:          clientID,
 			SkipClientIDCheck: skipClientIDCheck,
 			SkipIssuerCheck:   skipIssuerCheck,
-			SkipExpiryCheck:   true,
+			SkipExpiryCheck:   false,
 		},
 	)
 
