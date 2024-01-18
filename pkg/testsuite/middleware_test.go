@@ -1169,6 +1169,7 @@ func TestGroupPermissionsMiddleware(t *testing.T) {
 	newFakeProxy(cfg, &fakeAuthConfig{}).RunTests(t, requests)
 }
 
+//nolint:funlen
 func TestRolePermissionsMiddleware(t *testing.T) {
 	cfg := newFakeKeycloakConfig()
 	cfg.Resources = []*authorization.Resource{
