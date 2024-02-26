@@ -197,7 +197,7 @@ func oauthCallbackHandler(
 	forceEncryptedCookie bool,
 	enablePKCE bool,
 	provider *oidc3.Provider,
-	cm *cookie.Manager,
+	cookManager *cookie.Manager,
 	pat *PAT,
 	idpClient *gocloak.GoCloak,
 	store storage.Storage,
@@ -305,7 +305,7 @@ func oauthCallbackHandler(
 					return
 				}
 			default:
-				cm.DropRefreshTokenCookie(req, writer, encrypted, oidcTokensCookiesExp)
+				cookManager.DropRefreshTokenCookie(req, writer, encrypted, oidcTokensCookiesExp)
 			}
 		}
 
@@ -317,8 +317,8 @@ func oauthCallbackHandler(
 			}
 		}
 
-		cm.ClearStateParameterCookie(req, writer)
-		cm.ClearPKCECookie(req, writer)
+		cookManager.ClearStateParameterCookie(req, writer)
+		cookManager.ClearPKCECookie(req, writer)
 
 		if postLoginRedirectPath != "" && redirectURI == "/" {
 			redirectURI = postLoginRedirectPath
@@ -329,7 +329,7 @@ func oauthCallbackHandler(
 		if enableUma {
 			var methodScope *string
 			if enableUmaMethodScope {
-				ms := "method:" + req.Method
+				ms := constant.UmaMethodScope + req.Method
 				methodScope = &ms
 			}
 			// we are not returning access forbidden immediately because we want to setup
@@ -372,14 +372,14 @@ func oauthCallbackHandler(
 			}
 		}
 
-		cm.DropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)
+		cookManager.DropAccessTokenCookie(req, writer, accessToken, oidcTokensCookiesExp)
 		if enableIDTokenCookie {
-			cm.DropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
+			cookManager.DropIDTokenCookie(req, writer, identityToken, oidcTokensCookiesExp)
 		}
 
 		if enableUma && umaError == nil {
 			scope.Logger.Debug("got uma token", zap.String("uma", umaToken))
-			cm.DropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
+			cookManager.DropUMATokenCookie(req, writer, umaToken, oidcTokensCookiesExp)
 		}
 
 		if umaError != nil {
