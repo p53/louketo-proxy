@@ -2501,8 +2501,7 @@ func TestLogRealIP(t *testing.T) {
 		cfg.DiscoveryURL = auth.getLocation()
 		_ = cfg.Update()
 
-		proxy, _ := proxy.NewProxy(cfg, testLog)
-		proxy.Upstream = &FakeUpstreamService{}
+		proxy, _ := proxy.NewProxy(cfg, testLog, &FakeUpstreamService{})
 		_ = proxy.Run()
 
 		cfg.RedirectionURL = fmt.Sprintf("http://%s", proxy.Listener.Addr().String())

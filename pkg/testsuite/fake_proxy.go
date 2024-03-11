@@ -94,30 +94,28 @@ func newFakeProxy(cfg *config.Config, authConfig *fakeAuthConfig) *fakeProxy {
 	// c.Verbose = true
 	cfg.DisableAllLogging = true
 	err := cfg.Update()
-
 	if err != nil {
 		panic("failed to create fake proxy service, error: " + err.Error())
 	}
 
-	proxy, err := proxy.NewProxy(cfg, nil)
-
+	var oProxy *proxy.OauthProxy
+	if cfg.Upstream == "" {
+		oProxy, err = proxy.NewProxy(cfg, nil, &FakeUpstreamService{})
+	} else {
+		oProxy, err = proxy.NewProxy(cfg, nil, nil)
+	}
 	if err != nil {
 		panic("failed to create fake proxy service, error: " + err.Error())
 	}
 
 	// proxy.log = zap.NewNop()
-
-	if cfg.Upstream == "" {
-		proxy.Upstream = &FakeUpstreamService{}
-	}
-
-	if err = proxy.Run(); err != nil {
+	if err = oProxy.Run(); err != nil {
 		panic("failed to create the proxy service, error: " + err.Error())
 	}
 
-	cfg.RedirectionURL = fmt.Sprintf("http://%s", proxy.Listener.Addr().String())
+	cfg.RedirectionURL = fmt.Sprintf("http://%s", oProxy.Listener.Addr().String())
 
-	return &fakeProxy{cfg, auth, proxy, make(map[string]*http.Cookie)}
+	return &fakeProxy{cfg, auth, oProxy, make(map[string]*http.Cookie)}
 }
 
 func (f *fakeProxy) getServiceURL() string {
@@ -614,13 +612,12 @@ func newTestProxyService(config *config.Config) (*proxy.OauthProxy, *fakeAuthSer
 		panic("failed to create proxy service, error: " + err.Error())
 	}
 
-	proxy, err := proxy.NewProxy(config, nil)
+	proxy, err := proxy.NewProxy(config, nil, &FakeUpstreamService{})
 	if err != nil {
 		panic("failed to create proxy service, error: " + err.Error())
 	}
 
 	// step: create an fake upstream endpoint
-	proxy.Upstream = new(FakeUpstreamService)
 	service := httptest.NewServer(proxy.Router)
 	config.RedirectionURL = service.URL
 

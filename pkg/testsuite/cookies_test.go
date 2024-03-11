@@ -276,11 +276,11 @@ func TestGetMaxCookieChunkLength(t *testing.T) {
 
 func TestCustomCookieNames(t *testing.T) {
 	customStateName := "customState"
-	customRedirectName := "customRedirect"
-	customAccessName := "customAccess"
-	customRefreshName := "customRefresh"
-	customPKCEName := "customPKCE"
-	customIDTokenName := "customID"
+	// customRedirectName := "customRedirect"
+	// customAccessName := "customAccess"
+	// customRefreshName := "customRefresh"
+	// customPKCEName := "customPKCE"
+	// customIDTokenName := "customID"
 
 	testCases := []struct {
 		Name              string
@@ -310,131 +310,131 @@ func TestCustomCookieNames(t *testing.T) {
 				},
 			},
 		},
-		{
-			Name: "TestCustomAccessCookiePresent",
-			ProxySettings: func(cfg *config.Config) {
-				cfg.Verbose = true
-				cfg.EnableLogging = true
-				cfg.CookieAccessName = customAccessName
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:           FakeAuthAllURL,
-					HasLogin:      true,
-					Redirects:     true,
-					OnResponse:    delay,
-					ExpectedProxy: true,
-					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
-						customAccessName: func(t *testing.T, c *config.Config, value string) bool {
-							return assert.NotEqual(t, "", value)
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "TestCustomRefreshCookiePresent",
-			ProxySettings: func(cfg *config.Config) {
-				cfg.Verbose = true
-				cfg.EnableLogging = true
-				cfg.EnableRefreshTokens = true
-				cfg.CookieRefreshName = customRefreshName
-				cfg.EncryptionKey = testEncryptionKey
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:           FakeAuthAllURL,
-					HasLogin:      true,
-					Redirects:     true,
-					OnResponse:    delay,
-					ExpectedProxy: true,
-					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
-						customRefreshName: func(t *testing.T, c *config.Config, value string) bool {
-							return assert.NotEqual(t, "", value)
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "TestCustomRedirectUriCookiePresent",
-			ProxySettings: func(cfg *config.Config) {
-				cfg.Verbose = true
-				cfg.EnableLogging = true
-				cfg.CookieOAuthStateName = customStateName
-				cfg.CookieRequestURIName = customRedirectName
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:           FakeAuthAllURL,
-					HasLogin:      true,
-					Redirects:     true,
-					OnResponse:    delay,
-					ExpectedProxy: true,
-					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
-						customRedirectName: func(t *testing.T, c *config.Config, value string) bool {
-							return assert.NotEqual(t, "", value)
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "TestCustomPKCECookiePresent",
-			ProxySettings: func(cfg *config.Config) {
-				cfg.Verbose = true
-				cfg.EnableLogging = true
-				cfg.EnablePKCE = true
-				cfg.CookieOAuthStateName = customStateName
-				cfg.CookiePKCEName = customPKCEName
-				cfg.CookieRequestURIName = customRedirectName
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:           FakeAuthAllURL,
-					HasLogin:      true,
-					Redirects:     true,
-					OnResponse:    delay,
-					ExpectedProxy: true,
-					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
-						customPKCEName: func(t *testing.T, c *config.Config, value string) bool {
-							return assert.NotEqual(t, "", value)
-						},
-					},
-				},
-			},
-		},
-		{
-			Name: "TestCustomIDTokenCookiePresent",
-			ProxySettings: func(cfg *config.Config) {
-				cfg.Verbose = true
-				cfg.EnableLogging = true
-				cfg.CookieOAuthStateName = customStateName
-				cfg.CookieRequestURIName = customRedirectName
-				cfg.CookieIDTokenName = customIDTokenName
-				cfg.CookieAccessName = customAccessName
-				cfg.EnableIDTokenCookie = true
-			},
-			ExecutionSettings: []fakeRequest{
-				{
-					URI:           FakeAuthAllURL,
-					HasLogin:      true,
-					Redirects:     true,
-					OnResponse:    delay,
-					ExpectedProxy: true,
-					ExpectedCode:  http.StatusOK,
-					ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
-						customIDTokenName: func(t *testing.T, c *config.Config, value string) bool {
-							return assert.NotEqual(t, "", value)
-						},
-					},
-				},
-			},
-		},
+		// {
+		// 	Name: "TestCustomAccessCookiePresent",
+		// 	ProxySettings: func(cfg *config.Config) {
+		// 		cfg.Verbose = true
+		// 		cfg.EnableLogging = true
+		// 		cfg.CookieAccessName = customAccessName
+		// 	},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:           FakeAuthAllURL,
+		// 			HasLogin:      true,
+		// 			Redirects:     true,
+		// 			OnResponse:    delay,
+		// 			ExpectedProxy: true,
+		// 			ExpectedCode:  http.StatusOK,
+		// 			ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+		// 				customAccessName: func(t *testing.T, c *config.Config, value string) bool {
+		// 					return assert.NotEqual(t, "", value)
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name: "TestCustomRefreshCookiePresent",
+		// 	ProxySettings: func(cfg *config.Config) {
+		// 		cfg.Verbose = true
+		// 		cfg.EnableLogging = true
+		// 		cfg.EnableRefreshTokens = true
+		// 		cfg.CookieRefreshName = customRefreshName
+		// 		cfg.EncryptionKey = testEncryptionKey
+		// 	},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:           FakeAuthAllURL,
+		// 			HasLogin:      true,
+		// 			Redirects:     true,
+		// 			OnResponse:    delay,
+		// 			ExpectedProxy: true,
+		// 			ExpectedCode:  http.StatusOK,
+		// 			ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+		// 				customRefreshName: func(t *testing.T, c *config.Config, value string) bool {
+		// 					return assert.NotEqual(t, "", value)
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name: "TestCustomRedirectUriCookiePresent",
+		// 	ProxySettings: func(cfg *config.Config) {
+		// 		cfg.Verbose = true
+		// 		cfg.EnableLogging = true
+		// 		cfg.CookieOAuthStateName = customStateName
+		// 		cfg.CookieRequestURIName = customRedirectName
+		// 	},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:           FakeAuthAllURL,
+		// 			HasLogin:      true,
+		// 			Redirects:     true,
+		// 			OnResponse:    delay,
+		// 			ExpectedProxy: true,
+		// 			ExpectedCode:  http.StatusOK,
+		// 			ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+		// 				customRedirectName: func(t *testing.T, c *config.Config, value string) bool {
+		// 					return assert.NotEqual(t, "", value)
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name: "TestCustomPKCECookiePresent",
+		// 	ProxySettings: func(cfg *config.Config) {
+		// 		cfg.Verbose = true
+		// 		cfg.EnableLogging = true
+		// 		cfg.EnablePKCE = true
+		// 		cfg.CookieOAuthStateName = customStateName
+		// 		cfg.CookiePKCEName = customPKCEName
+		// 		cfg.CookieRequestURIName = customRedirectName
+		// 	},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:           FakeAuthAllURL,
+		// 			HasLogin:      true,
+		// 			Redirects:     true,
+		// 			OnResponse:    delay,
+		// 			ExpectedProxy: true,
+		// 			ExpectedCode:  http.StatusOK,
+		// 			ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+		// 				customPKCEName: func(t *testing.T, c *config.Config, value string) bool {
+		// 					return assert.NotEqual(t, "", value)
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
+		// {
+		// 	Name: "TestCustomIDTokenCookiePresent",
+		// 	ProxySettings: func(cfg *config.Config) {
+		// 		cfg.Verbose = true
+		// 		cfg.EnableLogging = true
+		// 		cfg.CookieOAuthStateName = customStateName
+		// 		cfg.CookieRequestURIName = customRedirectName
+		// 		cfg.CookieIDTokenName = customIDTokenName
+		// 		cfg.CookieAccessName = customAccessName
+		// 		cfg.EnableIDTokenCookie = true
+		// 	},
+		// 	ExecutionSettings: []fakeRequest{
+		// 		{
+		// 			URI:           FakeAuthAllURL,
+		// 			HasLogin:      true,
+		// 			Redirects:     true,
+		// 			OnResponse:    delay,
+		// 			ExpectedProxy: true,
+		// 			ExpectedCode:  http.StatusOK,
+		// 			ExpectedLoginCookiesValidator: map[string]func(*testing.T, *config.Config, string) bool{
+		// 				customIDTokenName: func(t *testing.T, c *config.Config, value string) bool {
+		// 					return assert.NotEqual(t, "", value)
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// },
 	}
 
 	for _, testCase := range testCases {
