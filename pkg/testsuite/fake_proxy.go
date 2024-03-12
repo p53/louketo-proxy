@@ -2,6 +2,7 @@ package testsuite
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -23,6 +24,7 @@ import (
 	"github.com/oleiade/reflections"
 	"github.com/stoewer/go-strcase"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type fakeRequest struct {
@@ -95,7 +97,7 @@ func newFakeProxy(cfg *config.Config, authConfig *fakeAuthConfig) *fakeProxy {
 	cfg.DisableAllLogging = true
 	err := cfg.Update()
 	if err != nil {
-		panic("failed to create fake proxy service, error: " + err.Error())
+		panic(errors.Join(ErrCreateFakeProxy, err).Error())
 	}
 
 	var oProxy *proxy.OauthProxy
@@ -105,7 +107,7 @@ func newFakeProxy(cfg *config.Config, authConfig *fakeAuthConfig) *fakeProxy {
 		oProxy, err = proxy.NewProxy(cfg, nil, nil)
 	}
 	if err != nil {
-		panic("failed to create fake proxy service, error: " + err.Error())
+		panic(errors.Join(ErrCreateFakeProxy, err).Error())
 	}
 
 	// proxy.log = zap.NewNop()
@@ -235,7 +237,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 						strcase.UpperCamelCase(i),
 						reqCfg.TokenClaims[i],
 					)
-					assert.NoError(t, err)
+					require.NoError(t, err)
 				}
 			}
 
@@ -257,11 +259,11 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 
 			if reqCfg.NotSigned {
 				authToken, err := token.GetUnsignedToken()
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				setRequestAuthentication(f.config, client, request, &reqCfg, authToken)
 			} else {
 				authToken, err := token.GetToken()
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				setRequestAuthentication(f.config, client, request, &reqCfg, authToken)
 			}
 		}
@@ -289,7 +291,7 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 			}
 		} else if err != nil {
 			if !strings.Contains(err.Error(), "auto redirect is disabled") {
-				assert.NoError(
+				require.NoError(
 					t,
 					err,
 					"case %d, unable to make request, error: %s",
@@ -467,8 +469,8 @@ func (f *fakeProxy) RunTests(t *testing.T, requests []fakeRequest) {
 				if expVal != "" {
 					assert.Equal(
 						t,
-						cookie.Value,
 						expVal,
+						cookie.Value,
 						"case %d, expected cookie value: %s, got: %s",
 						idx,
 						expVal,
@@ -609,12 +611,12 @@ func newTestProxyService(config *config.Config) (*proxy.OauthProxy, *fakeAuthSer
 	err := config.Update()
 
 	if err != nil {
-		panic("failed to create proxy service, error: " + err.Error())
+		panic(errors.Join(ErrCreateFakeProxy, err).Error())
 	}
 
 	proxy, err := proxy.NewProxy(config, nil, &FakeUpstreamService{})
 	if err != nil {
-		panic("failed to create proxy service, error: " + err.Error())
+		panic(errors.Join(ErrCreateFakeProxy, err).Error())
 	}
 
 	// step: create an fake upstream endpoint
@@ -672,7 +674,7 @@ func newFakeKeycloakConfig() *config.Config {
 		Verbose:                     false,
 		Resources: []*authorization.Resource{
 			{
-				URL:     FakeAdminRoleURL,
+				URL:     FakeAdminAllURL,
 				Methods: []string{"GET"},
 				Roles:   []string{FakeAdminRole},
 			},
