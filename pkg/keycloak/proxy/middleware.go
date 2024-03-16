@@ -472,6 +472,7 @@ func authenticationMiddleware(
 				}
 			}
 
+			*req = *(req.WithContext(ctx))
 			next.ServeHTTP(wrt, req)
 		})
 	}
@@ -630,6 +631,7 @@ func authorizationMiddleware(
 					decision = authorization.DeniedAuthz
 					err = varErr
 				} else {
+					req.Body.Close()
 					passReq := *req
 					passReq.Body = io.NopCloser(bytes.NewReader(reqBody))
 					req.Body = io.NopCloser(bytes.NewReader(reqBody))
