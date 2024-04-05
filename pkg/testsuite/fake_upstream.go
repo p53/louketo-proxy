@@ -84,6 +84,7 @@ func (f *FakeUpstreamService) ServeHTTP(wrt http.ResponseWriter, req *http.Reque
 // 	}
 // 	ln, err := net.Listen("tcp", randomLocalHost)
 // 	if err != nil {
+//nolint:dupword
 // 		return nil, nil, err
 // 	}
 // 	return proxyHTTPServer, ln, nil
