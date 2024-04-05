@@ -77,7 +77,7 @@ type Config struct {
 	OpenIDProviderHeaders map[string]string `json:"openid-provider-headers" usage:"http headers sent to idp provider" yaml:"openid-provider-headers"`
 	// UpstreamProxy proxy for upstream communication
 	UpstreamProxy string `env:"UPSTREAM_PROXY" json:"upstream-proxy" usage:"proxy for communication with upstream" yaml:"upstream-proxy"`
-	// UpstreamProxy proxy for upstream communication
+	// UpstreamNoProxy list of upstream destinations which should be not proxied
 	UpstreamNoProxy string `env:"UPSTREAM_NO_PROXY" json:"upstream-no-proxy" usage:"list of upstream destinations which should be not proxied" yaml:"upstream-no-proxy"`
 	// BaseURI is prepended to all the generated URIs
 	BaseURI string `env:"BASE_URI" json:"base-uri" usage:"common prefix for all URIs" yaml:"base-uri"`
