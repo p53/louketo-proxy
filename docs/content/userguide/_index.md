@@ -327,7 +327,7 @@ yaml example:
 ```yaml
   allowed-query-params:
     - myparam: "myvalue"
-    - yourparam: "yourvalue"
+    - yourparam: "yourvalueF"
 ```
 
 ## TCP proxy with HTTP CONNECT
@@ -454,7 +454,7 @@ in Keycloak, providing granular role controls over issue tokens.
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:2.10.0
+  image: quay.io/gogatekeeper/gatekeeper:2.11.0
   args:
   - --enable-forwarding=true
   - --forwarding-username=projecta
@@ -481,7 +481,7 @@ Example setup client credentials grant:
 
 ``` yaml
 - name: gatekeeper
-  image: quay.io/gogatekeeper/gatekeeper:2.10.0
+  image: quay.io/gogatekeeper/gatekeeper:2.11.0
   args:
   - --enable-forwarding=true
   - --forwarding-domains=projecta.svc.cluster.local
