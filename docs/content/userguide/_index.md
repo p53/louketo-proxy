@@ -327,6 +327,26 @@ yaml example:
     yourparam: "yourvalue"
 ```
 
+If you would like to have defaults for your parameters, there is `default-allowed-query-params` option available, these values
+will be used only when there are no params specified in url:
+
+**NOTE**: Params present in default query params must be allowed by allowed-query-params option
+
+cli example:
+
+```bash
+  --default-allowed-query-params="myparam=myvalue" \
+  --default-allowed-query-params="yourparam=yourvalue"
+```
+
+yaml example:
+
+```yaml
+  default-allowed-query-params:
+    myparam: "myvalue"
+    yourparam: "yourvalue"
+```
+
 ## TCP proxy with HTTP CONNECT
 
 You can protect your TCP services with gogatekeeper by adding `CONNECT` HTTP method to list of `custom-http-methods`. On client side you will need to pass of course token in `Authorization` header (righ now there are few clients which could make HTTP connect with `Bearer` token and then forward tcp, e.g. gost proxy - but only in static way, some IDE provide HTTP CONNECT functionality for db connectors but only with `Basic` authentication, we would like to add this functionality to gatekeeper in future). This setup will authenticate connection at start and will create tunnel to your backend service. Please use with care and ensure that it allows connection only to intended services, otherwise it can be missused for various attacks.
