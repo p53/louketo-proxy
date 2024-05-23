@@ -37,6 +37,8 @@ import (
 	"github.com/gogatekeeper/gatekeeper/pkg/constant"
 	"github.com/gogatekeeper/gatekeeper/pkg/encryption"
 	"github.com/gogatekeeper/gatekeeper/pkg/proxy/cookie"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy/models"
+	"github.com/gogatekeeper/gatekeeper/pkg/proxy/session"
 	"github.com/gogatekeeper/gatekeeper/pkg/utils"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -71,18 +73,18 @@ func filterCookies(req *http.Request, filter []string) error {
 
 // revokeProxy is responsible for stopping middleware from proxying the request
 func revokeProxy(logger *zap.Logger, req *http.Request) context.Context {
-	var scope *RequestScope
+	var scope *models.RequestScope
 	ctxVal := req.Context().Value(constant.ContextScopeName)
 
 	switch ctxVal {
 	case nil:
-		scope = &RequestScope{AccessDenied: true}
+		scope = &models.RequestScope{AccessDenied: true}
 	default:
 		var assertOk bool
-		scope, assertOk = ctxVal.(*RequestScope)
+		scope, assertOk = ctxVal.(*models.RequestScope)
 		if !assertOk {
 			logger.Error(apperrors.ErrAssertionFailed.Error())
-			scope = &RequestScope{AccessDenied: true}
+			scope = &models.RequestScope{AccessDenied: true}
 		}
 	}
 
@@ -276,7 +278,7 @@ func GetAccessCookieExpiration(
 		logger.Error("unable to parse token")
 	}
 
-	if ident, err := ExtractIdentity(webToken); err == nil {
+	if ident, err := session.ExtractIdentity(webToken); err == nil {
 		delta := time.Until(ident.ExpiresAt)
 
 		if delta > 0 {
@@ -416,14 +418,14 @@ func getPAT(
 func WithUMAIdentity(
 	req *http.Request,
 	targetPath string,
-	user *UserContext,
+	user *models.UserContext,
 	cookieUMAName string,
 	provider *oidc3.Provider,
 	clientID string,
 	skipClientIDCheck bool,
 	skipIssuerCheck bool,
-	getIdentity func(req *http.Request, tokenCookie string, tokenHeader string) (*UserContext, error),
-	authzFunc func(targetPath string, userPerms authorization.Permissions) (authorization.AuthzDecision, error),
+	getIdentity func(req *http.Request, tokenCookie string, tokenHeader string) (*models.UserContext, error),
+	authzFunc func(targetPath string, userPerms models.Permissions) (authorization.AuthzDecision, error),
 ) (authorization.AuthzDecision, error) {
 	umaUser, err := getIdentity(req, cookieUMAName, constant.UMAHeader)
 	if err != nil {
@@ -561,7 +563,7 @@ func getRPT(
 }
 
 func getCodeFlowTokens(
-	scope *RequestScope,
+	scope *models.RequestScope,
 	writer http.ResponseWriter,
 	req *http.Request,
 	enablePKCE bool,
@@ -705,7 +707,7 @@ func verifyToken(
 }
 
 func encryptToken(
-	scope *RequestScope,
+	scope *models.RequestScope,
 	rawToken string,
 	encKey string,
 	tokenType string,
@@ -726,7 +728,7 @@ func encryptToken(
 }
 
 func getRequestURIFromCookie(
-	scope *RequestScope,
+	scope *models.RequestScope,
 	encodedRequestURI *http.Cookie,
 ) string {
 	// some clients URL-escape padding characters
@@ -758,9 +760,9 @@ func refreshUmaToken(
 	idpClient *gocloak.GoCloak,
 	realm string,
 	targetPath string,
-	user *UserContext,
+	user *models.UserContext,
 	methodScope *string,
-) (*UserContext, error) {
+) (*models.UserContext, error) {
 	tok, err := getRPT(
 		ctx,
 		pat,
@@ -779,7 +781,7 @@ func refreshUmaToken(
 		return nil, err
 	}
 
-	umaUser, err := ExtractIdentity(token)
+	umaUser, err := session.ExtractIdentity(token)
 	if err != nil {
 		return nil, err
 	}
