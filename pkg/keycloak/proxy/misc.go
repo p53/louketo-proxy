@@ -44,33 +44,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// filterCookies is responsible for censoring any cookies we don't want sent
-func filterCookies(req *http.Request, filter []string) error {
-	// @NOTE: there doesn't appear to be a way of removing a cookie from the http.Request as
-	// AddCookie() just append
-	cookies := req.Cookies()
-	// @step: empty the current cookies
-	req.Header.Set("Cookie", "")
-	// @step: iterate the cookies and filter out anything we
-	for _, cookie := range cookies {
-		var found bool
-		// @step: does this cookie match our filter?
-		for _, n := range filter {
-			if strings.HasPrefix(cookie.Name, n) {
-				req.AddCookie(&http.Cookie{Name: cookie.Name, Value: "censored"})
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			req.AddCookie(cookie)
-		}
-	}
-
-	return nil
-}
-
 // revokeProxy is responsible for stopping middleware from proxying the request
 func revokeProxy(logger *zap.Logger, req *http.Request) context.Context {
 	var scope *models.RequestScope
