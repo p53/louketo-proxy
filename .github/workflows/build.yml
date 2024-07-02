@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["2"]
+        go: ["1.22"]
     steps:
       - uses: actions/setup-go@v5
         with:
