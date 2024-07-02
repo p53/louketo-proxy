@@ -610,13 +610,9 @@ func loginHandler(
 		}()
 
 		if err != nil {
-			clientIP := utils.RealIP(req)
-			scope.Logger.Debug(
-				"login from",
-				zap.String("client_ip", clientIP),
+			scope.Logger.Error(err.Error(),
 				zap.String("remote_addr", req.RemoteAddr),
 			)
-			scope.Logger.Error(err.Error())
 			writer.WriteHeader(code)
 		}
 	}
