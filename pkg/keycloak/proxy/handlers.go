@@ -611,10 +611,12 @@ func loginHandler(
 
 		if err != nil {
 			clientIP := utils.RealIP(req)
-			scope.Logger.Error(err.Error(),
+			scope.Logger.Debug(
+				"login from",
 				zap.String("client_ip", clientIP),
 				zap.String("remote_addr", req.RemoteAddr),
 			)
+			scope.Logger.Error(err.Error())
 			writer.WriteHeader(code)
 		}
 	}
@@ -812,7 +814,7 @@ func logoutHandler(
 			case http.StatusOK:
 				scope.Logger.Info(
 					"successfully logged out of the endpoint",
-					zap.String("email", user.Email),
+					zap.String("userID", user.ID),
 				)
 			default:
 				content, _ := io.ReadAll(response.Body)
