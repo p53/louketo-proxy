@@ -735,7 +735,8 @@ func makeTestCodeFlowLogin(location string, xforwarded bool) (*http.Response, []
 	}
 	// step: get the redirect
 	var resp *http.Response
-	for range 4 {
+	numIter := 4
+	for range numIter {
 		req, err := http.NewRequest(http.MethodGet, location, nil)
 
 		for _, cookie := range flowCookies {
