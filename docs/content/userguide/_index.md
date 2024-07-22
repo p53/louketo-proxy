@@ -1284,6 +1284,13 @@ by enabling `--enable-logging` and `--verbose` options. Also you can use `reques
 and `enable-request-id` options, which will generate unique uuid and will inject in
 header supplied in `request-id-header` option.
 
+## Logs and GDPR
+
+You can enable/disable logging by specifying `--enable-logging` option. This will log all
+messages with info log level and higher. It will NOT log any personal sensitive information, like client IP or user email. When you would like to see debug messages you need to use `--verbose=true` option.
+
+**IMPORTANT**: debug messages WILL contain personal information, for easier debugging
+
 ## Metrics
 
 Assuming `--enable-metrics` has been set, a Prometheus endpoint can be
