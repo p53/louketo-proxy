@@ -35,6 +35,8 @@ import (
 )
 
 // newOauthProxyApp creates a new cli application and runs it
+//
+//nolint:cyclop
 func NewOauthProxyApp[T proxycore.KeycloakProvider | proxycore.GoogleProvider](provider T) *cli.App {
 	cfg := config.ProduceConfig(provider)
 	app := cli.NewApp()
