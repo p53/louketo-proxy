@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"golang.org/x/net/http/httpproxy"
+	"golang.org/x/sync/errgroup"
 
 	"go.uber.org/zap/zapcore"
 
@@ -107,6 +108,7 @@ func NewProxy(config *config.Config, log *zap.Logger, upstream core.ReverseProxy
 		Config:         config,
 		Log:            log,
 		metricsHandler: promhttp.Handler(),
+		pat:            &PAT{},
 	}
 
 	// parse the upstream endpoint
@@ -137,28 +139,6 @@ func NewProxy(config *config.Config, log *zap.Logger, upstream core.ReverseProxy
 	}
 
 	svc.Log.Info("successfully retrieved openid configuration from the discovery")
-
-	if config.EnableUma || config.EnableForwarding {
-		patDone := make(chan bool)
-		svc.pat = &PAT{}
-		go getPAT(
-			log,
-			svc.pat,
-			config.ClientID,
-			config.ClientSecret,
-			config.Realm,
-			config.OpenIDProviderTimeout,
-			config.PatRetryCount,
-			config.PatRetryInterval,
-			config.EnableForwarding,
-			config.ForwardingGrantType,
-			svc.IdpClient,
-			config.ForwardingUsername,
-			config.ForwardingPassword,
-			patDone,
-		)
-		<-patDone
-	}
 
 	if config.SkipTokenVerification {
 		log.Warn(
@@ -223,7 +203,7 @@ func createLogger(config *config.Config) (*zap.Logger, error) {
 }
 
 // useDefaultStack sets the default middleware stack for router
-func (r *OauthProxy) useDefaultStack(engine chi.Router) {
+func (r *OauthProxy) useDefaultStack(engine chi.Router, accessForbidden func(wrt http.ResponseWriter, req *http.Request) context.Context) {
 	engine.NotFound(handlers.EmptyHandler)
 
 	if r.Config.EnableDefaultDeny || r.Config.EnableDefaultDenyStrict {
@@ -255,37 +235,6 @@ func (r *OauthProxy) useDefaultStack(engine chi.Router) {
 		engine.Use(gmiddleware.LoggingMiddleware(r.Log, r.Config.Verbose))
 	}
 
-	// step: load the templates if any
-	tmpl := createTemplates(
-		r.Log,
-		r.Config.SignInPage,
-		r.Config.ForbiddenPage,
-		r.Config.ErrorPage,
-	)
-
-	r.accessForbidden = core.AccessForbidden(
-		r.Log,
-		http.StatusForbidden,
-		r.Config.ForbiddenPage,
-		r.Config.Tags,
-		tmpl,
-	)
-
-	r.accessError = core.AccessForbidden(
-		r.Log,
-		http.StatusBadRequest,
-		r.Config.ErrorPage,
-		r.Config.Tags,
-		tmpl,
-	)
-
-	r.customSignInPage = core.CustomSignInPage(
-		r.Log,
-		r.Config.SignInPage,
-		r.Config.Tags,
-		tmpl,
-	)
-
 	if r.Config.EnableSecurityFilter {
 		engine.Use(
 			gmiddleware.SecurityMiddleware(
@@ -296,7 +245,7 @@ func (r *OauthProxy) useDefaultStack(engine chi.Router) {
 				r.Config.EnableContentNoSniff,
 				r.Config.EnableFrameDeny,
 				r.Config.EnableHTTPSRedirect,
-				r.accessForbidden,
+				accessForbidden,
 			),
 		)
 	}
@@ -317,8 +266,39 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		}
 	}
 
+	// step: load the templates if any
+	tmpl := createTemplates(
+		r.Log,
+		r.Config.SignInPage,
+		r.Config.ForbiddenPage,
+		r.Config.ErrorPage,
+	)
+
+	accessForbidden := core.AccessForbidden(
+		r.Log,
+		http.StatusForbidden,
+		r.Config.ForbiddenPage,
+		r.Config.Tags,
+		tmpl,
+	)
+
+	customSignInPage := core.CustomSignInPage(
+		r.Log,
+		r.Config.SignInPage,
+		r.Config.Tags,
+		tmpl,
+	)
+
+	accessError := core.AccessForbidden(
+		r.Log,
+		http.StatusBadRequest,
+		r.Config.ErrorPage,
+		r.Config.Tags,
+		tmpl,
+	)
+
 	engine := chi.NewRouter()
-	r.useDefaultStack(engine)
+	r.useDefaultStack(engine, accessForbidden)
 
 	WithOAuthURI := utils.WithOAuthURI(r.Config.BaseURI, r.Config.OAuthURI)
 	r.Cm = &cookie.Manager{
@@ -339,7 +319,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		NoRedirects:          r.Config.NoRedirects,
 	}
 
-	r.newOAuth2Config = utils.NewOAuth2Config(
+	newOAuth2Config := utils.NewOAuth2Config(
 		r.Config.ClientID,
 		r.Config.ClientSecret,
 		r.Provider.Endpoint().AuthURL,
@@ -347,7 +327,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Config.Scopes,
 	)
 
-	r.GetIdentity = session.GetIdentity(
+	getIdentity := session.GetIdentity(
 		r.Log,
 		r.Config.SkipAuthorizationHeaderIdentity,
 		r.Config.EnableEncryptedToken,
@@ -355,7 +335,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Config.EncryptionKey,
 	)
 
-	r.getRedirectionURL = handlers.GetRedirectionURL(
+	getRedirectionURL := handlers.GetRedirectionURL(
 		r.Log,
 		r.Config.RedirectionURL,
 		r.Config.NoProxy,
@@ -433,7 +413,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 			constant.MetricsURL,
 			handlers.ProxyMetricsHandler(
 				r.Config.LocalhostMetrics,
-				r.accessForbidden,
+				accessForbidden,
 				r.metricsHandler,
 			),
 		)
@@ -443,7 +423,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Log,
 		r.Config.CookieAccessName,
 		r.Config.CookieRefreshName,
-		r.GetIdentity,
+		getIdentity,
 		r.IdpClient.RestyClient().GetClient(),
 		r.Config.EnableIDPSessionCheck,
 		r.Provider,
@@ -451,7 +431,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Config.ClientID,
 		r.Config.SkipAccessTokenClientIDCheck,
 		r.Config.SkipAccessTokenIssuerCheck,
-		r.accessForbidden,
+		accessForbidden,
 		r.Config.EnableRefreshTokens,
 		r.Config.RedirectionURL,
 		r.Cm,
@@ -459,7 +439,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Config.ForceEncryptedCookie,
 		r.Config.EncryptionKey,
 		redToAuth,
-		r.newOAuth2Config,
+		newOAuth2Config,
 		r.Store,
 		r.Config.AccessTokenDuration,
 	)
@@ -469,8 +449,8 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Config.OpenIDProviderTimeout,
 		r.IdpClient.RestyClient().GetClient(),
 		r.Config.EnableLoginHandler,
-		r.newOAuth2Config,
-		r.getRedirectionURL,
+		newOAuth2Config,
+		getRedirectionURL,
 		r.Config.EnableEncryptedToken,
 		r.Config.ForceEncryptedCookie,
 		r.Config.EncryptionKey,
@@ -499,8 +479,8 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Store,
 		r.Cm,
 		r.IdpClient.RestyClient().GetClient(),
-		r.accessError,
-		r.GetIdentity,
+		accessError,
+		getIdentity,
 	)
 
 	oauthCallbackHand := oauthCallbackHandler(
@@ -526,10 +506,10 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.pat,
 		r.IdpClient,
 		r.Store,
-		r.newOAuth2Config,
-		r.getRedirectionURL,
-		r.accessForbidden,
-		r.accessError,
+		newOAuth2Config,
+		getRedirectionURL,
+		accessForbidden,
+		accessError,
 	)
 
 	oauthAuthorizationHand := oauthAuthorizationHandler(
@@ -539,9 +519,9 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		r.Config.EnablePKCE,
 		r.Config.SignInPage,
 		r.Cm,
-		r.newOAuth2Config,
-		r.getRedirectionURL,
-		r.customSignInPage,
+		newOAuth2Config,
+		getRedirectionURL,
+		customSignInPage,
 		r.Config.AllowedQueryParams,
 		r.Config.DefaultAllowedQueryParams,
 	)
@@ -551,11 +531,11 @@ func (r *OauthProxy) CreateReverseProxy() error {
 		eng.MethodNotAllowed(handlers.MethodNotAllowHandlder)
 		eng.HandleFunc(constant.AuthorizationURL, oauthAuthorizationHand)
 		eng.Get(constant.CallbackURL, oauthCallbackHand)
-		eng.Get(constant.ExpiredURL, handlers.ExpirationHandler(r.GetIdentity, r.Config.CookieAccessName))
+		eng.Get(constant.ExpiredURL, handlers.ExpirationHandler(getIdentity, r.Config.CookieAccessName))
 		eng.With(authMid).Get(constant.LogoutURL, logoutHand)
 		eng.With(authMid).Get(
 			constant.TokenURL,
-			handlers.TokenHandler(r.GetIdentity, r.Config.CookieAccessName, r.accessError),
+			handlers.TokenHandler(getIdentity, r.Config.CookieAccessName, accessError),
 		)
 		eng.Post(constant.LoginURL, loginHand)
 		eng.Get(constant.DiscoveryURL, handlers.DiscoveryHandler(r.Log, WithOAuthURI))
@@ -666,7 +646,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 				r.Log,
 				res,
 				r.Config.MatchClaims,
-				r.accessForbidden,
+				accessForbidden,
 			),
 		}
 
@@ -705,7 +685,7 @@ func (r *OauthProxy) CreateReverseProxy() error {
 
 		if res.URL == constant.AllPath && !res.WhiteListed && enableDefaultDenyStrict {
 			middlewares = []func(http.Handler) http.Handler{
-				gmiddleware.DenyMiddleware(r.Log, r.accessForbidden),
+				gmiddleware.DenyMiddleware(r.Log, accessForbidden),
 				gmiddleware.ProxyDenyMiddleware(r.Log),
 			}
 		}
@@ -735,14 +715,14 @@ func (r *OauthProxy) CreateReverseProxy() error {
 					r.Config.ClientID,
 					r.Config.SkipAccessTokenClientIDCheck,
 					r.Config.SkipAccessTokenIssuerCheck,
-					r.GetIdentity,
-					r.accessForbidden,
+					getIdentity,
+					accessForbidden,
 				),
 				gmiddleware.AdmissionMiddleware(
 					r.Log,
 					res,
 					r.Config.MatchClaims,
-					r.accessForbidden,
+					accessForbidden,
 				),
 			}
 
@@ -921,11 +901,10 @@ func (r *OauthProxy) createForwardingProxy() error {
 // Run starts the proxy service
 //
 //nolint:cyclop
-func (r *OauthProxy) Run() error {
+func (r *OauthProxy) Run() (context.Context, error) {
 	listener, err := r.createHTTPListener(makeListenerConfig(r.Config))
-
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// step: create the main http(s) server
@@ -939,24 +918,52 @@ func (r *OauthProxy) Run() error {
 
 	r.Server = server
 	r.Listener = listener
+	errGroup, ctx := errgroup.WithContext(context.Background())
+	r.ErrGroup = errGroup
+	patDone := make(chan bool)
 
-	go func() {
-		r.Log.Info(
-			"Gatekeeper proxy service starting",
-			zap.String("interface", r.Config.Listen),
-		)
+	if r.Config.EnableUma || r.Config.EnableForwarding {
+		r.ErrGroup.Go(func() error {
+			err := refreshPAT(
+				ctx,
+				r.Log,
+				r.pat,
+				r.Config.ClientID,
+				r.Config.ClientSecret,
+				r.Config.Realm,
+				r.Config.OpenIDProviderTimeout,
+				r.Config.PatRetryCount,
+				r.Config.PatRetryInterval,
+				r.Config.EnableForwarding,
+				r.Config.ForwardingGrantType,
+				r.IdpClient,
+				r.Config.ForwardingUsername,
+				r.Config.ForwardingPassword,
+				patDone,
+			)
+			return err
+		})
+		<-patDone
+	}
 
-		if err = server.Serve(listener); err != nil {
-			if err != http.ErrServerClosed {
-				r.Log.Fatal("failed to start the http service", zap.Error(err))
+	r.ErrGroup.Go(
+		func() error {
+			r.Log.Info(
+				"gatekeeper proxy service starting",
+				zap.String("interface", r.Config.Listen),
+			)
+			if err := server.Serve(listener); err != nil {
+				err = errors.Join(apperrors.ErrStartMainHTTP, err)
+				return err
 			}
-		}
-	}()
+			return nil
+		},
+	)
 
 	// step: are we running http service as well?
 	if r.Config.ListenHTTP != "" {
 		r.Log.Info(
-			"Gatekeeper proxy http service starting",
+			"gatekeeper proxy http service starting",
 			zap.String("interface", r.Config.ListenHTTP),
 		)
 
@@ -964,9 +971,8 @@ func (r *OauthProxy) Run() error {
 			listen:        r.Config.ListenHTTP,
 			proxyProtocol: r.Config.EnableProxyProtocol,
 		})
-
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		httpsvc := &http.Server{
@@ -977,18 +983,21 @@ func (r *OauthProxy) Run() error {
 			IdleTimeout:  r.Config.ServerIdleTimeout,
 		}
 
-		go func() {
+		r.HTTPServer = httpsvc
+		r.ErrGroup.Go(func() error {
 			if err := httpsvc.Serve(httpListener); err != nil {
-				r.Log.Fatal("failed to start the http redirect service", zap.Error(err))
+				err = errors.Join(apperrors.ErrStartRedirectHTTP, err)
+				return err
 			}
-		}()
+			return nil
+		})
 	}
 
 	// step: are we running specific admin service as well?
 	// if not, admin endpoints are added as routes in the main service
 	if r.Config.ListenAdmin != "" {
 		r.Log.Info(
-			"keycloak proxy admin service starting",
+			"gatekeeper proxy admin service starting",
 			zap.String("interface", r.Config.ListenAdmin),
 		)
 
@@ -1003,9 +1012,8 @@ func (r *OauthProxy) Run() error {
 				listen:        r.Config.ListenAdmin,
 				proxyProtocol: r.Config.EnableProxyProtocol,
 			})
-
 			if err != nil {
-				return err
+				return nil, err
 			}
 		} else {
 			adminListenerConfig := makeListenerConfig(r.Config)
@@ -1019,18 +1027,16 @@ func (r *OauthProxy) Run() error {
 				adminListenerConfig.certificate = r.Config.TLSAdminCertificate
 				adminListenerConfig.privateKey = r.Config.TLSAdminPrivateKey
 			}
-
 			if r.Config.TLSAdminCaCertificate != "" {
 				adminListenerConfig.ca = r.Config.TLSAdminCaCertificate
 			}
-
 			if r.Config.TLSAdminClientCertificate != "" {
 				adminListenerConfig.clientCert = r.Config.TLSAdminClientCertificate
 			}
 
 			adminListener, err = r.createHTTPListener(adminListenerConfig)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 
@@ -1042,26 +1048,52 @@ func (r *OauthProxy) Run() error {
 			IdleTimeout:  r.Config.ServerIdleTimeout,
 		}
 
-		go func() {
-			if ers := adminsvc.Serve(adminListener); err != nil {
-				r.Log.Fatal("failed to start the admin service", zap.Error(ers))
+		r.AdminServer = adminsvc
+		r.ErrGroup.Go(func() error {
+			if err := adminsvc.Serve(adminListener); err != nil {
+				err = errors.Join(apperrors.ErrStartAdminHTTP, err)
+				return err
 			}
-		}()
+			return nil
+		})
 	}
 
-	return nil
+	return ctx, nil
 }
 
 // Shutdown finishes the proxy service with gracefully period
 func (r *OauthProxy) Shutdown() error {
-	ctx, cancel := context.WithTimeout(context.Background(), r.Config.ServerGraceTimeout)
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		r.Config.ServerGraceTimeout,
+	)
 	defer cancel()
 
-	err := r.Server.Shutdown(ctx)
-	if err == nil {
-		return nil
+	var err error
+	servers := []*http.Server{
+		r.Server,
+		r.HTTPServer,
+		r.AdminServer,
 	}
-	return r.Server.Close()
+	for idx, srv := range servers {
+		if srv != nil {
+			r.Log.Debug("shutdown http server", zap.Int("num", idx))
+			if errShut := srv.Shutdown(ctx); errShut != nil {
+				if closeErr := srv.Close(); closeErr != nil {
+					err = errors.Join(err, closeErr)
+				}
+			}
+		}
+	}
+
+	r.Log.Debug("waiting for goroutines to finish")
+	if routineErr := r.ErrGroup.Wait(); routineErr != nil {
+		if !errors.Is(routineErr, http.ErrServerClosed) {
+			err = errors.Join(err, routineErr)
+		}
+	}
+
+	return err
 }
 
 // listenerConfig encapsulate listener options
