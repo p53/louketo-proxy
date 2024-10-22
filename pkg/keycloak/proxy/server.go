@@ -660,11 +660,11 @@ func (r *OauthProxy) CreateReverseProxy() error {
 					r.Config.EnablePKCE,
 					r.Config.SignInPage,
 					r.Cm,
-					r.newOAuth2Config,
-					r.getRedirectionURL,
-					r.customSignInPage,
+					newOAuth2Config,
+					getRedirectionURL,
+					customSignInPage,
 					res,
-					r.accessForbidden,
+					accessForbidden,
 				),
 			)
 		}
